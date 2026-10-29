@@ -386,7 +386,9 @@ class CatalogRepositoryImpl @Inject constructor(
      * que no sabrían qué archivo elegir).
      */
     private suspend fun scraperStreams(p: SourceProvider, item: CatalogItem, streamId: String): List<StreamSource> {
-        if (settings.debridService.first().viaTorrentio) return emptyList()
+        // Los buscadores propios dan infoHash: vale Real-Debrid o AllDebrid, que resuelven con su API.
+        val debrid = settings.debridService.first()
+        if (debrid != DebridService.REAL_DEBRID && debrid != DebridService.ALLDEBRID) return emptyList()
         val parts = streamId.split(':')
         val season = parts.getOrNull(1)?.toIntOrNull()
         val episode = parts.getOrNull(2)?.toIntOrNull()
@@ -587,7 +589,10 @@ class CatalogRepositoryImpl @Inject constructor(
         val debrid = settings.debridService.first()
         val base = checkNotNull(p.baseUrl)
         // "Castellano primero": Torrentio también pone delante las releases en español (opción "language").
-        val language = if (settings.spanishFirst.first()) "language=spanish" else null
+        // Peerflix usa el código ISO de la configuración de Torrentio; Torrentio, la abreviatura.
+        val language = if (settings.spanishFirst.first()) {
+            if (p == SourceProvider.PEERFLIX) "language=es-ES" else "language=spanish"
+        } else null
         if (!debrid.viaTorrentio) {
             // Real-Debrid: el buscador sin clave (solo infoHash); la resolución es local con la API de RD.
             val streams = when {
@@ -604,7 +609,14 @@ class CatalogRepositoryImpl @Inject constructor(
             ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
         val config = listOfNotNull(language, torrentioConfig(debrid, key)).joinToString("|")
         val streams = if (p == SourceProvider.TORRENTIO) torrentio.streamsWithConfig(config, type, streamId).streams
-        else torrentio.streamsAt("$base/$config/stream/$type/$streamId.json").streams
+        else {
+            val res = torrentio.streamsAt("$base/$config/stream/$type/$streamId.json").streams
+            if (res.isEmpty() && language != null) {
+                // Fallback sin filtro de idioma por si el tracker no tenía la etiqueta es-ES
+                val fallbackConfig = torrentioConfig(debrid, key)
+                torrentio.streamsAt("$base/$fallbackConfig/stream/$type/$streamId.json").streams
+            } else res
+        }
         val sources = streams.mapNotNull { it.toDebridSource(item, debrid) }
         if (sources.isEmpty()) {
             streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, debrid.title)) }
@@ -612,14 +624,14 @@ class CatalogRepositoryImpl @Inject constructor(
         return sources
     }
 
-    /** Fuente de Torrentio con debrid: hash y fileIdx salen del enlace /resolve/; "[TB+]" = está en la caché. */
+    /** Fuente de Torrentio o Peerflix con debrid: hash y fileIdx salen del enlace; "[TB+]" o "[AD+]" = está en la caché. */
     private fun TorrentioStreamDto.toDebridSource(item: CatalogItem, debrid: DebridService): StreamSource? {
-        val link = url?.takeIf { it.contains("/resolve/") } ?: return null
+        val link = url?.takeIf { it.startsWith("http") } ?: return null
         val (hash, idx) = parseResolveUrl(link) ?: return null
         return copy(infoHash = hash, fileIdx = fileIdx ?: idx).toStreamSource(item)?.copy(
             resolveUrl = link,
             debrid = debrid.title,
-            isCached = name.startsWith("[${debrid.shortName}+]"),
+            isCached = name.startsWith("[${debrid.shortName}+]") || name.contains("⚡") || name.contains("+]"),
         )
     }
 

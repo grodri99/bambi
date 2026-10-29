@@ -63,10 +63,10 @@ enum class SourceProvider(val title: String, val baseUrl: String?, val torrentio
     TORRENTIO("Torrentio", "https://torrentio.strem.fun", true),
     /**
      * Addon de Stremio en español: DonTorrent, MejorTorrent, Wolfmax4k… (castellano de verdad) y algo en inglés.
-     * Ahora responde en addon.peerflix.mov (26-oct-2026; el 24-oct no). Sin clave: da infoHash y se resuelve con
-     * Real-Debrid en la Shield, como Torrentio. Con otros debrids no (su configuración no es la de Torrentio).
+     * Ahora responde en addon.peerflix.mov (26-oct-2026; el 24-oct no). Acepta configuración en la ruta como
+     * Torrentio (`language=es-ES`, `<servicio>=CLAVE`), así que vale con Real-Debrid y con AllDebrid.
      */
-    PEERFLIX("Peerflix", "https://addon.peerflix.mov", false),
+    PEERFLIX("Peerflix", "https://addon.peerflix.mov", true),
     // KnightCrawler (ElfHosted) y ThePirateBay+ se probaron en la Shield (24-oct-2026) y no responden como addon
     // (HTML, dominio inexistente): fuera. Cualquier otro va por el addon propio.
     /** Buscadores propios de Bambi (como los scrapers de Kodi): consultan la web directamente. Solo Real-Debrid. */

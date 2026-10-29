@@ -1,6 +1,7 @@
 package com.shieldstream.tv.network.di
 
 import com.shieldstream.tv.model.Lang
+import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
@@ -22,6 +23,7 @@ import javax.inject.Singleton
 
 object ApiConfig {
     const val REAL_DEBRID_BASE_URL = "https://api.real-debrid.com/"
+    const val ALL_DEBRID_BASE_URL = "https://api.alldebrid.com/"
     const val TORRENTIO_BASE_URL = "https://torrentio.strem.fun/"
     const val TMDB_BASE_URL = "https://api.themoviedb.org/"
     // La clave de TMDB ya no va en el código: se guarda cifrada en el dispositivo y se cambia en Ajustes
@@ -59,6 +61,11 @@ object NetworkModule {
     @Singleton
     fun provideRealDebridApi(client: OkHttpClient, json: Json): RealDebridApi =
         buildRetrofit(ApiConfig.REAL_DEBRID_BASE_URL, client, json).create(RealDebridApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAllDebridApi(client: OkHttpClient, json: Json): AllDebridApi =
+        buildRetrofit(ApiConfig.ALL_DEBRID_BASE_URL, client, json).create(AllDebridApi::class.java)
 
     @Provides
     @Singleton

@@ -8,6 +8,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
@@ -29,6 +30,8 @@ import kotlinx.coroutines.withContext
 class ResolveStreamUseCase(
     private val realDebrid: RealDebridRepository,
     private val torrentio: TorrentioLinkResolver,
+    private val allDebrid: AllDebridRepository,
+    private val settings: SettingsRepository,
 ) {
     operator fun invoke(source: StreamSource): Flow<ResolveState> = flow {
         source.directUrl?.let {
@@ -44,6 +47,13 @@ class ResolveStreamUseCase(
                 is DebridLink.Ready -> emit(ResolveState.Ready(link.url))
                 is DebridLink.Problem -> emit(ResolveState.Failed(link.message, notCached = link.notCached))
             }
+            return@flow
+        }
+
+        // AllDebrid: su API propia (Torrentio no resuelve los buscadores propios con este servicio).
+        if (settings.debridService.first() == DebridService.ALLDEBRID) {
+            emit(ResolveState.Progress(tr("Añadiendo a AllDebrid…", "Adding to AllDebrid…")))
+            emit(ResolveState.Ready(allDebrid.resolveMagnet(source)))
             return@flow
         }
 

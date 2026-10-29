@@ -661,10 +661,10 @@ private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: ()
 
 private fun providerNote(p: SourceProvider): String = when (p) {
     SourceProvider.TORRENTIO -> tr("El buscador principal, como en Stremio.", "The main finder, like in Stremio.")
-    SourceProvider.PEERFLIX -> tr("Torrents en castellano de webs españolas (DonTorrent, MejorTorrent, Wolfmax4k…) y algunos en inglés. Solo con Real-Debrid.", "Spanish torrents from Spanish sites (DonTorrent, MejorTorrent, Wolfmax4k…) plus some in English. Real-Debrid only.")
-    SourceProvider.KNABEN -> tr("Buscadores propios de Bambi, juntos: The Pirate Bay, Knaben (1337x, Nyaa…), Nyaa (anime) y Comet. Solo con Real-Debrid.", "Bambi's own finders together: The Pirate Bay, Knaben (1337x, Nyaa…), Nyaa (anime) and Comet. Real-Debrid only.")
-    SourceProvider.THEPIRATEBAY -> tr("Buscadores propios de Bambi, juntos: The Pirate Bay, Knaben (1337x, Nyaa…), Nyaa (anime) y Comet. Solo con Real-Debrid.", "Bambi's own finders together: The Pirate Bay, Knaben (1337x, Nyaa…), Nyaa (anime) and Comet. Real-Debrid only.")
-    SourceProvider.NYAA -> tr("Buscador propio de anime (CocoScrapers). Solo con Real-Debrid.", "Own anime finder (CocoScrapers). Real-Debrid only.")
+    SourceProvider.PEERFLIX -> tr("Torrents en castellano de webs españolas (DonTorrent, MejorTorrent, Wolfmax4k…) y algunos en inglés.", "Spanish torrents from Spanish sites (DonTorrent, MejorTorrent, Wolfmax4k…) plus some in English.")
+    SourceProvider.KNABEN,
+    SourceProvider.THEPIRATEBAY -> tr("Buscadores propios de Bambi: The Pirate Bay, Knaben y Nyaa (Real-Debrid y AllDebrid).", "Bambi's own finders: The Pirate Bay, Knaben and Nyaa (Real-Debrid and AllDebrid).")
+    SourceProvider.NYAA -> tr("Buscador propio de anime (CocoScrapers).", "Own anime finder (CocoScrapers).")
     SourceProvider.COMET -> tr("Comet con tu token de Real-Debrid (se envía a comet.elfhosted.com, como en Umbrella).", "Comet with your Real-Debrid token (sent to comet.elfhosted.com, like Umbrella).")
     SourceProvider.AIOSTREAMS -> tr("Cualquier addon de Stremio (AIOStreams, Comet, MediaFusion…). Pega la URL de su manifiesto en Otros servicios → Addon de Stremio.", "Any Stremio addon (AIOStreams, Comet, MediaFusion…). Paste its manifest URL in Other services → Stremio addon.")
 }

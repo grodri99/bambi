@@ -1,9 +1,11 @@
 package com.shieldstream.tv.data.di
 
+import com.shieldstream.tv.data.repository.AllDebridRepositoryImpl
 import com.shieldstream.tv.data.repository.ApiKeysRepositoryImpl
 import com.shieldstream.tv.data.repository.TorrentioLinkResolverImpl
 import com.shieldstream.tv.domain.TorrentioLinkResolver
 import com.shieldstream.tv.data.repository.CatalogRepositoryImpl
+import com.shieldstream.tv.domain.AllDebridRepository
 import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.data.repository.RealDebridRepositoryImpl
 import com.shieldstream.tv.data.repository.SettingsRepositoryImpl
@@ -49,6 +51,10 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindRealDebridRepository(impl: RealDebridRepositoryImpl): RealDebridRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAllDebridRepository(impl: AllDebridRepositoryImpl): AllDebridRepository
 
     @Binds
     @Singleton
