@@ -2,7 +2,6 @@ package com.shieldstream.tv.home
 
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.tr
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.ColumnScope
@@ -79,6 +78,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.shouldLoop
 import com.shieldstream.tv.ui.theme.DisplayFont
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
@@ -474,15 +474,18 @@ private fun CatalogRowView(
 private fun HeroBackdrop(item: CatalogItem) {
     Box(Modifier.fillMaxSize()) {
         val area = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.74f).fillMaxHeight(0.70f)
-        Crossfade(targetState = item.backdropUrl, animationSpec = tween(450), label = "heroBackdrop", modifier = area) { url ->
-            if (url != null) {
-                AsyncImage(
-                    model = url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+        val backdropUrl = if (LocalLightweightUi.current) {
+            item.backdropUrl?.replace("/w1280/", "/w780/")
+        } else {
+            item.backdropUrl
+        }
+        if (backdropUrl != null) {
+            AsyncImage(
+                model = backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = area,
+            )
         }
         Box(
             area.background(

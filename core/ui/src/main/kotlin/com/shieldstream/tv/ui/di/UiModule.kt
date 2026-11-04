@@ -18,7 +18,8 @@ object UiModule {
     @Singleton
     fun provideImageLoader(@ApplicationContext context: Context): ImageLoader =
         ImageLoader.Builder(context)
-            .crossfade(true)
+            // Fading every poster/backdrop adds animation and compositing work on low-power TV boxes.
+            .crossfade(false)
             .diskCache(
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("image_cache"))

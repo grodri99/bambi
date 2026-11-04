@@ -4,6 +4,7 @@ import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.AppLanguage
 import android.content.Context
+import android.os.Build
 import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.domain.CatalogProvider
 import com.shieldstream.tv.domain.DebridService
@@ -27,8 +28,23 @@ class SettingsRepositoryImpl @Inject constructor(
         runCatching { CatalogProvider.valueOf(prefs.getString(KEY_PROVIDER, null) ?: "") }
             .getOrDefault(CatalogProvider.COMBINED),
     )
-    private val maxBufferFlow = MutableStateFlow(prefs.getInt(KEY_BUFFER, DEFAULT_BUFFER))
+    private val maxBufferFlow = MutableStateFlow(
+        prefs.getInt(
+            KEY_BUFFER,
+            if (Build.MODEL.equals("Nokia_Streaming_Box_8010", ignoreCase = true)) 40 else DEFAULT_BUFFER,
+        ),
+    )
     private val seekThumbnailsFlow = MutableStateFlow(prefs.getBoolean(KEY_SEEK_THUMBNAILS, true))
+    private val lightweightUiFlow = MutableStateFlow(
+        prefs.getBoolean(KEY_LIGHTWEIGHT_UI, Build.MODEL.equals("Nokia_Streaming_Box_8010", ignoreCase = true)),
+    )
+    override val lightweightUi: Flow<Boolean> = lightweightUiFlow
+    override val lightweightUiEnabled: Boolean get() = lightweightUiFlow.value
+
+    override suspend fun setLightweightUi(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_LIGHTWEIGHT_UI, enabled).apply()
+        lightweightUiFlow.value = enabled
+    }
     private val spanishFirstFlow = MutableStateFlow(prefs.getBoolean(KEY_SPANISH_FIRST, !Lang.isEnglish))
     override val spanishFirst: Flow<Boolean> = spanishFirstFlow
 
@@ -127,6 +143,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_PROVIDER = "catalog_provider"
         const val KEY_BUFFER = "max_buffer_seconds"
         const val KEY_SEEK_THUMBNAILS = "seek_thumbnails"
+        const val KEY_LIGHTWEIGHT_UI = "lightweight_ui"
         const val KEY_SPANISH_FIRST = "spanish_first"
         const val KEY_HIDDEN_CATEGORIES = "hidden_categories"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
@@ -135,7 +152,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_DEBRID = "debrid_service"
         const val KEY_PROVIDERS_OFF = "source_providers_off"
         const val DEFAULT_BUFFER = 80
-        const val MIN_BUFFER = 50
+        const val MIN_BUFFER = 20
         const val MAX_BUFFER = 100
     }
 }

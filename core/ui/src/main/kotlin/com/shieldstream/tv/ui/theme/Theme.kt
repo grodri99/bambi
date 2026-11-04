@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 private val DarkColors = darkColorScheme(
@@ -15,6 +16,9 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF1A1A1D),
     onSurface = Color.White,
 )
+
+/** Reduces image and animation work on low-power TV boxes. Provided by MainActivity. */
+val LocalLightweightUi = staticCompositionLocalOf { false }
 
 @Composable
 fun ShieldStreamTheme(

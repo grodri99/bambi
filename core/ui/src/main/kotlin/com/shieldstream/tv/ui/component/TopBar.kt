@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.res.painterResource
 import com.shieldstream.tv.ui.R
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -122,7 +123,11 @@ fun TopBar(
 @Composable
 private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.12f else 1f, label = "profileScale")
+    val scale = if (LocalLightweightUi.current) {
+        if (focused) 1.12f else 1f
+    } else {
+        animateFloatAsState(if (focused) 1.12f else 1f, label = "profileScale").value
+    }
     Box(
         Modifier
             .graphicsLayer {
@@ -151,7 +156,11 @@ private fun TopBarItem(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "topBarScale")
+    val scale = if (LocalLightweightUi.current) {
+        if (focused) 1.06f else 1f
+    } else {
+        animateFloatAsState(if (focused) 1.06f else 1f, label = "topBarScale").value
+    }
     val background = when {
         focused -> Color.White
         selected -> Color.White.copy(alpha = 0.18f)

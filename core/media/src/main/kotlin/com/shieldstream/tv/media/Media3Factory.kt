@@ -69,19 +69,19 @@ class Media3Factory @Inject constructor(
             )
         }
 
-        val maxBufferMs = maxBufferSeconds.coerceIn(50, 100) * 1000
+        val lowMemory = maxBufferSeconds <= 40
+        val maxBufferMs = maxBufferSeconds.coerceIn(20, 100) * 1000
+        val minBufferMs = minOf(if (lowMemory) 20_000 else 50_000, maxBufferMs)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs */ 50_000,
+                /* minBufferMs */ minBufferMs,
                 /* maxBufferMs */ maxBufferMs,
-                /* bufferForPlaybackMs */ 5_000,
-                /* bufferForPlaybackAfterRebufferMs */ 10_000,
+                /* bufferForPlaybackMs */ if (lowMemory) 3_000 else 5_000,
+                /* bufferForPlaybackAfterRebufferMs */ if (lowMemory) 5_000 else 10_000,
             )
-            .setBackBuffer(/* durationMs */ 15_000, /* retainAfterEnd */ false)
-            // Tope en MB: el búfer vive en la memoria Java de la app. Sin tope, un 4K remux llenaba ~180 MB y, con las
-            // miniaturas, se pasaba del límite (OutOfMemoryError: vídeo congelado o cierre). Con bitrates normales
-            // se siguen cumpliendo los segundos de Ajustes; en remux 4K manda este tope.
-            .setTargetBufferBytes(112 * 1024 * 1024)
+            .setBackBuffer(/* durationMs */ if (lowMemory) 5_000 else 15_000, /* retainAfterEnd */ false)
+            // Low buffer presets also cap Java heap usage more tightly on smaller TV boxes.
+            .setTargetBufferBytes((if (lowMemory) 64 else 112) * 1024 * 1024)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 

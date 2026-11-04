@@ -13,9 +13,14 @@ interface SettingsRepository {
     val catalogProvider: Flow<CatalogProvider>
     suspend fun setCatalogProvider(provider: CatalogProvider)
 
-    /** Máximo buffer del reproductor en segundos (50..100). */
+    /** Máximo buffer del reproductor en segundos (20..100). */
     val maxBufferSeconds: Flow<Int>
     suspend fun setMaxBufferSeconds(seconds: Int)
+
+    /** Interfaz ligera: fondos más pequeños y menos animaciones para TV boxes de baja potencia. */
+    val lightweightUi: Flow<Boolean>
+    val lightweightUiEnabled: Boolean
+    suspend fun setLightweightUi(enabled: Boolean)
 
     /** ◀▶ en el reproductor: true = búsqueda con miniaturas; false = saltos directos de 10 s (como antes). */
     val seekThumbnails: Flow<Boolean>

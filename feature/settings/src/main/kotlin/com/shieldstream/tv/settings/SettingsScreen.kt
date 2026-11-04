@@ -226,6 +226,7 @@ private fun SettingsList(
             item { SpanishFirstCard() }
             item { SectionTitle(tr("Inicio", "Home")) }
             item { HomeCategoriesCard() }
+            item { LightweightModeCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(tr("Reproducción", "Playback")) }
@@ -507,6 +508,50 @@ private fun SpanishFirstCard(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
+/** Reduce image decoding, background changes and focus animations on low-power TV boxes. */
+@Composable
+private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.lightweightUi.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.setLightweightUi(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.setLightweightUi(true); true }
+                Key.DirectionRight -> { viewModel.setLightweightUi(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tr("Interfaz ligera", "Lightweight UI"),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    tr(
+                        "Fondos más pequeños, sin rotación automática ni animaciones de foco. Para TV boxes de baja potencia.",
+                        "Smaller backdrops, no automatic rotation or focus animations. For low-power TV boxes.",
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(tr("Sí", "On"), selected = enabled)
+                SegmentOption(tr("No", "Off"), selected = !enabled)
+            }
+        }
+    }
+}
+
 /** Series: "Siguiente episodio" en los créditos y paso automático al terminar. ◀ = Sí, ▶ = No, OK cambia. */
 @Composable
 private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
@@ -708,7 +753,17 @@ private fun BufferCard(seconds: Int, onChange: (Int) -> Unit) {
                     color = Color.White,
                 )
                 Text(
-                    tr("Segundos de vídeo que se cargan por adelantado. Más búfer aguanta mejor los cortes de conexión.", "Seconds of video loaded ahead. A bigger buffer copes better with connection drops."),
+                    if (seconds <= 40) {
+                        tr(
+                            "Modo ligero: búfer trasero de 5 s, hasta 64 MB y arranque más rápido. ◀ ▶ para elegir los segundos.",
+                            "Lightweight: 5 s back buffer, up to 64 MB and faster startup. Use ◀ ▶ to adjust seconds.",
+                        )
+                    } else {
+                        tr(
+                            "Segundos de vídeo que se cargan por adelantado. ◀ ▶ para ajustar; más búfer aguanta mejor los cortes.",
+                            "Seconds of video buffered ahead. Use ◀ ▶ to adjust; a larger buffer tolerates network interruptions better.",
+                        )
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
@@ -919,5 +974,5 @@ private fun KeyEditorDialog(
     }
 }
 
-private const val MIN_BUFFER = 50
+private const val MIN_BUFFER = 20
 private const val MAX_BUFFER = 100

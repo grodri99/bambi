@@ -118,6 +118,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** Interfaz ligera para TV boxes de baja potencia. */
+    val lightweightUi: StateFlow<Boolean> =
+        settings.lightweightUi.stateIn(viewModelScope, SharingStarted.Eagerly, settings.lightweightUiEnabled)
+
+    fun setLightweightUi(enabled: Boolean) {
+        viewModelScope.launch { settings.setLightweightUi(enabled) }
+    }
+
     /** Buscadores de fuentes activados (se pinta aparte del resto del estado). */
     val providers: StateFlow<Set<SourceProvider>> =
         settings.sourceProviders.stateIn(viewModelScope, SharingStarted.Eagerly, SourceProvider.entries.toSet())

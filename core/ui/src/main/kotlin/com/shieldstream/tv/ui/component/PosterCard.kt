@@ -1,6 +1,5 @@
 package com.shieldstream.tv.ui.component
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -60,7 +59,7 @@ fun PosterCard(
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, label = "posterScale")
+    val scale = if (focused) 1.1f else 1f
 
     Box(
         modifier = modifier

@@ -27,13 +27,12 @@ fun loopStartIndex(size: Int): Int {
 fun firstVirtualIndex(size: Int): Int = if (shouldLoop(size)) loopStartIndex(size) else 0
 
 @Composable
-// Fluidez en vertical: cuando la lista de filas prepara por adelantado la fila siguiente, se montan también sus
-// primeras 7 tarjetas (por defecto solo 2), así al bajar con el botón pulsado la fila ya está lista al entrar.
+// Prefetch only the next couple of nested cards: seven causes excessive composition and image work on low-power boxes.
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun rememberLoopingRowState(size: Int): LazyListState =
     rememberLazyListState(
         initialFirstVisibleItemIndex = firstVirtualIndex(size),
-        prefetchStrategy = androidx.compose.foundation.lazy.LazyListPrefetchStrategy(nestedPrefetchItemCount = 7),
+        prefetchStrategy = androidx.compose.foundation.lazy.LazyListPrefetchStrategy(nestedPrefetchItemCount = 2),
     )
 
 /** [content] recibe (posición virtual, índice real, elemento). */

@@ -69,6 +69,7 @@ import com.shieldstream.tv.ui.component.loopingItems
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.tvClickable
 import com.shieldstream.tv.ui.theme.DisplayFont
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -90,8 +91,9 @@ internal fun FeaturedCarousel(
     if (index >= items.size) index = 0
     var focused by remember { mutableStateOf(false) }
     // Cambiar de destacado a mano reinicia la cuenta (el efecto depende de index).
-    LaunchedEffect(index, items.size) {
-        if (items.size > 1) {
+    val lightweightUi = LocalLightweightUi.current
+    LaunchedEffect(index, items.size, lightweightUi) {
+        if (!lightweightUi && items.size > 1) {
             delay(10_000)
             index = (index + 1) % items.size
         }
@@ -120,8 +122,12 @@ internal fun FeaturedCarousel(
             }
             .tvClickable { onOpen(current.item) },
     ) {
-        Crossfade(targetState = current, animationSpec = tween(500), label = "featured") { featured ->
-            FeaturedSlide(featured)
+        if (lightweightUi) {
+            FeaturedSlide(current)
+        } else {
+            Crossfade(targetState = current, animationSpec = tween(500), label = "featured") { featured ->
+                FeaturedSlide(featured)
+            }
         }
         if (items.size > 1) {
             Row(
@@ -145,9 +151,14 @@ internal fun FeaturedCarousel(
 @Composable
 private fun FeaturedSlide(featured: FeaturedItem) {
     val item = featured.item
+    val backdropUrl = if (LocalLightweightUi.current) {
+        item.backdropUrl?.replace("/w1280/", "/w780/")
+    } else {
+        item.backdropUrl
+    }
     Box(Modifier.fillMaxSize().background(Color(0xFF111114))) {
         AsyncImage(
-            model = item.backdropUrl,
+            model = backdropUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
@@ -347,7 +358,11 @@ private fun CategoryChip(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.07f else 1f, label = "chipScale")
+    val scale = if (LocalLightweightUi.current) {
+        if (focused) 1.07f else 1f
+    } else {
+        animateFloatAsState(if (focused) 1.07f else 1f, label = "chipScale").value
+    }
     val shape = RoundedCornerShape(10.dp)
     Box(
         contentAlignment = Alignment.Center,
