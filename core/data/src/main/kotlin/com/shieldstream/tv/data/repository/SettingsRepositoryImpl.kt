@@ -71,10 +71,13 @@ class SettingsRepositoryImpl @Inject constructor(
     override val debridService: Flow<DebridService> = debridFlow
 
     // Se guardan los DESACTIVADOS: así un buscador nuevo (actualización) sale activado sin tocar nada.
-    // (Antes se guardaban los activados y los nuevos quedaban apagados.)
+    // Comet es la excepción: requiere enviar el token de Real-Debrid a un tercero y debe ser opt-in.
+    // Si el usuario ya lo activó expresamente, su elección guardada se respeta.
     private val providersFlow = MutableStateFlow(
-        SourceProvider.entries.toSet() - prefs.getStringSet(KEY_PROVIDERS_OFF, emptySet()).orEmpty()
-            .mapNotNull { n -> SourceProvider.entries.firstOrNull { it.name == n } }.toSet(),
+        SourceProvider.entries.toSet() -
+            (if (prefs.contains(KEY_PROVIDERS_OFF)) emptySet() else setOf(SourceProvider.COMET)) -
+            prefs.getStringSet(KEY_PROVIDERS_OFF, emptySet()).orEmpty()
+                .mapNotNull { n -> SourceProvider.entries.firstOrNull { it.name == n } }.toSet(),
     )
     override val sourceProviders: Flow<Set<SourceProvider>> = providersFlow
 
