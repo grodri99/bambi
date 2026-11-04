@@ -84,9 +84,9 @@ enum class SourceProvider(val title: String, val baseUrl: String?, val torrentio
     AIOSTREAMS(tr("Addon de Stremio", "Stremio addon"), null, false),
     ;
 
-    /** Sección en Fuentes y en Ajustes: los buscadores propios van todos juntos bajo "The Pirate Bay". */
+    /** Sección en Fuentes y en Ajustes. Comet va aparte para exigir su activación expresa. */
     val section: String get() = when (this) {
-        TORRENTIO, PEERFLIX, AIOSTREAMS -> title
+        TORRENTIO, PEERFLIX, COMET, AIOSTREAMS -> title
         else -> "The Pirate Bay"
     }
 }
