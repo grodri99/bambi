@@ -365,9 +365,10 @@ class CatalogRepositoryImpl @Inject constructor(
             SourceProvider.AIOSTREAMS -> coroutineScope {
                 val bases = aioStreamBases(store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).orEmpty())
                 bases.map { base ->
+                    val label = addonLabel(base, bases.size)
                     async {
-                        runCatching { aioStreams(base, item, type, streamId, label = addonLabel(base, bases.size)) }
-                            .onFailure { Log.w("Catalog", "Addon ${base.take(40)} falló: ${it.message}") }
+                        runCatching { aioStreams(base, item, type, streamId, label = label) }
+                            .onFailure { Log.w("Catalog", "Addon $label falló (${it.javaClass.simpleName})") }
                             .getOrDefault(emptyList())
                     }
                 }.awaitAll().flatten()

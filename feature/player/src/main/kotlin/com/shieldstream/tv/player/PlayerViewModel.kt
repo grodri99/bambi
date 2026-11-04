@@ -241,7 +241,7 @@ class PlayerViewModel @Inject constructor(
                         slateChecked = false
                         spanishChecked = false
                         // Diagnóstico: en packs de temporada el enlace del debrid acaba en el archivo elegido.
-                        Log.i("PlayerVM", "Fuente ${index + 1}/${queue.size}: ${java.net.URLDecoder.decode(result.url.substringAfterLast('/'), "UTF-8").take(120)}")
+                        Log.i("PlayerVM", "Fuente ${index + 1}/${queue.size}: ${(source.fileName ?: source.title).take(120)}")
                         playingFileName = source.fileName ?: source.title
                         val resumeAt = savedResumePosition()
                         createAndPlay(result.url, startPositionMs = resumeAt)

@@ -6,6 +6,7 @@ import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.util.Log
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -14,7 +15,6 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
@@ -49,9 +49,14 @@ object NetworkModule {
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .apply {
-            // Registro de peticiones solo en "Bambi (pruebas)": en la release no se imprimen URLs con claves.
             val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-            if (debuggable) addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+            // Solo método, host y código: las rutas y query strings pueden contener claves.
+            if (debuggable) addInterceptor { chain ->
+                val request = chain.request()
+                val response = chain.proceed(request)
+                Log.d("Http", "${request.method} ${request.url.host} -> ${response.code}")
+                response
+            }
         }
         .build()
 
