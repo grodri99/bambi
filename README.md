@@ -283,8 +283,8 @@ Necesitas **JDK 17** y el **Android SDK** (API 35). El decodificador AV1 de Medi
    traktClientId=...
    traktRedirectUri=https://...       # la misma que pusiste al crear la app
 
-   # seedKeys=false → APK sin tus claves (para dárselo a otra persona)
-   # seedKeys=false
+   # seedKeys=true → incluye tus claves en el APK (solo para tu build privado; por defecto no se incluyen)
+   # seedKeys=true
 
    # Firma de la release (si no, usa la clave de depuración)
    releaseStoreFile=keystore/bambi.keystore

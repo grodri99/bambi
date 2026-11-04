@@ -12,9 +12,9 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-// seedKeys=false en local.properties → la app se compila SIN tus claves (APK para otra persona, o para probar la
-// guía de configuración como en una instalación nueva). Por defecto (sin la línea) se incluyen como valores iniciales.
-val seedKeys: Boolean = localProps.getProperty("seedKeys")?.trim()?.lowercase() != "false"
+// seedKeys=true en local.properties → incluye tus claves como valores iniciales (solo para tu APK privado).
+// Por defecto no se incluyen credenciales personales en el APK.
+val seedKeys: Boolean = localProps.getProperty("seedKeys")?.trim()?.lowercase() == "true"
 fun seed(name: String): String = if (seedKeys) localProps.getProperty(name) ?: "" else ""
 val rdToken: String = seed("rdToken")
 // API key gratuita de https://subdl.com (opcional): activa SubDL en "Subtítulos externos".
