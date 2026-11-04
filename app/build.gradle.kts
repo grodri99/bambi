@@ -88,6 +88,17 @@ android {
             isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
         }
+        // Release-like performance testing without touching the stable app or enabling self-updates.
+        // Shares the debug package/data, but is non-debuggable so AGP packages the baseline profile.
+        create("benchmark") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-benchmark"
+            manifestPlaceholders["appLabel"] = "Bambi (benchmark)"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
     }
 }
 
