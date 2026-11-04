@@ -12,7 +12,7 @@ y una interfaz pensada para el mando: perfiles, "Seguir viendo" sincronizado con
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-TV-4285F4?logo=jetpackcompose&logoColor=white)
 ![Media3](https://img.shields.io/badge/Media3-1.6-3DDC84?logo=android&logoColor=white)
-![Version](https://img.shields.io/badge/versi%C3%B3n-1.0.6-E50914)
+![Version](https://img.shields.io/badge/versi%C3%B3n-1.0.7-E50914)
 ![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-blue)
 
 <img src="docs/screenshots/02-inicio.jpg" alt="Inicio de Bambi" width="900" />
