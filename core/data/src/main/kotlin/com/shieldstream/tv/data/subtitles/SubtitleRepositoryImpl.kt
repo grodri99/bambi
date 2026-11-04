@@ -74,7 +74,11 @@ class SubtitleRepositoryImpl @Inject constructor(
                 .build()
             val raw = http.client.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Descarga fallida (HTTP ${response.code})" }
-                response.body?.bytes() ?: error(tr("Respuesta vacía", "Empty response"))
+                val body = response.body ?: error(tr("Respuesta vacía", "Empty response"))
+                check(body.contentLength() <= SubtitleLimits.DOWNLOAD_BYTES) {
+                    tr("El subtítulo descargado es demasiado grande", "The subtitle download is too large")
+                }
+                body.byteStream().use { it.readBounded(SubtitleLimits.DOWNLOAD_BYTES) }
             }
 
             val (bytes, ext) = unpack(raw, query)
@@ -96,11 +100,22 @@ class SubtitleRepositoryImpl @Inject constructor(
     private fun unpack(raw: ByteArray, query: SubtitleQuery): Pair<ByteArray, String> {
         if (raw.size > 4 && raw[0] == 'P'.code.toByte() && raw[1] == 'K'.code.toByte()) {
             val candidates = mutableListOf<Pair<String, ByteArray>>()
+            var entries = 0
+            var totalBytes = 0
             ZipInputStream(ByteArrayInputStream(raw)).use { zip ->
                 generateSequence { zip.nextEntry }.forEach { entry ->
+                    entries++
+                    check(entries <= SubtitleLimits.ARCHIVE_ENTRIES) {
+                        tr("El zip contiene demasiados archivos", "The zip contains too many files")
+                    }
                     val ext = entry.name.substringAfterLast('.', "").lowercase()
                     if (!entry.isDirectory && ext in SUPPORTED_EXTENSIONS) {
-                        candidates += entry.name to zip.readBytes()
+                        val bytes = zip.readBounded(SubtitleLimits.SUBTITLE_BYTES)
+                        totalBytes += bytes.size
+                        check(totalBytes <= SubtitleLimits.ARCHIVE_BYTES) {
+                            tr("Los subtítulos descomprimidos son demasiado grandes", "The decompressed subtitles are too large")
+                        }
+                        candidates += entry.name to bytes
                     }
                 }
             }
@@ -110,7 +125,12 @@ class SubtitleRepositoryImpl @Inject constructor(
             return chosen.second to chosen.first.substringAfterLast('.').lowercase()
         }
         if (raw.size > 2 && raw[0] == 0x1f.toByte() && raw[1] == 0x8b.toByte()) {
-            return GZIPInputStream(ByteArrayInputStream(raw)).use { it.readBytes() } to "srt"
+            return GZIPInputStream(ByteArrayInputStream(raw)).use {
+                it.readBounded(SubtitleLimits.SUBTITLE_BYTES)
+            } to "srt"
+        }
+        check(raw.size <= SubtitleLimits.SUBTITLE_BYTES) {
+            tr("El subtítulo es demasiado grande", "The subtitle is too large")
         }
         return raw to guessExtension(raw)
     }
