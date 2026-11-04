@@ -48,6 +48,12 @@ object ProfilePin {
     fun matches(profile: Profile, pin: String): Boolean = profile.pinHash == null || profile.pinHash == hash(profile.id, pin)
 }
 
+/** PIN que autoriza administrar perfiles. Preferir un perfil adulto; aceptar cualquier PIN como fallback. */
+object ProfileManagement {
+    fun pinProfile(profiles: List<Profile>): Profile? =
+        profiles.firstOrNull { !it.kids && it.locked } ?: profiles.firstOrNull { it.locked }
+}
+
 /** Colores de los avatares: [primero, segundo] del degradado. */
 object ProfileAvatars {
     val colors: List<Pair<Long, Long>> = listOf(

@@ -22,7 +22,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Profile
+import com.shieldstream.tv.model.ProfileManagement
 import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.component.AppIcons
@@ -69,8 +69,25 @@ fun ProfilePickerScreen(
         Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
-    var manage by rememberSaveable { mutableStateOf(false) }
-    // Perfil con PIN: antes de entrar (o de editarlo) se pide el PIN. (perfil, ¿es para editar?)
+    var manage by remember { mutableStateOf(false) }
+    var managementUnlocked by remember { mutableStateOf(false) }
+    var managementAction by remember { mutableStateOf<ManagementAction?>(null) }
+    var managementPinError by remember { mutableStateOf<String?>(null) }
+    val managementPinProfile = ProfileManagement.pinProfile(ready.profiles)
+
+    fun requestManagement(action: ManagementAction) {
+        if (managementPinProfile == null || managementUnlocked) {
+            managementUnlocked = true
+            when (action) {
+                ManagementAction.MANAGE -> manage = true
+                ManagementAction.ADD -> onAdd()
+            }
+        } else {
+            managementPinError = null
+            managementAction = action
+        }
+    }
+    // Perfil con PIN: antes de entrar se pide su PIN. La edición además exige el PIN de administración.
     var pinFor by remember { mutableStateOf<Pair<Profile, Boolean>?>(null) }
     var pinError by remember { mutableStateOf<String?>(null) }
     val activeRequester = remember { FocusRequester() }
@@ -116,7 +133,7 @@ fun ProfilePickerScreen(
                         manage = manage,
                         onClick = {
                             when {
-                                profile.locked -> {
+                                profile.locked && !(manage && managementUnlocked) -> {
                                     pinError = null
                                     pinFor = profile to manage
                                 }
@@ -130,15 +147,46 @@ fun ProfilePickerScreen(
                         modifier = if (profile.id == ready.activeId) Modifier.focusRequester(activeRequester) else Modifier,
                     )
                 }
-                if (ready.canAdd) AddTile(onClick = onAdd)
+                if (ready.canAdd) AddTile(onClick = { requestManagement(ManagementAction.ADD) })
             }
             Spacer(Modifier.height(56.dp))
             TvButton(
                 text = if (manage) tr("Listo", "Done") else tr("Administrar perfiles", "Manage profiles"),
                 icon = if (manage) AppIcons.Check else AppIcons.Edit,
-                onClick = { manage = !manage },
+                onClick = {
+                    if (manage) manage = false else requestManagement(ManagementAction.MANAGE)
+                },
             )
         }
+    }
+
+    managementAction?.let { action ->
+        val profile = managementPinProfile ?: return@let
+        PinDialog(
+            title = tr("PIN de administración", "Management PIN"),
+            subtitle = tr(
+                "Escribe el PIN de ${profile.name} para añadir o editar perfiles",
+                "Enter ${profile.name}'s PIN to add or edit profiles",
+            ),
+            error = managementPinError,
+            onPin = { pin ->
+                if (com.shieldstream.tv.model.ProfilePin.matches(profile, pin)) {
+                    managementUnlocked = true
+                    managementAction = null
+                    managementPinError = null
+                    when (action) {
+                        ManagementAction.MANAGE -> manage = true
+                        ManagementAction.ADD -> onAdd()
+                    }
+                } else {
+                    managementPinError = tr("PIN incorrecto", "Wrong PIN")
+                }
+            },
+            onDismiss = {
+                managementAction = null
+                managementPinError = null
+            },
+        )
     }
 
     pinFor?.let { (profile, forEdit) ->
@@ -167,6 +215,8 @@ fun ProfilePickerScreen(
         )
     }
 }
+
+private enum class ManagementAction { MANAGE, ADD }
 
 // 5 perfiles (o 4 + "Añadir") tienen que caber en los 960 dp de ancho de la Shield.
 private val TileSize = 128.dp
