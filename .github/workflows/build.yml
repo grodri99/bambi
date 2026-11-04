@@ -34,7 +34,7 @@ jobs:
       - run: chmod +x gradlew
 
       - name: Compilar (debug) y pasar los tests
-        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest
+        run: ./gradlew --no-daemon assembleDebug :core:model:test :core:domain:test testDebugUnitTest
 
       - uses: actions/upload-artifact@v4
         with:

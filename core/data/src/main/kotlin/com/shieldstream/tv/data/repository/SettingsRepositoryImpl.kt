@@ -9,6 +9,8 @@ import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.domain.CatalogProvider
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.domain.enabledSourceProviders
+import com.shieldstream.tv.model.DeviceProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,12 +33,12 @@ class SettingsRepositoryImpl @Inject constructor(
     private val maxBufferFlow = MutableStateFlow(
         prefs.getInt(
             KEY_BUFFER,
-            if (Build.MODEL.equals("Nokia_Streaming_Box_8010", ignoreCase = true)) 40 else DEFAULT_BUFFER,
+            DeviceProfile.defaultBufferSeconds(Build.MODEL),
         ),
     )
     private val seekThumbnailsFlow = MutableStateFlow(prefs.getBoolean(KEY_SEEK_THUMBNAILS, true))
     private val lightweightUiFlow = MutableStateFlow(
-        prefs.getBoolean(KEY_LIGHTWEIGHT_UI, Build.MODEL.equals("Nokia_Streaming_Box_8010", ignoreCase = true)),
+        prefs.getBoolean(KEY_LIGHTWEIGHT_UI, DeviceProfile.lightweightUiDefault(Build.MODEL)),
     )
     override val lightweightUi: Flow<Boolean> = lightweightUiFlow
     override val lightweightUiEnabled: Boolean get() = lightweightUiFlow.value
@@ -90,10 +92,10 @@ class SettingsRepositoryImpl @Inject constructor(
     // Comet es la excepción: requiere enviar el token de Real-Debrid a un tercero y debe ser opt-in.
     // Si el usuario ya lo activó expresamente, su elección guardada se respeta.
     private val providersFlow = MutableStateFlow(
-        SourceProvider.entries.toSet() -
-            (if (prefs.contains(KEY_PROVIDERS_OFF)) emptySet() else setOf(SourceProvider.COMET)) -
-            prefs.getStringSet(KEY_PROVIDERS_OFF, emptySet()).orEmpty()
-                .mapNotNull { n -> SourceProvider.entries.firstOrNull { it.name == n } }.toSet(),
+        enabledSourceProviders(
+            prefs.getStringSet(KEY_PROVIDERS_OFF, null)
+                ?.mapNotNull { n -> SourceProvider.entries.firstOrNull { it.name == n } }?.toSet(),
+        ),
     )
     override val sourceProviders: Flow<Set<SourceProvider>> = providersFlow
 
@@ -151,7 +153,6 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_SPANISH_ONLY = "spanish_only_sources"
         const val KEY_DEBRID = "debrid_service"
         const val KEY_PROVIDERS_OFF = "source_providers_off"
-        const val DEFAULT_BUFFER = 80
         const val MIN_BUFFER = 20
         const val MAX_BUFFER = 100
     }

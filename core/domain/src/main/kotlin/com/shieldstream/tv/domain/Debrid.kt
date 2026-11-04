@@ -90,3 +90,9 @@ enum class SourceProvider(val title: String, val baseUrl: String?, val torrentio
         else -> "The Pirate Bay"
     }
 }
+
+/** Defaults de buscadores. null = nunca se guardó una elección; vacío = elección guardada con todo activado. */
+fun enabledSourceProviders(savedProvidersOff: Set<SourceProvider>?): Set<SourceProvider> =
+    SourceProvider.entries.toSet() -
+        (if (savedProvidersOff == null) setOf(SourceProvider.COMET) else emptySet()) -
+        savedProvidersOff.orEmpty()

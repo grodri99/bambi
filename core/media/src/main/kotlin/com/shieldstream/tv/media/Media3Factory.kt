@@ -1,6 +1,7 @@
 package com.shieldstream.tv.media
 
 import com.shieldstream.tv.model.Lang
+import com.shieldstream.tv.model.PlaybackBufferProfile
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.media.MediaFormat
@@ -69,19 +70,17 @@ class Media3Factory @Inject constructor(
             )
         }
 
-        val lowMemory = maxBufferSeconds <= 40
-        val maxBufferMs = maxBufferSeconds.coerceIn(20, 100) * 1000
-        val minBufferMs = minOf(if (lowMemory) 20_000 else 50_000, maxBufferMs)
+        val buffer = PlaybackBufferProfile.forSeconds(maxBufferSeconds)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs */ minBufferMs,
-                /* maxBufferMs */ maxBufferMs,
-                /* bufferForPlaybackMs */ if (lowMemory) 3_000 else 5_000,
-                /* bufferForPlaybackAfterRebufferMs */ if (lowMemory) 5_000 else 10_000,
+                /* minBufferMs */ buffer.minBufferMs,
+                /* maxBufferMs */ buffer.maxBufferMs,
+                /* bufferForPlaybackMs */ buffer.bufferForPlaybackMs,
+                /* bufferForPlaybackAfterRebufferMs */ buffer.bufferForPlaybackAfterRebufferMs,
             )
-            .setBackBuffer(/* durationMs */ if (lowMemory) 5_000 else 15_000, /* retainAfterEnd */ false)
+            .setBackBuffer(/* durationMs */ buffer.backBufferMs, /* retainAfterEnd */ false)
             // Low buffer presets also cap Java heap usage more tightly on smaller TV boxes.
-            .setTargetBufferBytes((if (lowMemory) 64 else 112) * 1024 * 1024)
+            .setTargetBufferBytes(buffer.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 
