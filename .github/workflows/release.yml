@@ -1,0 +1,108 @@
+name: Publicar release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existente a publicar (por ejemplo, v1.0.7)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Comprobar que el tag coincide con versionName
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "El tag debe tener el formato vX.Y.Z: $RELEASE_TAG"
+            exit 1
+          }
+          APP_VERSION=$(awk -F'"' '/versionName = / {print $2; exit}' app/build.gradle.kts)
+          [[ "$APP_VERSION" == "${RELEASE_TAG#v}" ]] || {
+            echo "versionName ($APP_VERSION) no coincide con $RELEASE_TAG"
+            exit 1
+          }
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+
+      - name: Instalar Android SDK 37
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+
+      - name: Preparar firma y configuración local
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          TRAKT_ID: ${{ vars.TRAKT_CLIENT_ID }}
+          TRAKT_URI: ${{ vars.TRAKT_REDIRECT_URI }}
+        run: |
+          : "${KEYSTORE_BASE64:?Falta RELEASE_KEYSTORE_BASE64}"
+          : "${STORE_PASSWORD:?Falta RELEASE_STORE_PASSWORD}"
+          : "${KEY_PASSWORD:?Falta RELEASE_KEY_PASSWORD}"
+          : "${KEY_ALIAS:?Falta RELEASE_KEY_ALIAS}"
+          : "${TRAKT_ID:?Falta la variable TRAKT_CLIENT_ID}"
+          : "${TRAKT_URI:?Falta la variable TRAKT_REDIRECT_URI}"
+          KEYSTORE="$RUNNER_TEMP/keystore/bambi.keystore"
+          mkdir -p "$(dirname "$KEYSTORE")"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          {
+            printf 'sdk.dir=%s\n' "$ANDROID_HOME"
+            printf 'seedKeys=false\n'
+            printf 'releaseStoreFile=%s\n' "$KEYSTORE"
+            printf 'releaseStorePassword=%s\n' "$STORE_PASSWORD"
+            printf 'releaseKeyAlias=%s\n' "$KEY_ALIAS"
+            printf 'releaseKeyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'traktClientId=%s\n' "$TRAKT_ID"
+            printf 'traktRedirectUri=%s\n' "$TRAKT_URI"
+          } > local.properties
+          chmod 600 local.properties "$KEYSTORE"
+
+      - name: Compilar release y ejecutar tests
+        run: ./gradlew --no-daemon :app:assembleRelease :core:model:test :core:domain:test testDebugUnitTest
+
+      - name: Preparar Bambi.apk
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-artifact"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Bambi.apk"
+          test -s "$RUNNER_TEMP/release-artifact/Bambi.apk"
+
+      - name: Publicar GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Bambi.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$RELEASE_TAG" \
+            --generate-notes \
+            --latest \
+            --verify-tag
