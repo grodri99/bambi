@@ -80,6 +80,9 @@ jobs:
           } > local.properties
           chmod 600 local.properties "$KEYSTORE"
 
+      - name: Habilitar Gradle wrapper
+        run: chmod +x gradlew
+
       - name: Compilar release y ejecutar tests
         run: ./gradlew --no-daemon :app:assembleRelease :core:model:test :core:domain:test testDebugUnitTest
 
