@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Credentials must never leave the device through Android backup. -->
+    <exclude domain="sharedpref" path="secure_prefs.xml" />
+    <!-- Also exclude plaintext files left by older versions with the insecure fallback. -->
+    <exclude domain="sharedpref" path="secure_prefs_fallback.xml" />
+</full-backup-content>

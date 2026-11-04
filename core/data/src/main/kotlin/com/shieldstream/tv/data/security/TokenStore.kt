@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 /**
  * Claves y tokens de los servicios (Real-Debrid, TMDB, SubDL), cifrados con AES-256-GCM y la clave
- * maestra en el Android Keystore. Fallback a SharedPreferences plano si el dispositivo no soporta cifrado.
+ * maestra en el Android Keystore. Si el almacenamiento seguro no está disponible, falla en vez de guardar secretos en plano.
  *
  * Se guarda copia en memoria: TMDB lee su clave en cada petición y descifrar cada vez sería tirar CPU.
  */
@@ -20,7 +20,7 @@ import javax.inject.Singleton
 class TokenStore @Inject constructor(
     @ApplicationContext context: Context,
 ) {
-    private val prefs: SharedPreferences = runCatching {
+    private val prefs: SharedPreferences = try {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -31,8 +31,8 @@ class TokenStore @Inject constructor(
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
-    }.getOrElse {
-        context.getSharedPreferences("${PREFS_NAME}_fallback", Context.MODE_PRIVATE)
+    } catch (e: Exception) {
+        throw IllegalStateException("Secure credential storage is unavailable on this device", e)
     }
 
     private val memory = ConcurrentHashMap<String, String>()
