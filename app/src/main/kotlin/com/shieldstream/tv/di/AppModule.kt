@@ -24,7 +24,7 @@ object AppModule {
         AppVersion(
             name = BuildConfig.VERSION_NAME,
             isDebug = BuildConfig.DEBUG || BuildConfig.APPLICATION_ID.endsWith(".debug"),
-            updateRepo = "javiermolinar/bambi",
+            updateRepo = "javiermolinar/franklix",
         )
 
     @Provides

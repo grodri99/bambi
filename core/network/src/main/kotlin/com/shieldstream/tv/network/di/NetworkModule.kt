@@ -1,6 +1,7 @@
 package com.shieldstream.tv.network.di
 
 import com.shieldstream.tv.model.Lang
+import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
@@ -21,6 +22,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 object ApiConfig {
+    const val ALLDEBRID_BASE_URL = "https://api.alldebrid.com/"
     const val REAL_DEBRID_BASE_URL = "https://api.real-debrid.com/"
     const val TORRENTIO_BASE_URL = "https://torrentio.strem.fun/"
     const val TMDB_BASE_URL = "https://api.themoviedb.org/"
@@ -55,6 +57,11 @@ object NetworkModule {
             }
         }
         .build()
+
+    @Provides
+    @Singleton
+    fun provideAllDebridApi(client: OkHttpClient, json: Json): AllDebridApi =
+        buildRetrofit(ApiConfig.ALLDEBRID_BASE_URL, client, json).create(AllDebridApi::class.java)
 
     @Provides
     @Singleton

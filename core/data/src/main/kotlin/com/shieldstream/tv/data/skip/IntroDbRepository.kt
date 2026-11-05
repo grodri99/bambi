@@ -42,7 +42,7 @@ class IntroDbRepository @Inject constructor(
                     .addQueryParameter("season", season.toString())
                     .addQueryParameter("episode", episode.toString())
                     .build()
-                client.newCall(Request.Builder().url(url).header("User-Agent", "Bambi").build()).execute().use { r ->
+                client.newCall(Request.Builder().url(url).header("User-Agent", "Franklix").build()).execute().use { r ->
                     if (r.code == 404) return@use SkipSegments.NONE
                     check(r.isSuccessful) { "IntroDB HTTP ${r.code}" }
                     parse(r.body?.string().orEmpty())

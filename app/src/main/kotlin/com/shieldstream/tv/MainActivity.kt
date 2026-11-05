@@ -11,7 +11,7 @@ import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.UpdateRepository
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
-import com.shieldstream.tv.ui.theme.ShieldStreamTheme
+import com.shieldstream.tv.ui.theme.FranklixTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val lightweightUi by settings.lightweightUi.collectAsState(initial = settings.lightweightUiEnabled)
             CompositionLocalProvider(LocalLightweightUi provides lightweightUi) {
-                ShieldStreamTheme {
+                FranklixTheme {
                     AppNavHost(holder = holder)
                 }
             }

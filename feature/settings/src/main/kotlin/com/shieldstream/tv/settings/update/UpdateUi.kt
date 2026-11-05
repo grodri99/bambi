@@ -93,7 +93,7 @@ fun UpdatePrompt(viewModel: UpdateViewModel = hiltViewModel()) {
                 }
                 is UpdateState.NeedsPermission -> UpdateBody(
                     title = localizedStringResource(StringsR.string.settings_one_permission_needed_first_time_only),
-                    subtitle = localizedStringResource(StringsR.string.settings_android_asks_to_allow_bambi_to_install),
+                    subtitle = localizedStringResource(StringsR.string.settings_android_asks_to_allow_franklix_to_install),
                     update = null,
                 ) {
                     Buttons(
@@ -180,7 +180,7 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
         UpdateState.Unsupported -> localizedStringResource(StringsR.string.settings_updates) to
             localizedStringResource(StringsR.string.settings_the_testing_app_doesn_t_self_update)
         UpdateState.Idle -> localizedStringResource(StringsR.string.settings_check_for_updates) to
-            localizedStringResource(StringsR.string.settings_bambi_checks_for_new_versions_when_it)
+            localizedStringResource(StringsR.string.settings_franklix_checks_for_new_versions_when_it)
         UpdateState.Checking -> localizedStringResource(StringsR.string.settings_checking_for_updates) to ""
         is UpdateState.UpToDate -> localizedStringResource(StringsR.string.settings_you_re_up_to_date) to
             localizedStringResource(StringsR.string.update_latest_version, s.current)
@@ -188,7 +188,7 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
             localizedStringResource(StringsR.string.settings_ok_to_download_and_install_it)
         is UpdateState.Downloading -> localizedStringResource(StringsR.string.update_downloading_version, s.update.version) to "${(s.progress * 100).toInt()} %"
         is UpdateState.NeedsPermission -> localizedStringResource(StringsR.string.settings_install_permission_needed) to
-            localizedStringResource(StringsR.string.settings_ok_opens_the_list_turn_bambi_on)
+            localizedStringResource(StringsR.string.settings_ok_opens_the_list_turn_franklix_on)
         is UpdateState.Installing -> localizedStringResource(StringsR.string.settings_ready_to_install) to
             localizedStringResource(StringsR.string.settings_press_install_in_android_s_window)
         is UpdateState.Failed -> localizedStringResource(StringsR.string.settings_couldn_t_update) to s.message

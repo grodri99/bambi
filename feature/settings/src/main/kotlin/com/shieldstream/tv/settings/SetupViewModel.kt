@@ -168,6 +168,11 @@ class SetupViewModel @Inject constructor(
         }
     }
 
+    fun completeAllDebridConnect() {
+        error.value = null
+        details.update { it + (ApiService.ALLDEBRID to texts.get(StringResources.setup_connected)) }
+    }
+
     fun clearError() {
         error.value = null
     }

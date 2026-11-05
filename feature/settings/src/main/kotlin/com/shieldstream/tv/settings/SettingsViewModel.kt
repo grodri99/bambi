@@ -197,6 +197,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun completeAllDebridConnect() {
+        statuses.update { it + (ApiService.ALLDEBRID to ServiceStatus.Ok(texts.get(StringsR.string.settings_connected))) }
+        editor.value = null
+    }
+
     fun removeKey() {
         val current = editor.value ?: return
         if (current.service.required) return

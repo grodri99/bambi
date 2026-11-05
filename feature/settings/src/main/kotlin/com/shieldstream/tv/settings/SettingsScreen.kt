@@ -97,6 +97,7 @@ private val Red = Color(0xFFFF5A5F)
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit = {},
+    onOpenPhoneConfig: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -121,6 +122,7 @@ fun SettingsScreen(
                     onDeviceOptimization = viewModel::setDeviceOptimization,
                     onExperimentalSync = viewModel::setExperimentalSubtitleSync,
                     onOpenSetup = onOpenSetup,
+                    onOpenPhoneConfig = onOpenPhoneConfig,
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
                     onToggleProvider = viewModel::toggleProvider,
@@ -131,6 +133,7 @@ fun SettingsScreen(
                         onSave = viewModel::saveKey,
                         onRemove = viewModel::removeKey,
                         onClose = viewModel::closeEditor,
+                        onAllDebridConnected = viewModel::completeAllDebridConnect,
                     )
                 }
             }
@@ -148,6 +151,7 @@ private fun SettingsList(
     onDeviceOptimization: (DeviceOptimization) -> Unit,
     onExperimentalSync: (Boolean) -> Unit,
     onOpenSetup: () -> Unit,
+    onOpenPhoneConfig: () -> Unit,
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
     onToggleProvider: (SourceProvider) -> Unit,
@@ -267,6 +271,7 @@ private fun SettingsList(
             item { SectionTitle(localizedStringResource(StringsR.string.settings_about)) }
             item { AboutCard() }
             item { UpdateCard() }
+            item { PhoneConfigCard(onClick = onOpenPhoneConfig) }
             item { SetupGuideCard(onClick = onOpenSetup) }
         }
     }
@@ -399,6 +404,31 @@ private fun StatusPill(status: ServiceStatus) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(end = 2.dp),
         )
+    }
+}
+
+@Composable
+private fun PhoneConfigCard(onClick: () -> Unit) {
+    FocusCard(onClick = onClick) { focused ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_configure_from_phone),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_phone_config_card_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Text(
+                localizedStringResource(StringsR.string.settings_ok_to_open),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (focused) Color.White else Color.Transparent,
+            )
+        }
     }
 }
 
@@ -683,7 +713,7 @@ private fun DeviceOptimizationCard(
                 )
                 Text(
                     if (optimization == DeviceOptimization.AUTOMATIC) {
-                        localizedStringResource(StringsR.string.settings_bambi_adapts_memory_buffering_thumbnails_and_sources)
+                        localizedStringResource(StringsR.string.settings_franklix_adapts_memory_buffering_thumbnails_and_sources)
                     } else {
                         localizedStringResource(StringsR.string.settings_uses_your_manual_settings_and_shield_compatible)
                     },
@@ -831,8 +861,8 @@ private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: ()
 private fun providerNote(p: SourceProvider): String = when (p) {
     SourceProvider.TORRENTIO -> localizedStringResource(StringsR.string.settings_the_main_finder_like_in_stremio)
     SourceProvider.PEERFLIX -> localizedStringResource(StringsR.string.settings_spanish_torrents_from_spanish_sites_dontorrent_mejortorrent)
-    SourceProvider.KNABEN -> localizedStringResource(StringsR.string.settings_bambi_s_own_finders_together_the_pirate)
-    SourceProvider.THEPIRATEBAY -> localizedStringResource(StringsR.string.settings_bambi_s_own_finders_together_the_pirate)
+    SourceProvider.KNABEN -> localizedStringResource(StringsR.string.settings_franklix_s_own_finders_together_the_pirate)
+    SourceProvider.THEPIRATEBAY -> localizedStringResource(StringsR.string.settings_franklix_s_own_finders_together_the_pirate)
     SourceProvider.NYAA -> localizedStringResource(StringsR.string.settings_own_anime_finder_cocoscrapers_real_debrid_only)
     SourceProvider.COMET -> localizedStringResource(StringsR.string.settings_comet_with_your_real_debrid_token_sent)
     SourceProvider.AIOSTREAMS -> localizedStringResource(StringsR.string.settings_any_stremio_addon_aiostreams_comet_mediafusion_paste)
@@ -940,7 +970,7 @@ private fun AboutCard() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (testing) localizedStringResource(StringsR.string.settings_bambi_testing) else "Bambi",
+                    if (testing) localizedStringResource(StringsR.string.settings_franklix_testing) else "Franklix",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
@@ -961,6 +991,7 @@ private fun KeyEditorDialog(
     onSave: (String) -> Unit,
     onRemove: () -> Unit,
     onClose: () -> Unit,
+    onAllDebridConnected: () -> Unit,
 ) {
     var input by rememberSaveable(editor.service) { mutableStateOf("") }
     val fieldRequester = remember { FocusRequester() }
@@ -980,7 +1011,7 @@ private fun KeyEditorDialog(
     ) {
         Column(
             Modifier
-                .width(720.dp)
+                .width(if (editor.service == ApiService.ALLDEBRID) 1040.dp else 720.dp)
                 .background(Color(0xFF1B1D29), RoundedCornerShape(20.dp))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
                 .padding(36.dp),
@@ -995,17 +1026,23 @@ private fun KeyEditorDialog(
                         color = Color.White,
                     )
                     Text(
-                        localizedStringResource(
-                            StringsR.string.settings_get_key_at,
-                            localizedStringResource(editor.service.keyNameResource),
-                            localizedStringResource(editor.service.whereToGetResource),
-                        ),
+                        if (editor.service == ApiService.ALLDEBRID) {
+                            localizedStringResource(StringsR.string.settings_alldebrid_qr_or_manual)
+                        } else {
+                            localizedStringResource(
+                                StringsR.string.settings_get_key_at,
+                                localizedStringResource(editor.service.keyNameResource),
+                                localizedStringResource(editor.service.whereToGetResource),
+                            )
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = Muted,
                     )
                 }
             }
             Spacer(Modifier.height(24.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
             BasicTextField(
                 value = input,
                 onValueChange = { input = it.replace("\n", "") },
@@ -1088,6 +1125,12 @@ private fun KeyEditorDialog(
                     TvButton(text = localizedStringResource(StringsR.string.settings_remove_key), onClick = onRemove, enabled = !editor.busy)
                 }
                 TvButton(text = localizedStringResource(StringsR.string.settings_cancel), onClick = onClose, enabled = !editor.busy)
+            }
+                }
+                if (editor.service == ApiService.ALLDEBRID) {
+                    Spacer(Modifier.width(24.dp))
+                    AllDebridQrPanel(onConnected = onAllDebridConnected)
+                }
             }
         }
     }

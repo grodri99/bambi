@@ -1,4 +1,10 @@
-Fork of https://github.com/grodri99/bambi
+<p align="center">
+  <img src="docs/franklix.png" alt="Franklix logo" width="320">
+</p>
+
+# Franklix
+
+Franklix is a fork of https://github.com/grodri99/bambi.
 
 Credits
 
@@ -12,8 +18,8 @@ Playback: AndroidX Media3 and dav1d. The tolerant MKV reader is a modified copy 
 
 License
 
-Bambi is free software: you can use, study, modify, and share it under the terms of the GNU General Public License v3.0 (LICENSE). If you distribute a modified version, it must remain GPL-3.0, and its source code must be available. Third-party components retain their respective licenses (the Media3-based MKV reader is Apache 2.0, which is compatible with GPL-3.0).
+Franklix is free software: you can use, study, modify, and share it under the terms of the GNU General Public License v3.0 (LICENSE). If you distribute a modified version, it must remain GPL-3.0, and its source code must be available. Third-party components retain their respective licenses (the Media3-based MKV reader is Apache 2.0, which is compatible with GPL-3.0).
 
 Legal notice
 
-Bambi does not host, upload, or distribute content. It is a client that queries third-party services configured by each user with their own accounts and keys. You are responsible for complying with the laws in your country and the terms of the services you use. Bambi is not affiliated with TMDB, Trakt, Real-Debrid, or any of the services mentioned, and the name “Bambi” is not associated with any registered trademark.
+Franklix does not host, upload, or distribute content. It is a client that queries third-party services configured by each user with their own accounts and keys. You are responsible for complying with the laws in your country and the terms of the services you use. Franklix is not affiliated with TMDB, Trakt, Real-Debrid, or any of the services mentioned.

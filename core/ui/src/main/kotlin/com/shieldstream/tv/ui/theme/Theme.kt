@@ -21,7 +21,7 @@ private val DarkColors = darkColorScheme(
 val LocalLightweightUi = staticCompositionLocalOf { false }
 
 @Composable
-fun ShieldStreamTheme(
+fun FranklixTheme(
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(

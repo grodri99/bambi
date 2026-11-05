@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="setup_catalog">Catálogo</string>
-    <string name="setup_tmdb_intro">Bambi saca de TMDB las portadas, sinopsis, temporadas y edades recomendadas. La clave es gratis.</string>
+    <string name="setup_tmdb_intro">Franklix saca de TMDB las portadas, sinopsis, temporadas y edades recomendadas. La clave es gratis.</string>
     <string name="setup_tmdb_step_account">Crea una cuenta gratis en themoviedb.org (o entra con la tuya).</string>
     <string name="setup_tmdb_step_api">En tu perfil: Ajustes → API → solicita una clave de uso personal.</string>
     <string name="setup_tmdb_step_copy">Copia la «Clave de la API» (32 letras y números, no el token largo) y escríbela aquí.</string>
     <string name="setup_debrid_service">Servicio debrid</string>
-    <string name="setup_debrid_intro">El debrid es el que reproduce las películas a toda velocidad. Elige el tuyo con ◀ ▶ y pon su clave.</string>
+    <string name="setup_debrid_intro">El debrid es el que reproduce las películas a toda velocidad. Elige el tuyo con ◀ ▶ y conéctalo.</string>
     <string name="setup_debrid_torrentio"> Va a través de Torrentio, como en Stremio.</string>
     <string name="setup_extra_subtitles">Subtítulos extra</string>
     <string name="setup_subdl_intro">Opcional. Con una clave de SubDL aparecen más subtítulos externos. OpenSubtitles y Podnapisi ya funcionan sin clave.</string>
@@ -20,21 +20,23 @@
     <string name="setup_torbox_step_settings">Abre Settings y busca tu API key.</string>
     <string name="setup_premiumize_step_account">Entra en premiumize.me con tu cuenta.</string>
     <string name="setup_premiumize_step_settings">Abre «Account» y busca la API Key.</string>
-    <string name="setup_alldebrid_step_account">Entra en alldebrid.com con tu cuenta.</string>
-    <string name="setup_alldebrid_step_settings">Abre la página de claves de API (alldebrid.com/apikeys) y crea una.</string>
+    <string name="setup_alldebrid_step_account">Escanea el QR e inicia sesión en alldebrid.com.</string>
+    <string name="setup_alldebrid_step_settings">Autoriza Franklix; la clave se guarda automáticamente.</string>
+    <string name="setup_alldebrid_step_manual">También puedes copiar una clave de API y escribirla aquí.</string>
     <string name="setup_debrid_link_step_account">Entra en debrid-link.com con tu cuenta.</string>
     <string name="setup_debrid_link_step_settings">Abre la página de la clave de API (debrid-link.com/webapp/apikey).</string>
     <string name="setup_offcloud_step_account">Entra en offcloud.com con tu cuenta.</string>
     <string name="setup_offcloud_step_settings">Abre «Account» y busca tu API key.</string>
     <string name="setup_copy_key">Cópiala y escríbela aquí.</string>
     <string name="setup_step_counter">PASO %1$d DE 4</string>
-    <string name="setup_welcome_title">Vamos a dejar Bambi listo</string>
+    <string name="setup_welcome_title">Vamos a dejar Franklix listo</string>
     <string name="setup_welcome_body">Son 4 pasos y solo se hace una vez. Ten a mano el móvil o el ordenador para sacar las claves.</string>
     <string name="setup_catalog_artwork">Portadas y sinopsis (TMDB)</string>
     <string name="setup_optional_subdl">Opcional (SubDL)</string>
     <string name="setup_preferences">Preferencias</string>
     <string name="setup_language_audio_subtitles">Idioma, audio y subtítulos</string>
     <string name="setup_start">Empezar</string>
+    <string name="setup_continue_on_phone">Continuar en el móvil</string>
     <string name="setup_later">Más tarde</string>
     <string name="setup_audio_subtitles_title">AUDIO Y SUBTÍTULOS</string>
     <string name="setup_preferences_saved">Se guardan en el perfil activo y puedes cambiarlas después.</string>
@@ -51,7 +53,7 @@
     <string name="setup_manual_selection">Elección manual</string>
     <string name="setup_embedded_external">Integrados o externos</string>
     <string name="setup_english">Inglés</string>
-    <string name="setup_external_subtitles_explanation">Si el archivo no trae subtítulos en ese idioma, Bambi buscará subtítulos externos.</string>
+    <string name="setup_external_subtitles_explanation">Si el archivo no trae subtítulos en ese idioma, Franklix buscará subtítulos externos.</string>
     <string name="setup_next">Siguiente</string>
     <string name="setup_key_placeholder">%1$s de %2$s</string>
     <string name="setup_checking">Comprobando…</string>

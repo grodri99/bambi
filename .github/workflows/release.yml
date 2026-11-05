@@ -68,7 +68,7 @@ jobs:
           : "${KEY_ALIAS:?Missing RELEASE_KEY_ALIAS}"
           : "${TRAKT_ID:?Missing TRAKT_CLIENT_ID variable}"
           : "${TRAKT_URI:?Missing TRAKT_REDIRECT_URI variable}"
-          KEYSTORE="$RUNNER_TEMP/keystore/bambi.keystore"
+          KEYSTORE="$RUNNER_TEMP/keystore/franklix.keystore"
           mkdir -p "$(dirname "$KEYSTORE")"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           {
@@ -92,17 +92,17 @@ jobs:
       - name: Run Android lint
         run: ./gradlew --no-daemon lintDebug
 
-      - name: Prepare Bambi.apk
+      - name: Prepare Franklix.apk
         run: |
           mkdir -p "$RUNNER_TEMP/release-artifact"
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Bambi.apk"
-          test -s "$RUNNER_TEMP/release-artifact/Bambi.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Franklix.apk"
+          test -s "$RUNNER_TEMP/release-artifact/Franklix.apk"
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Bambi.apk" \
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Franklix.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_TAG" \
             --generate-notes \

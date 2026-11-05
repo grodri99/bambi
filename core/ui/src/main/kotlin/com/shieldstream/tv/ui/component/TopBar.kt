@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 enum class TopTab {
     SEARCH,
@@ -81,15 +82,16 @@ fun TopBar(
             modifier = Modifier.align(Alignment.CenterStart).padding(start = 32.dp),
         ) {
             Image(
-                painter = painterResource(R.drawable.bambi_logo),
-                contentDescription = "Bambi",
+                painter = painterResource(R.drawable.franklix_logo),
+                contentDescription = "Franklix",
                 modifier = Modifier.size(40.dp),
             )
             Spacer(Modifier.width(12.dp))
-            Image(
-                painter = painterResource(R.drawable.bambi_wordmark),
-                contentDescription = null,
-                modifier = Modifier.height(14.dp),
+            Text(
+                text = "Franklix",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
             )
         }
         Row(

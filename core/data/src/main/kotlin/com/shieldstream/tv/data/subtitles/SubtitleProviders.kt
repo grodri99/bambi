@@ -24,7 +24,7 @@ interface SubtitleProvider {
     suspend fun search(query: SubtitleQuery): List<ExternalSubtitle>
 }
 
-internal const val USER_AGENT = "ShieldStream/1.0 (Android TV)"
+internal const val USER_AGENT = "Franklix/1.0 (Android TV)"
 
 internal val subtitleJson = Json {
     ignoreUnknownKeys = true

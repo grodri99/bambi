@@ -96,6 +96,7 @@ private val Accent = Color(0xFFE50914)
 fun SetupScreen(
     onFinish: () -> Unit,
     onExit: () -> Unit,
+    onOpenPhone: (() -> Unit)? = null,
     viewModel: SetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -114,6 +115,7 @@ fun SetupScreen(
                 SetupStep.WELCOME -> WelcomeStep(
                     onStart = viewModel::next,
                     onLater = onExit,
+                    onOpenPhone = onOpenPhone,
                 )
                 SetupStep.PLAYBACK -> PlaybackPreferencesStep(
                     audio = s.audio,
@@ -152,6 +154,7 @@ fun SetupScreen(
                     onSubmit = { viewModel.submitKey(s.debrid.apiService, it) },
                     onNext = viewModel::next,
                     onTyping = viewModel::clearError,
+                    onAllDebridConnected = viewModel::completeAllDebridConnect,
                     selector = { modifier -> DebridSelectorCard(active = s.debrid, onChange = viewModel::setDebrid, modifier = modifier) },
                 )
                 SetupStep.SUBDL -> KeyStep(
@@ -198,7 +201,7 @@ private fun debridSteps(debrid: DebridService): List<String> = when (debrid) {
     DebridService.ALLDEBRID -> listOf(
         localizedStringResource(SR.setup_alldebrid_step_account),
         localizedStringResource(SR.setup_alldebrid_step_settings),
-        localizedStringResource(SR.setup_copy_key),
+        localizedStringResource(SR.setup_alldebrid_step_manual),
     )
     DebridService.DEBRID_LINK -> listOf(
         localizedStringResource(SR.setup_debrid_link_step_account),
@@ -217,9 +220,9 @@ private fun debridSteps(debrid: DebridService): List<String> = when (debrid) {
 @Composable
 private fun SetupHeader(step: SetupStep) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Image(painterResource(R.drawable.bambi_logo), contentDescription = null, modifier = Modifier.size(36.dp))
+        Image(painterResource(R.drawable.franklix_logo), contentDescription = null, modifier = Modifier.size(36.dp))
         Spacer(Modifier.width(10.dp))
-        Image(painterResource(R.drawable.bambi_wordmark), contentDescription = "Bambi", modifier = Modifier.height(13.dp))
+        Text("Franklix", fontFamily = DisplayFont, fontSize = 22.sp, color = Color.White)
         Spacer(Modifier.weight(1f))
         step.number?.let { n ->
             Text(localizedStringResource(SR.setup_step_counter, n), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)
@@ -241,18 +244,19 @@ private fun SetupHeader(step: SetupStep) {
 // ------------------------------------------------------------------ bienvenida
 
 @Composable
-private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit) {
+private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit, onOpenPhone: (() -> Unit)?) {
     val startRequester = remember { FocusRequester() }
+    val phoneRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        runCatching { startRequester.requestFocus() }
+        runCatching { (if (onOpenPhone != null) phoneRequester else startRequester).requestFocus() }
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth().weight(1f),
     ) {
-        Image(painterResource(R.drawable.bambi_logo), contentDescription = null, modifier = Modifier.size(120.dp))
+        Image(painterResource(R.drawable.franklix_logo), contentDescription = null, modifier = Modifier.size(120.dp))
         Spacer(Modifier.height(16.dp))
         Text(localizedStringResource(SR.setup_welcome_title), fontFamily = DisplayFont, fontSize = 44.sp, color = Color.White)
         Text(
@@ -270,6 +274,13 @@ private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit) {
         }
         Spacer(Modifier.height(28.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (onOpenPhone != null) {
+                TvButton(
+                    text = localizedStringResource(SR.setup_continue_on_phone),
+                    onClick = onOpenPhone,
+                    modifier = Modifier.focusRequester(phoneRequester),
+                )
+            }
             TvButton(text = localizedStringResource(SR.setup_start), onClick = onStart, modifier = Modifier.focusRequester(startRequester))
             TvButton(text = localizedStringResource(SR.setup_later), onClick = onLater)
         }
@@ -471,6 +482,7 @@ private fun ColumnScope.KeyStep(
     onSubmit: (String) -> Unit,
     onNext: () -> Unit,
     onTyping: () -> Unit,
+    onAllDebridConnected: () -> Unit = {},
     selector: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val has = state.has(service)
@@ -573,7 +585,11 @@ private fun ColumnScope.KeyStep(
             }
         }
         Spacer(Modifier.width(36.dp))
-        QrPanel(url = service.url)
+        if (service == ApiService.ALLDEBRID && editing) {
+            AllDebridQrPanel(onConnected = onAllDebridConnected)
+        } else {
+            QrPanel(url = service.url)
+        }
     }
 }
 

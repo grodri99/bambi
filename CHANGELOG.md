@@ -1,26 +1,44 @@
 # Changelog
 
-## [1.0.10] - 2026-11-05
+## [1.0.11] - 2026-11-05
 
 ### Added
 
-- **Experimental subtitle sync:** a per-profile preference, enabled by default, controls automatic subtitle alignment in Settings and setup. Slow devices can disable demuxing while keeping automatic best-match subtitle downloads.
-- **Subtitle synchronization feedback:** show a bilingual syncing message while references are read and alignment is calculated.
-- **Playback and demux tests:** added lifecycle, coordinator, catalog, Home, and real MKV/MP4 instrumentation coverage, including resume reads, sparse tracks, and missing subtitle tracks.
+- **Franklix rebrand:** new name and artwork throughout the app, Android TV launcher, setup, README, and release packages. Existing installations keep their application ID, profiles, preferences, and stored keys.
+- **AllDebrid QR sign-in:** authorize AllDebrid from setup or Settings and save the returned API key automatically. Manual API-key entry remains available.
+- **Guided phone setup:** complete first-run configuration in four steps—TMDB, debrid, optional SubDL, and language/audio/subtitles—with required-key validation and a final confirmation.
+- **Phone configuration editor:** later, use Settings to edit service keys, source finders, and playback preferences from a phone or computer on the same local network. Sessions expire after 10 minutes and existing secrets stay hidden.
 
 ### Improved
 
-- **Subtitle references:** prefer embedded text tracks, select dense dialogue tracks, decode real cue durations, seek near the playback position, and reduce startup sampling to 20 cues.
-- **Alignment reliability:** use strong-match gates and two-window confirmation for plausible matches, with frame-rate scaling and high-correlation near-sync handling.
-- **Subtitle downloads:** reject ambiguous multi-CD archives, rank matching disc parts correctly, and filter Portuguese releases mislabeled as Spanish.
-- **Playback architecture:** immutable playback requests, deduplicated TMDB mapping, and focused Home/Continue Watching regression tests.
+- Use AllDebrid as the default debrid service for new installations.
+- Updated release artifacts and self-update checks for the Franklix repository and `Franklix.apk` package.
 
 ### Fixed
 
-- Handle MKV, MP4, AVI, and MPEG-TS reference extraction with bounded seeks, cancellation, typed failures, and shared playback data-source configuration.
-- Prevent late subtitle search, download, demux, or alignment work from changing state after source changes, disabling subtitles, or leaving playback.
-- Preserve the active subtitle and timing when a replacement candidate fails to synchronize.
-- Report missing reference tracks immediately instead of downloading large streams until timeout.
+- Restore D-pad navigation from the debrid API-key field back to the service selector.
+
+## [1.0.10] - 2026-11-05
+
+### Highlights
+
+- **Automatic subtitle sync:** align downloaded subtitles with the dialogue track embedded in the video. The per-profile option is enabled by default and can be changed in Settings or during setup.
+- **Clearer feedback:** a bilingual message shows when subtitle references are being read and synchronized.
+- **Better playback on slower devices:** disabling synchronization skips demuxing but keeps automatic best-match subtitle downloads.
+
+### Improved
+
+- Select better reference tracks and dialogue cues, account for frame-rate differences, and require stronger matches before applying timing adjustments.
+- Read fewer cues during startup and seek near the current playback position to reduce synchronization work.
+- Support subtitle references in MKV, MP4, AVI, and MPEG-TS videos with bounded reads and consistent network handling.
+- Choose matching disc parts more accurately, reject ambiguous multi-disc archives, and filter Portuguese releases mislabeled as Spanish.
+
+### Fixed
+
+- Keep the current subtitle and timing when a replacement cannot be synchronized.
+- Prevent late searches, downloads, or synchronization results from affecting a different source or a playback session that has already ended.
+- Report missing reference tracks immediately instead of downloading until timeout.
+- Expanded regression coverage for subtitle synchronization, playback lifecycle, catalog handling, Home, and real MKV/MP4 media.
 
 ## [1.0.9] - 2026-11-05
 

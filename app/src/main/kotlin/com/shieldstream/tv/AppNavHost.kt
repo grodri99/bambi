@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavBackStackEntry
@@ -14,6 +15,7 @@ import com.shieldstream.tv.details.DetailsScreen
 import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.home.MainScreen
+import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.player.PlayerScreen
 import com.shieldstream.tv.settings.SettingsScreen
 import com.shieldstream.tv.settings.SetupGateViewModel
@@ -23,7 +25,10 @@ import com.shieldstream.tv.settings.profiles.ProfileEditViewModel
 import com.shieldstream.tv.settings.profiles.ProfilePickerScreen
 import com.shieldstream.tv.settings.profiles.ProfilesViewModel
 import com.shieldstream.tv.settings.profiles.TraktConnectScreen
+import com.shieldstream.tv.settings.phoneconfig.PhoneConfigMode
+import com.shieldstream.tv.settings.phoneconfig.PhoneConfigScreen
 import com.shieldstream.tv.settings.update.UpdatePrompt
+import com.shieldstream.tv.ui.component.restartApp
 
 @Composable
 fun AppNavHost(holder: SelectedContentHolder) {
@@ -39,7 +44,11 @@ fun AppNavHost(holder: SelectedContentHolder) {
             val toProfiles = {
                 navController.navigate("profiles") { popUpTo("setup") { inclusive = true } }
             }
-            SetupScreen(onFinish = toProfiles, onExit = toProfiles)
+            SetupScreen(
+                onFinish = toProfiles,
+                onExit = toProfiles,
+                onOpenPhone = { navController.navigate("phone_setup") },
+            )
         }
         composable("profiles") { entry ->
             ProfilePickerScreen(
@@ -62,6 +71,7 @@ fun AppNavHost(holder: SelectedContentHolder) {
             SetupScreen(
                 onFinish = { navController.popBackStack() },
                 onExit = { navController.popBackStack() },
+                onOpenPhone = { navController.navigate("phone_setup_again") },
             )
         }
         composable("main") { entry ->
@@ -109,6 +119,38 @@ fun AppNavHost(holder: SelectedContentHolder) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenSetup = { navController.navigate("setup_again") },
+                onOpenPhoneConfig = { navController.navigate("phone_config") },
+            )
+        }
+        composable("phone_config") { entry ->
+            PhoneConfigScreen(onDone = { if (entry.isVisible()) navController.popBackStack() })
+        }
+        composable("phone_setup") { entry ->
+            val context = LocalContext.current
+            PhoneConfigScreen(
+                mode = PhoneConfigMode.SETUP,
+                onDone = { if (entry.isVisible()) navController.popBackStack() },
+                onFinishSetup = { language ->
+                    if (language != Lang.current) {
+                        restartApp(context)
+                    } else {
+                        navController.navigate("profiles") { popUpTo("setup") { inclusive = true } }
+                    }
+                },
+            )
+        }
+        composable("phone_setup_again") { entry ->
+            val context = LocalContext.current
+            PhoneConfigScreen(
+                mode = PhoneConfigMode.SETUP,
+                onDone = { if (entry.isVisible()) navController.popBackStack() },
+                onFinishSetup = { language ->
+                    if (language != Lang.current) {
+                        restartApp(context)
+                    } else {
+                        navController.popBackStack("settings", inclusive = false)
+                    }
+                },
             )
         }
     }

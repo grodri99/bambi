@@ -144,7 +144,7 @@ class UpdateRepositoryImpl @Inject constructor(
         val request = Request.Builder()
             .url("https://api.github.com/repos/${version.updateRepo}/releases/latest")
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "Bambi/${version.name}")
+            .header("User-Agent", "Franklix/${version.name}")
             .build()
         val body = client.newCall(request).execute().use { response ->
             if (response.code == 404) return null
@@ -169,9 +169,9 @@ class UpdateRepositoryImpl @Inject constructor(
     private fun download(update: AppUpdate): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() } // APK de actualizaciones anteriores
-        val file = File(dir, "Bambi-${update.version}.apk")
+        val file = File(dir, "Franklix-${update.version}.apk")
         _state.value = UpdateState.Downloading(update, 0f)
-        val request = Request.Builder().url(update.apkUrl).header("User-Agent", "Bambi/${version.name}").build()
+        val request = Request.Builder().url(update.apkUrl).header("User-Agent", "Franklix/${version.name}").build()
         client.newCall(request).execute().use { response ->
             check(response.isSuccessful) { "Descarga HTTP ${response.code}" }
             val body = checkNotNull(response.body)
@@ -210,13 +210,13 @@ class UpdateRepositoryImpl @Inject constructor(
         val sessionId = installer.createSession(params)
         installer.openSession(sessionId).use { session ->
             apk.inputStream().use { input ->
-                session.openWrite("bambi.apk", 0, apk.length()).use { output ->
+                session.openWrite("franklix.apk", 0, apk.length()).use { output ->
                     input.copyTo(output)
                     session.fsync(output)
                 }
             }
             if (dm != null) {
-                session.openWrite("bambi.dm", 0, dm.size.toLong()).use { output ->
+                session.openWrite("franklix.dm", 0, dm.size.toLong()).use { output ->
                     output.write(dm)
                     session.fsync(output)
                 }
@@ -258,7 +258,7 @@ class UpdateRepositoryImpl @Inject constructor(
         private const val TAG = "Update"
         private const val KEY_LAST_CHECK = "last_check"
         private const val AUTO_CHECK_INTERVAL_MS = 6 * 3_600_000L
-        const val APK_NAME = "Bambi.apk"
+        const val APK_NAME = "Franklix.apk"
 
         /** "1.0.10" > "1.0.9"; ignora sufijos ("-pruebas"). */
         fun isNewer(candidate: String, current: String): Boolean {

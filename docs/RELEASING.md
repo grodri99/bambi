@@ -1,6 +1,6 @@
 # Publicar una actualización
 
-El workflow `.github/workflows/release.yml` publica un GitHub Release con el asset `Bambi.apk`, que es el nombre que busca el actualizador de la app.
+El workflow `.github/workflows/release.yml` publica un GitHub Release con el asset `Franklix.apk`, que es el nombre que busca el actualizador de la app.
 
 ## Requisitos
 

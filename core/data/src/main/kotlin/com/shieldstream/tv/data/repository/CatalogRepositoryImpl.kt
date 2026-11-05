@@ -558,7 +558,7 @@ class CatalogRepositoryImpl @Inject constructor(
     private fun normalize(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
 
     private fun scraperDto(p: SourceProvider, name: String, hash: String, size: Long, seeders: Int) = TorrentioStreamDto(
-        name = "Bambi\n$name",
+        name = "Franklix\n$name",
         title = "$name\n👤 $seeders 💾 ${"%.2f".format(java.util.Locale.US, size / 1_073_741_824.0)} GB ⚙️ ${texts.get(p.titleResource)}",
         infoHash = hash.lowercase(),
     )

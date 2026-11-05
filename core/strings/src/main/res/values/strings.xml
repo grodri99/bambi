@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="setup_catalog">Catalog</string>
-    <string name="setup_tmdb_intro">Bambi gets artwork, synopses, seasons and age ratings from TMDB. The key is free.</string>
+    <string name="setup_tmdb_intro">Franklix gets artwork, synopses, seasons and age ratings from TMDB. The key is free.</string>
     <string name="setup_tmdb_step_account">Create a free account at themoviedb.org (or sign in).</string>
     <string name="setup_tmdb_step_api">In your profile: Settings → API → request a key for personal use.</string>
     <string name="setup_tmdb_step_copy">Copy the “API Key” (32 letters and numbers, not the long token) and type it here.</string>
     <string name="setup_debrid_service">Debrid service</string>
-    <string name="setup_debrid_intro">The debrid service is what plays movies at full speed. Choose yours with ◀ ▶ and enter its key.</string>
+    <string name="setup_debrid_intro">The debrid service is what plays movies at full speed. Choose yours with ◀ ▶ and connect it.</string>
     <string name="setup_debrid_torrentio"> It works through Torrentio, like in Stremio.</string>
     <string name="setup_extra_subtitles">Extra subtitles</string>
     <string name="setup_subdl_intro">Optional. With a SubDL key you get more external subtitles. OpenSubtitles and Podnapisi already work without a key.</string>
@@ -20,21 +20,23 @@
     <string name="setup_torbox_step_settings">Open Settings and find your API key.</string>
     <string name="setup_premiumize_step_account">Sign in at premiumize.me.</string>
     <string name="setup_premiumize_step_settings">Open “Account” and find the API Key.</string>
-    <string name="setup_alldebrid_step_account">Sign in at alldebrid.com.</string>
-    <string name="setup_alldebrid_step_settings">Open the API keys page (alldebrid.com/apikeys) and create one.</string>
+    <string name="setup_alldebrid_step_account">Scan the QR and sign in at alldebrid.com.</string>
+    <string name="setup_alldebrid_step_settings">Approve Franklix; the key is saved automatically.</string>
+    <string name="setup_alldebrid_step_manual">You can also copy an API key and type it here.</string>
     <string name="setup_debrid_link_step_account">Sign in at debrid-link.com.</string>
     <string name="setup_debrid_link_step_settings">Open the API key page (debrid-link.com/webapp/apikey).</string>
     <string name="setup_offcloud_step_account">Sign in at offcloud.com.</string>
     <string name="setup_offcloud_step_settings">Open “Account” and find your API key.</string>
     <string name="setup_copy_key">Copy it and type it here.</string>
     <string name="setup_step_counter">STEP %1$d OF 4</string>
-    <string name="setup_welcome_title">Let\'s get Bambi ready</string>
+    <string name="setup_welcome_title">Let\'s get Franklix ready</string>
     <string name="setup_welcome_body">It takes 4 steps and you only do it once. Keep your phone or computer handy to get the keys.</string>
     <string name="setup_catalog_artwork">Artwork and synopses (TMDB)</string>
     <string name="setup_optional_subdl">Optional (SubDL)</string>
     <string name="setup_preferences">Preferences</string>
     <string name="setup_language_audio_subtitles">Language, audio &amp; subtitles</string>
     <string name="setup_start">Start</string>
+    <string name="setup_continue_on_phone">Continue on phone</string>
     <string name="setup_later">Later</string>
     <string name="setup_audio_subtitles_title">AUDIO &amp; SUBTITLES</string>
     <string name="setup_preferences_saved">Saved to the active profile; you can change them later.</string>
@@ -51,7 +53,7 @@
     <string name="setup_manual_selection">Manual selection</string>
     <string name="setup_embedded_external">Embedded or external</string>
     <string name="setup_english">English</string>
-    <string name="setup_external_subtitles_explanation">If the file has no subtitles in that language, Bambi will search for external subtitles.</string>
+    <string name="setup_external_subtitles_explanation">If the file has no subtitles in that language, Franklix will search for external subtitles.</string>
     <string name="setup_next">Next</string>
     <string name="setup_key_placeholder">%2$s %1$s</string>
     <string name="setup_checking">Checking…</string>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline probe for Bambi's subtitle timing heuristics.
+"""Offline probe for Franklix's subtitle timing heuristics.
 
 No video, API key, or third-party package is needed. A known-good embedded
 subtitle is the usual reference; external SRT/VTT/ASS files are the candidates.

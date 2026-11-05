@@ -29,8 +29,8 @@ android {
         applicationId = "com.shieldstream.tv"
         minSdk = 21
         targetSdk = 35
-        versionCode = 110
-        versionName = "1.0.10"
+        versionCode = 111
+        versionName = "1.0.11"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         buildConfigField("String", "RD_TOKEN", "\"$rdToken\"")
@@ -67,7 +67,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-pruebas"
-            manifestPlaceholders["appLabel"] = "Bambi (pruebas)"
+            manifestPlaceholders["appLabel"] = "Franklix (pruebas)"
         }
         release {
             isMinifyEnabled = false
@@ -81,7 +81,7 @@ android {
             isDebuggable = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-benchmark"
-            manifestPlaceholders["appLabel"] = "Bambi (benchmark)"
+            manifestPlaceholders["appLabel"] = "Franklix (benchmark)"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += "release"
         }

@@ -1,11 +1,13 @@
 package com.shieldstream.tv.data.di
 
+import com.shieldstream.tv.data.repository.AllDebridAuthRepositoryImpl
 import com.shieldstream.tv.data.repository.ApiKeysRepositoryImpl
 import com.shieldstream.tv.data.repository.EpisodeReleaseRepositoryImpl
 import com.shieldstream.tv.data.repository.EpisodeTrackingRepositoryImpl
 import com.shieldstream.tv.data.repository.TorrentioLinkResolverImpl
 import com.shieldstream.tv.domain.TorrentioLinkResolver
 import com.shieldstream.tv.data.repository.CatalogRepositoryImpl
+import com.shieldstream.tv.domain.AllDebridAuthRepository
 import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.EpisodeReleaseRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
@@ -37,6 +39,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAllDebridAuthRepository(impl: AllDebridAuthRepositoryImpl): AllDebridAuthRepository
 
     @Binds
     @Singleton

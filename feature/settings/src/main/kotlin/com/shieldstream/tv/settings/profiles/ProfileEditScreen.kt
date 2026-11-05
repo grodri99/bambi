@@ -382,7 +382,7 @@ private fun TraktCard(
     val user = state.profile.traktUser
     val (title, subtitle) = when {
         !state.traktAvailable -> localizedStringResource(StringsR.string.settings_trakt_not_available) to
-            localizedStringResource(StringsR.string.settings_this_build_of_bambi_has_no_traktclientid)
+            localizedStringResource(StringsR.string.settings_this_build_of_franklix_has_no_traktclientid)
         user != null && state.confirmDisconnect -> localizedStringResource(StringsR.string.settings_disconnect_trakt) to
             localizedStringResource(StringsR.string.settings_trakt_disconnect_user, user)
         user != null -> localizedStringResource(StringsR.string.settings_trakt_connected_user, user) to

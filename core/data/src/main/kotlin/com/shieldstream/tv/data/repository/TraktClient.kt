@@ -34,7 +34,7 @@ class TraktClient @Inject constructor(
                     .header("Content-Type", "application/json")
                     .header("trakt-api-version", "2")
                     .header("trakt-api-key", credentials.clientId)
-                    .header("User-Agent", "Bambi/1.0 (Android TV)")
+                    .header("User-Agent", "Franklix/1.0 (Android TV)")
                     .build(),
             )
         }

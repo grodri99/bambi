@@ -62,7 +62,7 @@ class SetupScreenTest {
     fun `welcome renders Spanish text`() {
         renderStep(SetupStep.WELCOME, AppLanguage.ES)
 
-        composeRule.onNodeWithText("Vamos a dejar Bambi listo").assertExists()
+        composeRule.onNodeWithText("Vamos a dejar Franklix listo").assertExists()
         composeRule.onNodeWithText("Idioma, audio y subtítulos").assertExists()
         composeRule.onNodeWithText("Empezar").assertExists()
         composeRule.onNodeWithText("Más tarde").assertExists()
@@ -72,8 +72,17 @@ class SetupScreenTest {
     fun `welcome renders English text`() {
         renderStep(SetupStep.WELCOME, AppLanguage.EN)
 
-        composeRule.onNodeWithText("Let's get Bambi ready").assertExists()
+        composeRule.onNodeWithText("Let's get Franklix ready").assertExists()
         composeRule.onNodeWithText("Language, audio & subtitles").assertExists()
+        composeRule.onNodeWithText("Start").assertExists()
+        composeRule.onNodeWithText("Later").assertExists()
+    }
+
+    @Test
+    fun `welcome offers the optional phone setup path`() {
+        renderStep(SetupStep.WELCOME, AppLanguage.EN, onOpenPhone = {})
+
+        composeRule.onNodeWithText("Continue on phone").assertExists()
         composeRule.onNodeWithText("Start").assertExists()
         composeRule.onNodeWithText("Later").assertExists()
     }
@@ -118,6 +127,7 @@ class SetupScreenTest {
         step: SetupStep,
         selectedLanguage: AppLanguage,
         currentLanguage: AppLanguage = selectedLanguage,
+        onOpenPhone: (() -> Unit)? = null,
     ) {
         Lang.current = currentLanguage
         val viewModel = mockk<SetupViewModel>(relaxed = true)
@@ -140,7 +150,7 @@ class SetupScreenTest {
         )
 
         composeRule.setContent {
-            SetupScreen(onFinish = {}, onExit = {}, viewModel = viewModel)
+            SetupScreen(onFinish = {}, onExit = {}, onOpenPhone = onOpenPhone, viewModel = viewModel)
         }
     }
 }

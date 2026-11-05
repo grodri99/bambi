@@ -29,7 +29,7 @@ public final class MkvProbe {
     for (String path : args) {
       System.out.println("== " + new File(path).getName());
       run("Media3", new MatroskaExtractor(new DefaultSubtitleParserFactory(), 0), path);
-      run("Bambi ", new LenientMatroskaExtractor(new DefaultSubtitleParserFactory(), 0), path);
+      run("Franklix ", new LenientMatroskaExtractor(new DefaultSubtitleParserFactory(), 0), path);
     }
   }
 
