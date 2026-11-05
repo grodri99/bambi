@@ -57,6 +57,14 @@ internal data class SyncResult(
         other.timing.scale == timing.scale && abs(other.timing.offsetMs - timing.offsetMs) <= 300
 }
 
+internal fun confirmedByWindows(candidate: SyncResult, first: SyncResult?, second: SyncResult?): Boolean {
+    if (candidate.strong) return true
+    if (!candidate.plausible || first == null || second == null) return false
+    return (first.strong || first.plausible) &&
+        (second.strong || second.plausible) &&
+        candidate.agreesWith(first) && candidate.agreesWith(second)
+}
+
 internal object SubtitleSync {
     const val MIN_REFERENCE_CUES = 10
     private const val BIN_MS = 100L
@@ -89,6 +97,29 @@ internal object SubtitleSync {
         val fine = refine(refs, usable, external, b.scale, b.offsetMs, isActive)
         if (!isActive()) return null
         return SyncResult(SubtitleTiming(fine, b.scale), b.score, ratio, refs.size)
+    }
+
+    fun shouldAutoApply(
+        reference: List<SubInterval>,
+        sampledWindow: SubInterval,
+        external: List<SubInterval>,
+        result: SyncResult,
+    ): Boolean {
+        if (result.strong) return true
+        if (!result.plausible || reference.size < MIN_REFERENCE_CUES * 2) return false
+        val sorted = reference.sortedBy { it.startMs }
+        val split = sorted.size / 2
+        val midpoint = (sorted[split - 1].endMs + sorted[split].startMs) / 2
+        val firstWindow = SubInterval(sampledWindow.startMs, midpoint)
+        val secondWindow = SubInterval(midpoint, sampledWindow.endMs)
+        if (firstWindow.endMs - firstWindow.startMs < MIN_WINDOW_MS ||
+            secondWindow.endMs - secondWindow.startMs < MIN_WINDOW_MS
+        ) {
+            return false
+        }
+        val first = align(reference, listOf(firstWindow), external)
+        val second = align(reference, listOf(secondWindow), external)
+        return confirmedByWindows(result, first, second)
     }
 
     @OptIn(UnstableApi::class)

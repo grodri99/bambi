@@ -6,6 +6,7 @@ import androidx.media3.common.text.Cue
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.text.CuesWithTiming
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -87,6 +88,23 @@ class SubtitleSyncTest {
                 isActive = { false },
             ),
         )
+    }
+
+    @Test
+    fun `plausible matches require agreement in both windows`() {
+        val candidate = SyncResult(SubtitleTiming(-410), 0.30f, 2.2f, 40)
+        val agreeing = SyncResult(SubtitleTiming(-450), 0.28f, 2.1f, 20)
+        val disagreeing = SyncResult(SubtitleTiming(2_000), 0.28f, 2.1f, 20)
+
+        assertTrue(confirmedByWindows(candidate, agreeing, agreeing))
+        assertFalse(confirmedByWindows(candidate, agreeing, disagreeing))
+        assertFalse(confirmedByWindows(candidate, agreeing, null))
+    }
+
+    @Test
+    fun `strong matches do not require a second confirmation`() {
+        val strong = SyncResult(SubtitleTiming(-410), 0.80f, 2.2f, 40)
+        assertTrue(confirmedByWindows(strong, null, null))
     }
 
     @Test

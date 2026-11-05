@@ -255,7 +255,7 @@ internal class SubtitleCoordinator(
                     }
                     if (generation != operationGeneration) return@launch
                     Log.i(TAG, "SYNC_RESULT ${externalContext(candidate.item)} result=$result")
-                    if (result != null && (result.strong || result.plausible)) {
+                    if (result != null && SubtitleSync.shouldAutoApply(refs, reference.sampledWindow, ext.intervals, result)) {
                         commitCandidate(candidate, result.timing)
                     } else {
                         failCandidate(candidate, SyncStatus.Unsure)

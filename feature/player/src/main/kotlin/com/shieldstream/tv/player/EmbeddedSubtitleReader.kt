@@ -20,6 +20,8 @@ import androidx.media3.extractor.avi.AviExtractor
 import androidx.media3.extractor.TrackOutput
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.mp4.Mp4Extractor
+import androidx.media3.extractor.text.CueDecoder
+import androidx.media3.extractor.text.CuesWithTiming
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.ts.TsExtractor
 import kotlinx.coroutines.CancellationException
@@ -27,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 enum class ReferenceFailureReason {
@@ -218,12 +221,17 @@ internal class Media3EmbeddedReferenceReader(
                 else -> Unit
             }
         }
-        Log.i(TAG, "DEMUX_CUES count=${output.starts.size}")
+        val decodedIntervals = SubtitleSync.intervalsOf(output.cues)
+        val intervals = if (decodedIntervals.size >= SubtitleSync.MIN_REFERENCE_CUES) {
+            decodedIntervals
+        } else {
+            referenceIntervalsFromStarts(output.starts)
+        }
+        Log.i(TAG, "DEMUX_CUES starts=${output.starts.size} decoded=${output.cues.size}")
         if (metrics.track == null) return failure(ReferenceFailureReason.NO_TEXT_TRACK, retryable = false)
-        if (output.starts.size < SubtitleSync.MIN_REFERENCE_CUES) {
+        if (intervals.size < SubtitleSync.MIN_REFERENCE_CUES) {
             return failure(ReferenceFailureReason.INSUFFICIENT_CUES, retryable = true)
         }
-        val intervals = referenceIntervalsFromStarts(output.starts)
         return ReferenceReadResult.Success(
             EmbeddedReference(
                 sourceUrl = sourceUrl,
@@ -267,6 +275,7 @@ internal class Media3EmbeddedReferenceReader(
         private val metrics: DemuxMetrics,
     ) : ExtractorOutput {
         val starts = mutableListOf<Long>()
+        val cues = mutableListOf<CuesWithTiming>()
         var seekMap: SeekMap? = null
         var tracksEnded = false
         private val tracks = mutableListOf<TimestampTrackOutput>()
@@ -288,6 +297,8 @@ internal class Media3EmbeddedReferenceReader(
             var format: Format? = null
             var score: Int? = null
             var accepted = false
+            private val sampleBuffer = ByteArrayOutputStream()
+            private val cueDecoder = CueDecoder()
 
             override fun format(format: Format) {
                 this.format = format
@@ -312,13 +323,20 @@ internal class Media3EmbeddedReferenceReader(
                     if (read == C.RESULT_END_OF_INPUT) {
                         return if (allowEndOfInput && total == 0) C.RESULT_END_OF_INPUT else total
                     }
+                    if (accepted) sampleBuffer.write(scratch, 0, read)
                     total += read
                 }
                 return total
             }
 
             override fun sampleData(data: ParsableByteArray, length: Int, sampleDataPart: Int) {
-                data.skipBytes(length)
+                if (accepted) {
+                    val bytes = ByteArray(length)
+                    data.readBytes(bytes, 0, length)
+                    sampleBuffer.write(bytes)
+                } else {
+                    data.skipBytes(length)
+                }
             }
 
             override fun sampleMetadata(
@@ -328,7 +346,19 @@ internal class Media3EmbeddedReferenceReader(
                 offset: Int,
                 cryptoData: TrackOutput.CryptoData?,
             ) {
-                if (accepted && timeUs >= positionMs * 1_000) starts += timeUs / 1_000
+                if (!accepted) return
+                if (timeUs >= positionMs * 1_000) {
+                    starts += timeUs / 1_000
+                    val bytes = sampleBuffer.toByteArray()
+                    val start = bytes.size - offset - size
+                    if (size > 0 && start >= 0) {
+                        runCatching { cueDecoder.decode(timeUs, bytes, start, size) }
+                            .getOrNull()
+                            ?.takeIf { it.cues.isNotEmpty() && it.startTimeUs != C.TIME_UNSET }
+                            ?.let(cues::add)
+                    }
+                }
+                sampleBuffer.reset()
             }
         }
         override fun seekMap(seekMap: SeekMap) {

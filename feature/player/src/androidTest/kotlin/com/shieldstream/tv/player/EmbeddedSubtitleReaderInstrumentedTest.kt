@@ -40,6 +40,10 @@ class EmbeddedSubtitleReaderInstrumentedTest {
         assertTrue(success.reference.intervals.size >= SubtitleSync.MIN_REFERENCE_CUES)
         assertTrue(success.reference.bytesRead > 0)
         assertTrue(success.reference.track.isNotBlank())
+        assertEquals(
+            1_200,
+            success.reference.intervals.first().let { it.endMs - it.startMs },
+        )
     }
 
     @Test
