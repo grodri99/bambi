@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.shieldstream.tv.details.DetailsScreen
+import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.home.MainScreen
 import com.shieldstream.tv.player.PlayerScreen
@@ -79,6 +80,12 @@ fun AppNavHost(holder: SelectedContentHolder) {
                 onOpenItem = { item ->
                     if (entry.isVisible()) {
                         holder.selectItem(item)
+                        navController.navigate("details")
+                    }
+                },
+                onOpenNewEpisode = { item, episode ->
+                    if (entry.isVisible()) {
+                        holder.selectItem(item, EpisodeTarget(episode.season, episode.number))
                         navController.navigate("details")
                     }
                 },

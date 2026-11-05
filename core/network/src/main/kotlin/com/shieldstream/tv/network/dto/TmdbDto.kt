@@ -154,6 +154,8 @@ data class TmdbTvDetailDto(
     val number_of_seasons: Int = 0,
     /** "ja" + género Animación = anime: sus releases suelen ir con numeración absoluta ("One Piece - 1100"). */
     val original_language: String? = null,
+    val last_episode_to_air: TmdbEpisodeDto? = null,
+    val next_episode_to_air: TmdbEpisodeDto? = null,
 )
 
 @Serializable
@@ -164,6 +166,7 @@ data class TmdbEpisodeDto(
     val overview: String = "",
     val still_path: String? = null,
     val runtime: Int? = null,
+    val air_date: String? = null,
 )
 
 @Serializable

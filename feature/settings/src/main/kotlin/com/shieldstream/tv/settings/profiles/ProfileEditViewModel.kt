@@ -8,6 +8,7 @@ import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.ProfilePin
+import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,6 +93,10 @@ class ProfileEditViewModel @Inject constructor(
     fun setSpanishFirst(enabled: Boolean) = edit { it.copy(profile = it.profile.copy(spanishFirst = enabled)) }
 
     fun setSpanishOnly(enabled: Boolean) = edit { it.copy(profile = it.profile.copy(spanishOnlySources = enabled)) }
+
+    fun setSubtitlePreference(preference: SubtitlePreference) = edit {
+        it.copy(profile = it.profile.copy(subtitlePreference = preference))
+    }
 
     /** Categorías del Inicio de este perfil. La última visible no se puede ocultar. */
     fun toggleCategory(category: Category) {

@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Episodio que va después del que se reproduce (lo calcula la ficha). [label]: "T1:E2 · Capítulo 2". */
 data class NextEpisode(val showId: String, val season: Int, val episode: Int, val label: String)
 
+/** Episodio concreto que debe seleccionar la ficha al abrirse desde Nuevos episodios. */
+data class EpisodeTarget(val season: Int, val number: Int)
+
 /**
  * Estado de navegación compartido en memoria (selección actual).
  * Evita serializar objetos complejos como argumentos de navegación.
@@ -62,11 +65,16 @@ class SelectedContentHolder {
         _prefetch.value = next
     }
 
-    fun selectItem(item: CatalogItem) {
+    @Volatile private var episodeTarget: EpisodeTarget? = null
+
+    fun selectItem(item: CatalogItem, target: EpisodeTarget? = null) {
+        episodeTarget = target
         _selectedItem.value = item
         _queue.value = emptyList()
         _prefetch.value = null
     }
+
+    fun consumeEpisodeTarget(): EpisodeTarget? = episodeTarget.also { episodeTarget = null }
 
     fun playQueue(
         sources: List<StreamSource>,

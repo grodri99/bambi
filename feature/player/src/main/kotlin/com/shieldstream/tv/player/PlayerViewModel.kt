@@ -10,6 +10,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
@@ -37,9 +38,14 @@ import androidx.media3.common.PlaybackException
 import com.shieldstream.tv.model.ExternalSubtitle
 import com.shieldstream.tv.model.PlaybackVideoInfo
 import com.shieldstream.tv.model.SubtitleQuery
+import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,7 +86,13 @@ sealed interface NextUpUiState {
 sealed interface ExternalSubsState {
     data object Idle : ExternalSubsState
     data class Searching(val language: String) : ExternalSubsState
-    data class Results(val language: String, val items: List<ExternalSubtitle>) : ExternalSubsState
+    data class Results(
+        val language: String,
+        val items: List<ExternalSubtitle>,
+        val evaluating: Boolean = false,
+        val candidateCount: Int = 0,
+        val referenceCues: Int = 0,
+    ) : ExternalSubsState
     data class Downloading(val language: String, val item: ExternalSubtitle) : ExternalSubsState
     /** Cargado en el vídeo: la pantalla cierra el panel. */
     data class Attached(val label: String) : ExternalSubsState
@@ -162,6 +174,8 @@ class PlayerViewModel @Inject constructor(
     // vuelve a la que sí se reproducía.
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
+    private val subtitlePreference = profiles.active.value.subtitlePreference
+    private var subtitleDefaultHandled = false
     private var spanishChecked = false
     private var spanishSkips = 0
     private var spanishFallback: Int? = null
@@ -206,8 +220,16 @@ class PlayerViewModel @Inject constructor(
     /** Elegida: la ventana de referencia empieza cuando ExoPlayer la marca como seleccionada. */
     private var referenceAwaitingStart = false
     private var referenceAvailable = false
+    private var textSelectionBeforeReference: TrackSelectionParameters? = null
     private var syncJob: Job? = null
 
+    private data class SubtitleCandidate(
+        val item: ExternalSubtitle,
+        val label: String,
+        val segments: List<CuesWithTiming>,
+        val intervals: List<SubInterval>,
+        val run: MutableList<SyncResult> = mutableListOf(),
+    )
     /**
      * Prueba la cola de fuentes en orden. Sin instantAvailability, la única forma de saber si
      * una fuente está en la caché de RD es intentarlo: si no lo está, se pasa a la siguiente.
@@ -259,6 +281,11 @@ class PlayerViewModel @Inject constructor(
                         everPlayed = false
                         slateChecked = false
                         spanishChecked = false
+                        subtitleDefaultHandled = false
+                        subsJob?.cancel()
+                        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) {
+                            cancelCandidateEvaluation()
+                        }
                         // Diagnóstico: en packs de temporada el enlace del debrid acaba en el archivo elegido.
                         Log.i("PlayerVM", "Fuente ${index + 1}/${queue.size}: ${(source.fileName ?: source.title).take(120)}")
                         playingFileName = source.fileName ?: source.title
@@ -307,26 +334,48 @@ class PlayerViewModel @Inject constructor(
     // Subtítulos externos
     // -----------------------------------------------------------------------
 
-    fun searchExternalSubtitles(language: String) {
+    fun searchExternalSubtitles(language: String) = searchExternalSubtitles(language, automatic = false)
+
+    private fun searchExternalSubtitles(language: String, automatic: Boolean) {
+        if (!automatic) subtitleDefaultHandled = true
         val query = buildQuery(language) ?: run {
             _externalSubs.value = ExternalSubsState.Error(language, tr("No se sabe qué se está reproduciendo", "Unknown what's playing"))
             return
         }
         subsJob?.cancel()
+        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) cancelCandidateEvaluation()
         _externalSubs.value = ExternalSubsState.Searching(language)
         subsJob = viewModelScope.launch {
             runCatching { subtitles.search(query) }
-                .onSuccess { _externalSubs.value = ExternalSubsState.Results(language, it) }
-                .onFailure { _externalSubs.value = ExternalSubsState.Error(language, it.message ?: tr("Error buscando subtítulos", "Error searching subtitles")) }
+                .onSuccess { items ->
+                    if (items.isEmpty()) {
+                        _externalSubs.value = ExternalSubsState.Results(language, items)
+                        if (automatic) {
+                            _notice.value = tr("No se encontraron subtítulos externos en este idioma", "No external subtitles found in this language")
+                        }
+                    } else {
+                        val count = candidateShortlist(items).size
+                        _externalSubs.value = ExternalSubsState.Results(language, items, evaluating = true, candidateCount = count)
+                        startCandidateEvaluation(language, items, query)
+                    }
+                }
+                .onFailure {
+                    if (it is CancellationException) throw it
+                    _externalSubs.value = ExternalSubsState.Error(language, it.message ?: tr("Error buscando subtítulos", "Error searching subtitles"))
+                    if (automatic) _notice.value = tr("No se pudieron buscar subtítulos externos", "Couldn't search for external subtitles")
+                }
         }
     }
 
     fun downloadExternalSubtitle(item: ExternalSubtitle) {
+        subtitleDefaultHandled = true
         val query = buildQuery(item.language) ?: return
+        val previous = _externalSubs.value
+        cancelCandidateEvaluation()
         if (currentExternal != null) {
             Log.w(TAG, "AUTO_SYNC_FAILURE reason=replaced_by_user ${externalContext(currentExternal)}")
+            disableExternalSubtitle()
         }
-        val previous = _externalSubs.value
         subsJob?.cancel()
         Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
         _externalSubs.value = ExternalSubsState.Downloading(item.language, item)
@@ -344,11 +393,12 @@ class PlayerViewModel @Inject constructor(
                     _externalSubs.value = ExternalSubsState.Attached(file.label)
                 }
                 .onFailure { e ->
+                    if (e is CancellationException) throw e
                     Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}", e)
                     _externalSubs.value = ExternalSubsState.Error(item.language, e.message ?: tr("No se pudo descargar", "Couldn't download"))
                     if (previous is ExternalSubsState.Results) {
                         delay(2_500)
-                        _externalSubs.value = previous
+                        _externalSubs.value = previous.copy(evaluating = false)
                     }
                 }
         }
@@ -356,7 +406,159 @@ class PlayerViewModel @Inject constructor(
 
     fun resetExternalSubtitles() {
         subsJob?.cancel()
+        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) cancelCandidateEvaluation()
         _externalSubs.value = ExternalSubsState.Idle
+    }
+
+    /** Descarga una selección pequeña de todos los proveedores y elige solo una coincidencia confirmada. */
+    private fun startCandidateEvaluation(language: String, items: List<ExternalSubtitle>, query: SubtitleQuery) {
+        syncJob?.cancel()
+        if (currentExternal != null) {
+            Log.w(TAG, "AUTO_SYNC_FAILURE reason=replaced_by_user ${externalContext(currentExternal)}")
+            disableExternalSubtitle()
+        }
+        beginReferenceCapture()
+        syncJob = viewModelScope.launch {
+            val shortlist = candidateShortlist(items)
+            Log.i(TAG, "AUTO_SELECTION_START candidates=${shortlist.size} ${externalContext(null)}")
+            if (!referenceAvailable && !referencePending) {
+                failCandidateEvaluation(language, items, "no_reference")
+                return@launch
+            }
+            val downloaded = supervisorScope {
+                shortlist.map { item ->
+                    async {
+                        try {
+                            Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
+                            downloadCandidate(item, query)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}")
+                            null
+                        }
+                    }
+                }.awaitAll().filterNotNull().distinctBy { it.intervals }
+            }
+            if (!isActive) return@launch
+            if (downloaded.isEmpty()) {
+                failCandidateEvaluation(language, items, "no_downloads")
+                return@launch
+            }
+            Log.i(TAG, "AUTO_SELECTION_DOWNLOADED unique=${downloaded.size} of=${shortlist.size}")
+
+            var nextAt = SubtitleSync.MIN_REFERENCE_CUES
+            while (isActive) {
+                delay(3_000)
+                val count = reference.cueCount
+                _externalSubs.value = ExternalSubsState.Results(
+                    language, items, evaluating = true, candidateCount = downloaded.size, referenceCues = count,
+                )
+                if (!referenceAvailable && !referencePending) {
+                    failCandidateEvaluation(language, items, "no_reference")
+                    return@launch
+                }
+                if (count < nextAt) continue
+                val position = _player.value?.currentPosition ?: continue
+                val (refs, windows) = reference.snapshot(position)
+                nextAt = count + 5
+
+                val accepted = ArrayList<Pair<SubtitleCandidate, SyncResult>>()
+                for (candidate in downloaded) {
+                    val result = withContext(Dispatchers.Default) {
+                        SubtitleSync.align(refs, windows, candidate.intervals)
+                    } ?: continue
+                    Log.i(
+                        TAG,
+                        "CANDIDATE_SCORE offsetMs=${result.timing.offsetMs} scale=${result.timing.scale} " +
+                            "correlation=${result.correlation} ratio=${result.ratio} refs=${result.referenceCues} " +
+                            externalContext(candidate.item),
+                    )
+                    if (result.strong || result.plausible || result.consistent) {
+                        if (candidate.run.isNotEmpty() && !result.agreesWith(candidate.run.last())) candidate.run.clear()
+                        candidate.run += result
+                    } else {
+                        candidate.run.clear()
+                    }
+                    val confirmed = result.strong || (result.plausible && candidate.run.size >= 2) || candidate.run.size >= 3
+                    if (confirmed) accepted += candidate to result
+                }
+
+                val winner = accepted.maxWithOrNull(
+                    compareByDescending<Pair<SubtitleCandidate, SyncResult>> { it.second.correlation }
+                        .thenByDescending { it.second.ratio }
+                        .thenByDescending { it.first.item.matchScore }
+                        .thenBy { it.first.item.hearingImpaired }
+                        .thenBy { it.first.item.provider }
+                        .thenBy { it.first.item.id },
+                )
+                if (winner != null) {
+                    selectCandidate(winner.first, winner.second)
+                    return@launch
+                }
+                if (count >= MAX_AUTO_REFERENCE_CUES) {
+                    failCandidateEvaluation(language, items, "no_reliable_match")
+                    return@launch
+                }
+            }
+        }
+    }
+
+    private fun candidateShortlist(items: List<ExternalSubtitle>): List<ExternalSubtitle> {
+        val sorted = items.sortedWith(
+            compareByDescending<ExternalSubtitle> { it.matchScore }.thenBy { it.hearingImpaired },
+        )
+        val providers = sorted.groupBy { it.provider }.values.toList()
+        val diverse = ArrayList<ExternalSubtitle>()
+        var index = 0
+        while (diverse.size < AUTO_CANDIDATE_LIMIT && providers.any { index < it.size }) {
+            for (provider in providers) {
+                if (index < provider.size && diverse.size < AUTO_CANDIDATE_LIMIT) diverse += provider[index]
+            }
+            index++
+        }
+        return diverse
+    }
+
+    private suspend fun downloadCandidate(item: ExternalSubtitle, query: SubtitleQuery): SubtitleCandidate {
+        val file = subtitles.download(item, query)
+        val segments = withContext(Dispatchers.IO) { parseSubtitle(file.path, file.mimeType) }
+        check(segments.isNotEmpty()) { tr("El subtítulo está vacío o no se puede leer", "The subtitle is empty or unreadable") }
+        return SubtitleCandidate(item, file.label, segments, SubtitleSync.intervalsOf(segments))
+    }
+
+    private fun selectCandidate(candidate: SubtitleCandidate, result: SyncResult) {
+        currentExternal = candidate.item
+        _activeExternal.value = ActiveExternalSubtitle(candidate.label, candidate.segments, candidate.intervals)
+        Log.i(
+            TAG,
+            "AUTO_SELECTION_SUCCESS correlation=${result.correlation} ratio=${result.ratio} " +
+                externalContext(candidate.item),
+        )
+        applyAuto(result.timing, announce = true, force = true)
+        _externalSubs.value = ExternalSubsState.Attached(candidate.label)
+    }
+
+    private fun failCandidateEvaluation(language: String, items: List<ExternalSubtitle>, reason: String) {
+        Log.w(TAG, "AUTO_SELECTION_FAILURE reason=$reason")
+        _externalSubs.value = ExternalSubsState.Results(language, items)
+        _syncStatus.value = SyncStatus.Off
+        restoreReferenceSelection()
+        _notice.value = if (reason == "no_reference") {
+            tr("Sin subtítulos de referencia: elige uno y ajústalo a mano", "No reference subtitles: choose one and adjust it manually")
+        } else {
+            tr("Ningún subtítulo encaja automáticamente: elige uno a mano", "No subtitle matched automatically: choose one manually")
+        }
+    }
+
+    private fun cancelCandidateEvaluation() {
+        syncJob?.cancel()
+        syncJob = null
+        if (_activeExternal.value == null) restoreReferenceSelection()
+        val current = _externalSubs.value
+        if (current is ExternalSubsState.Results && current.evaluating) {
+            _externalSubs.value = current.copy(evaluating = false)
+        }
     }
 
     private fun buildQuery(language: String): SubtitleQuery? {
@@ -382,26 +584,49 @@ class PlayerViewModel @Inject constructor(
         return out.filter { it.startTimeUs != C.TIME_UNSET }.sortedBy { it.startTimeUs }
     }
 
+    private fun beginReferenceCapture() {
+        if (textSelectionBeforeReference == null) {
+            textSelectionBeforeReference = _player.value?.trackSelectionParameters
+        }
+        reference.reset()
+        referencePending = true
+        referenceAwaitingStart = false
+        referenceAvailable = false
+        _player.value?.let { selectReferenceTrack(it, it.currentTracks) }
+    }
+
+    private fun restoreReferenceSelection() {
+        referencePending = false
+        referenceAwaitingStart = false
+        referenceAvailable = false
+        textSelectionBeforeReference?.let { saved ->
+            _player.value?.trackSelectionParameters = saved
+        }
+        textSelectionBeforeReference = null
+        reference.reset()
+    }
+
     private fun attachExternal(label: String, segments: List<CuesWithTiming>) {
         syncJob?.cancel()
         _activeExternal.value = ActiveExternalSubtitle(label, segments, SubtitleSync.intervalsOf(segments))
         _subtitleTiming.value = SubtitleTiming()
         _syncStatus.value = SyncStatus.Collecting(0)
-        reference.reset()
-        referencePending = true
-        _player.value?.let { selectReferenceTrack(it, it.currentTracks) }
+        beginReferenceCapture()
         if (referenceAvailable) {
             _notice.value = tr("Subtítulos añadidos: $label · sincronizando…", "Subtitles added: $label · syncing…")
             startAutoSync()
         }
     }
 
+    /** Cualquier elección manual tiene prioridad sobre el idioma automático durante esta fuente. */
+    fun onManualSubtitleSelection() {
+        subtitleDefaultHandled = true
+    }
+
     /** Quitar el subtítulo externo (se ha elegido otra pista o "Desactivados" en el panel). */
     fun disableExternalSubtitle() {
         syncJob?.cancel()
-        referencePending = false
-        referenceAwaitingStart = false
-        reference.reset()
+        restoreReferenceSelection()
         _activeExternal.value = null
         currentExternal = null
         _subtitleTiming.value = SubtitleTiming()
@@ -467,8 +692,10 @@ class PlayerViewModel @Inject constructor(
                 .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
-            if (_syncStatus.value !is SyncStatus.Manual) _syncStatus.value = SyncStatus.NoReference
-            _notice.value = tr("Subtítulos añadidos. Si no van a tiempo: Audio y subtítulos › Sincronizar", "Subtitles added. If they're out of sync: Audio & subtitles › Sync")
+            if (_activeExternal.value != null) {
+                if (_syncStatus.value !is SyncStatus.Manual) _syncStatus.value = SyncStatus.NoReference
+                _notice.value = tr("Subtítulos añadidos. Si no van a tiempo: Audio y subtítulos › Sincronizar", "Subtitles added. If they're out of sync: Audio & subtitles › Sync")
+            }
             return
         }
         referenceAvailable = true
@@ -504,7 +731,61 @@ class PlayerViewModel @Inject constructor(
         return score
     }
 
+    /** Selecciona el idioma integrado o, si no existe, delega en la evaluación de externos. */
+    private fun applySubtitlePreference(player: Player, tracks: Tracks) {
+        if (subtitleDefaultHandled || tracks.isEmpty) return
+        if (_activeExternal.value != null) {
+            subtitleDefaultHandled = true
+            return
+        }
+        if (subtitlePreference == SubtitlePreference.OFF) {
+            subtitleDefaultHandled = true
+            return
+        }
+        val candidate = tracks.groups
+            .filter { it.type == C.TRACK_TYPE_TEXT }
+            .flatMap { group ->
+                (0 until group.length)
+                    .filter { group.isTrackSupported(it) }
+                    .map { group to it }
+            }
+            .filter { (group, index) -> subtitlePreference.matches(group.getTrackFormat(index).language) }
+            .minByOrNull { (group, index) ->
+                val format = group.getTrackFormat(index)
+                (if (isForced(format)) 2 else 0) +
+                    (if (format.sampleMimeType == androidx.media3.common.MimeTypes.APPLICATION_PGS) 1 else 0)
+            }
+
+        subtitleDefaultHandled = true
+        if (candidate != null) {
+            val (group, index) = candidate
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                .build()
+            _notice.value = when (subtitlePreference) {
+                SubtitlePreference.SPANISH -> tr("Subtítulos integrados en español", "Embedded Spanish subtitles")
+                SubtitlePreference.ENGLISH -> tr("Subtítulos integrados en inglés", "Embedded English subtitles")
+                SubtitlePreference.OFF -> return
+            }
+            return
+        }
+
+        // Mientras se busca el externo, no enseñar una pista forzada en otro idioma.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .build()
+        _notice.value = when (subtitlePreference) {
+            SubtitlePreference.SPANISH -> tr("Sin subtítulos integrados en español: buscando externos…", "No embedded Spanish subtitles: finding external subtitles…")
+            SubtitlePreference.ENGLISH -> tr("Sin subtítulos integrados en inglés: buscando externos…", "No embedded English subtitles: finding external subtitles…")
+            SubtitlePreference.OFF -> return
+        }
+        searchExternalSubtitles(subtitlePreference.code ?: return, automatic = true)
+    }
+
     private fun onReferenceTracks(player: Player, tracks: Tracks) {
+        applySubtitlePreference(player, tracks)
         selectReferenceTrack(player, tracks)
         if (referenceAwaitingStart && tracks.isTypeSelected(C.TRACK_TYPE_TEXT)) {
             referenceAwaitingStart = false
@@ -887,6 +1168,7 @@ class PlayerViewModel @Inject constructor(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
                         updateVideoInfo()
+                        applySubtitlePreference(player, player.currentTracks)
                         checkSpanishAudio(player, player.currentTracks)
                         if (checkErrorSlate(player)) return
                     }
@@ -969,8 +1251,9 @@ class PlayerViewModel @Inject constructor(
                 }
             },
         )
-        // Player recreado (volver de Home) con subtítulo externo: hay que volver a elegir la referencia.
-        if (_activeExternal.value != null && referenceAvailable) referencePending = true
+        // Player recreado: reanudar la referencia de un externo o de una evaluación todavía en curso.
+        val evaluating = (_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true
+        if ((_activeExternal.value != null || evaluating) && referenceAvailable) referencePending = true
         player.setMediaItem(buildMediaItem(url), startPositionMs)
         // No iniciar audio hasta verificarlo, ni siquiera durante el primer búfer.
         spanishChecked = false
@@ -990,6 +1273,8 @@ class PlayerViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "SubSync"
+        const val AUTO_CANDIDATE_LIMIT = 6
+        const val MAX_AUTO_REFERENCE_CUES = 80
         /** Fuentes que se prueban de verdad antes de rendirse (las bloqueadas por RD no cuentan). */
         const val MAX_ATTEMPTS = 8
         /** La tarjeta "Siguiente episodio" sale en los créditos (5 % final, entre 45 s y 2 min). */

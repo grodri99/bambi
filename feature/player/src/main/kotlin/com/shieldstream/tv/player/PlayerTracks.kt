@@ -79,6 +79,7 @@ fun TracksPanel(
     externalLabel: String? = null,
     syncDetail: String = "",
     onExternalOff: () -> Unit = {},
+    onManualSubtitleSelection: () -> Unit = {},
     onOpenSync: () -> Unit = {},
 ) {
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
@@ -120,7 +121,15 @@ fun TracksPanel(
                         add(TrackOption("t_ext_active", externalLabel, tr("Subtítulo externo", "External subtitle"), selected = true, onSelect = {}))
                         add(TrackOption("t_sync", tr("Sincronizar subtítulos ›", "Sync subtitles ›"), syncDetail, selected = false, onSelect = onOpenSync))
                     }
-                    addAll(textOptions(tracks, player, externalActive = externalLabel != null, onExternalOff = onExternalOff))
+                    addAll(
+                        textOptions(
+                            tracks,
+                            player,
+                            externalActive = externalLabel != null,
+                            onExternalOff = onExternalOff,
+                            onManualSelection = onManualSubtitleSelection,
+                        ),
+                    )
                 }
             }
             TracksView(audio = audio, text = text)
@@ -255,12 +264,23 @@ private fun ExternalSubtitlesView(
                             onSelect = { onPick(sub) },
                         )
                     }
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        contentPadding = PaddingValues(bottom = 48.dp),
-                    ) {
-                        itemsIndexed(options, key = { _, o -> o.key }) { _, option ->
-                            OptionRow(option = option, onClick = { option.onSelect() })
+                    Column {
+                        if (state.evaluating) {
+                            StatusText(
+                                tr(
+                                    "Probando ${state.candidateCount} candidatos · ${state.referenceCues} frases de referencia",
+                                    "Testing ${state.candidateCount} candidates · ${state.referenceCues} reference cues",
+                                ),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            contentPadding = PaddingValues(bottom = 48.dp),
+                        ) {
+                            itemsIndexed(options, key = { _, o -> o.key }) { _, option ->
+                                OptionRow(option = option, onClick = { option.onSelect() })
+                            }
                         }
                     }
                 }
@@ -414,6 +434,7 @@ private fun textOptions(
     player: Player,
     externalActive: Boolean,
     onExternalOff: () -> Unit,
+    onManualSelection: () -> Unit,
 ): List<TrackOption> {
     val textGroups = tracks.groups.withIndex().filter { it.value.type == C.TRACK_TYPE_TEXT }
     // Con subtítulo externo, la pista seleccionada del archivo es solo la referencia (oculta): no cuenta.
@@ -427,6 +448,7 @@ private fun textOptions(
                 detail = "",
                 selected = !anySelected,
                 onSelect = {
+                    onManualSelection()
                     onExternalOff()
                     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                         .clearOverridesOfType(C.TRACK_TYPE_TEXT)
@@ -454,6 +476,7 @@ private fun textOptions(
                         ).distinct().joinToString(" · "),
                         selected = !externalActive && group.isTrackSelected(i),
                         onSelect = {
+                            onManualSelection()
                             onExternalOff()
                             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)

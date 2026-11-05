@@ -9,6 +9,9 @@ data class CatalogDetails(
     val genres: List<String> = emptyList(),
     val tagline: String? = null,
     val seasons: List<Season> = emptyList(),
+    /** Último episodio emitido y próximo anunciado (solo series). */
+    val latestEpisode: Episode? = null,
+    val nextEpisode: Episode? = null,
 )
 
 data class Season(
@@ -24,6 +27,8 @@ data class Episode(
     val overview: String,
     val stillUrl: String?,
     val runtimeMinutes: Int?,
+    /** Fecha de emisión ISO (yyyy-MM-dd), tal como la publica TMDB. */
+    val airDate: String? = null,
 ) {
     val code: String get() = tr("T$season:E$number", "S$season:E$number")
 }
@@ -32,4 +37,11 @@ data class Episode(
 enum class HomeFilter { ALL, MOVIES, TV }
 
 /** Estilo visual de una fila de la Home. */
-enum class RowStyle { POSTER, TOP10, CONTINUE }
+enum class RowStyle { POSTER, TOP10, CONTINUE, NEW_EPISODES }
+
+/** Estado de emisión ligero de una serie, sin logos ni traducciones. */
+data class ShowAiring(
+    val item: CatalogItem,
+    val latestEpisode: Episode? = null,
+    val nextEpisode: Episode? = null,
+)

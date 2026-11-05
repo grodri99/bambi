@@ -52,6 +52,7 @@ import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ProfileAvatars
+import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.settings.HomeCategoriesDialog
 import com.shieldstream.tv.ui.component.ProfileAvatar
@@ -148,6 +149,31 @@ fun ProfileEditScreen(
                             onClick = { if (!profile.spanishOnlySources) viewModel.setSpanishFirst(!profile.spanishFirst) },
                         )
                     }
+                    Spacer(Modifier.height(12.dp))
+                    Text(tr("Subtítulos por defecto", "Default subtitles"), color = ProfileMuted, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SubtitlePreference.entries.forEach { preference ->
+                            OptionChip(
+                                text = when (preference) {
+                                    SubtitlePreference.OFF -> tr("Desactivados", "Off")
+                                    SubtitlePreference.SPANISH -> tr("Español", "Spanish")
+                                    SubtitlePreference.ENGLISH -> tr("Inglés", "English")
+                                },
+                                highlighted = profile.subtitlePreference == preference,
+                                onClick = { viewModel.setSubtitlePreference(preference) },
+                            )
+                        }
+                    }
+                    Text(
+                        tr(
+                            "Si el archivo no trae el idioma elegido, Bambi busca y selecciona subtítulos externos.",
+                            "If the file has no subtitles in the chosen language, Bambi finds and selects external subtitles.",
+                        ),
+                        color = ProfileMuted,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OptionChip(

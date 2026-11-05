@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
+import com.shieldstream.tv.model.tr
 
 val PosterWidth: Dp = 124.dp
 private val CardShape = RoundedCornerShape(6.dp)
@@ -164,6 +165,56 @@ fun ContinueCard(
                         .background(Color(0xFFE50914)),
                 )
             }
+        }
+    }
+}
+
+/** Póster de una serie con distintivo de episodio nuevo, código y fecha de emisión. */
+@Composable
+fun NewEpisodeCard(
+    item: CatalogItem,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit = {},
+) {
+    PosterCard(item = item, onClick = onClick, modifier = modifier, onFocused = onFocused) {
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(84.dp)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.35f to Color.Black.copy(alpha = 0.8f),
+                        1f to Color.Black.copy(alpha = 0.96f),
+                    ),
+                ),
+        )
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(8.dp),
+        ) {
+            Text(
+                text = tr("NUEVO EPISODIO", "NEW EPISODE"),
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .background(Color(0xFFE50914), RoundedCornerShape(3.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

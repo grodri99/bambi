@@ -30,6 +30,7 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.model.Season
+import com.shieldstream.tv.model.ShowAiring
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.VideoCodec
 import com.shieldstream.tv.network.api.TmdbApi
@@ -232,6 +233,8 @@ class CatalogRepositoryImpl @Inject constructor(
                 seasons = d.seasons
                     .filter { it.season_number > 0 && it.episode_count > 0 }
                     .map { Season(it.season_number, it.name.ifBlank { tr("Temporada ${it.season_number}", "Season ${it.season_number}") }, it.episode_count) },
+                latestEpisode = d.last_episode_to_air?.toEpisode(),
+                nextEpisode = d.next_episode_to_air?.toEpisode(),
             )
         } else {
             val d = tmdb.movieDetails(id, key)
@@ -290,18 +293,52 @@ class CatalogRepositoryImpl @Inject constructor(
         return item
     }
 
+    private class CachedAiring(val at: Long, val value: ShowAiring)
+    private val airingCache = ConcurrentHashMap<String, CachedAiring>()
+
+    override suspend fun getShowAiring(id: String): ShowAiring? {
+        val tmdbId = id.toIntOrNull() ?: return null
+        airingCache[id]?.takeIf { System.currentTimeMillis() - it.at < AIRING_CACHE_MS }?.let { return it.value }
+        val d = tmdb.tvDetails(tmdbId, key, append = "external_ids")
+        val item = CatalogItem(
+            id = id,
+            imdbId = d.external_ids?.imdb_id,
+            type = MediaType.TV,
+            title = d.name,
+            overview = d.overview,
+            posterUrl = d.poster_path?.let { poster(it) },
+            backdropUrl = d.backdrop_path?.let { backdrop(it) },
+            year = d.first_air_date?.take(4)?.toIntOrNull(),
+            rating = d.vote_average.toFloat(),
+            genres = d.genres.map { it.name },
+        )
+        return ShowAiring(
+            item = item,
+            latestEpisode = d.last_episode_to_air?.toEpisode(),
+            nextEpisode = d.next_episode_to_air?.toEpisode(),
+        ).also {
+            itemCache["TV_$id"] = item
+            airingCache[id] = CachedAiring(System.currentTimeMillis(), it)
+        }
+    }
+
     override suspend fun getEpisodes(item: CatalogItem, season: Int): List<Episode> {
         val id = item.id.toIntOrNull() ?: return emptyList()
-        return tmdb.tvSeason(id, season, key).episodes.map { e ->
-            Episode(
-                season = e.season_number.takeIf { it > 0 } ?: season,
-                number = e.episode_number,
-                title = e.name.ifBlank { tr("Episodio ${e.episode_number}", "Episode ${e.episode_number}") },
-                overview = e.overview,
-                stillUrl = e.still_path?.let { "$IMG/w300$it" },
-                runtimeMinutes = e.runtime,
-            )
-        }
+        return tmdb.tvSeason(id, season, key).episodes.mapNotNull { it.toEpisode(defaultSeason = season) }
+    }
+
+    private fun com.shieldstream.tv.network.dto.TmdbEpisodeDto.toEpisode(defaultSeason: Int? = null): Episode? {
+        val seasonNumber = season_number.takeIf { it > 0 } ?: defaultSeason ?: return null
+        if (episode_number <= 0) return null
+        return Episode(
+            season = seasonNumber,
+            number = episode_number,
+            title = name.ifBlank { tr("Episodio $episode_number", "Episode $episode_number") },
+            overview = overview,
+            stillUrl = still_path?.let { "$IMG/w300$it" },
+            runtimeMinutes = runtime,
+            airDate = air_date,
+        )
     }
 
     override fun getStreams(item: CatalogItem, episode: Episode?): Flow<StreamResults> = channelFlow {
@@ -812,6 +849,9 @@ class CatalogRepositoryImpl @Inject constructor(
 
 /** Validez de la caché de Inicio / Series / Películas. */
 private const val HOME_CACHE_MS = 30 * 60 * 1000L
+
+/** TMDB solo cambia estos datos al emitirse o anunciarse un episodio; no hace falta pedirlos en cada sync. */
+private const val AIRING_CACHE_MS = 6 * 60 * 60 * 1000L
 
 /** Se muestra en el Inicio (con "Reintentar") si no hay clave de TMDB. */
 val MISSING_TMDB_KEY: String get() = tr("Falta la clave de TMDB. Añádela en Ajustes (rueda arriba a la derecha).", "TMDB key missing. Add it in Settings (gear, top right).")

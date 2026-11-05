@@ -339,8 +339,9 @@ fun PlayerScreen(
                 },
                 update = { view ->
                     view.player = exoPlayer
-                    // Con subtítulo externo, la pista del archivo seleccionada es solo la referencia: no se muestra.
-                    view.subtitleView?.visibility = if (activeExternal != null) View.GONE else View.VISIBLE
+                    // La referencia queda oculta tanto con un externo como durante la selección automática.
+                    val evaluating = (externalSubs as? ExternalSubsState.Results)?.evaluating == true
+                    view.subtitleView?.visibility = if (activeExternal != null || evaluating) View.GONE else View.VISIBLE
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -405,6 +406,7 @@ fun PlayerScreen(
                     externalLabel = activeExternal?.label,
                     syncDetail = syncStatus.describe().ifBlank { subtitleTiming.describe() },
                     onExternalOff = { viewModel.disableExternalSubtitle() },
+                    onManualSubtitleSelection = viewModel::onManualSubtitleSelection,
                     onOpenSync = {
                         tracksOpen = false
                         syncOpen = true

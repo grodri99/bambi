@@ -74,6 +74,8 @@ Todo pensado para el mando: el foco siempre sabe dónde está, nada de ratones n
 - **Administrar perfiles**: añadir, renombrar, cambiar el color o eliminar (con confirmación).
 - El avatar del perfil activo está siempre arriba a la derecha: un OK y cambias de perfil.
 - **PIN de 4 cifras** por perfil: se pide para entrar en él y para editarlo.
+- **Subtítulos por defecto**: desactivados, español o inglés. Si el archivo no trae el idioma elegido, Bambi busca,
+  descarga y valida subtítulos externos automáticamente; una elección manual siempre tiene prioridad.
 - **Perfil infantil**: Inicio, portada, categorías y búsqueda solo con contenido para niños.
 - Al actualizar desde una versión sin perfiles, todo tu progreso pasa a un perfil "Principal": no se pierde nada.
 

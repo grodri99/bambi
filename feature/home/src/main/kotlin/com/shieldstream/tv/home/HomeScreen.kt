@@ -63,16 +63,19 @@ import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.FeaturedItem
+import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.ui.component.ContinueCard
+import com.shieldstream.tv.ui.component.NewEpisodeCard
 import com.shieldstream.tv.ui.component.PosterCard
 import com.shieldstream.tv.ui.component.PosterWidth
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.Top10Card
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.firstVirtualIndex
+import com.shieldstream.tv.ui.component.formatEpisodeDate
 import com.shieldstream.tv.ui.component.loopingItems
 import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
@@ -97,6 +100,7 @@ private val ContentStart = 48.dp
 fun HomeScreen(
     filter: HomeFilter,
     onItemClick: (CatalogItem) -> Unit,
+    onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     topBar: @Composable (Modifier) -> Unit,
     topBarRequester: FocusRequester,
@@ -143,6 +147,7 @@ fun HomeScreen(
                 }
             },
             onItemClick = onItemClick,
+            onNewEpisodeClick = onNewEpisodeClick,
             onOpenCategory = onOpenCategory,
             onRemoveContinue = viewModel::removeFromContinue,
             topBar = topBar,
@@ -162,6 +167,7 @@ private fun HomeContent(
     featured: List<FeaturedItem>,
     categories: List<Category>,
     onItemClick: (CatalogItem) -> Unit,
+    onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
     topBar: @Composable (Modifier) -> Unit,
@@ -178,6 +184,7 @@ private fun HomeContent(
         RowsBrowser(
             rows = rows,
             onItemClick = onItemClick,
+            onNewEpisodeClick = onNewEpisodeClick,
             onRemoveContinue = onRemoveContinue,
             onExitTop = {
                 topFocus = TopFocus.CHIPS
@@ -284,6 +291,7 @@ internal fun RowsBrowser(
     onItemClick: (CatalogItem) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
     onExitTop: (() -> Unit)?,
+    onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)? = null,
     onBack: () -> Unit,
     header: String? = null,
 ) {
@@ -370,6 +378,7 @@ internal fun RowsBrowser(
                             restoreRequester = restoreRequester,
                             onFocused = { virtual -> savedFocus.value = keyOf(row, virtual) },
                             onItemClick = onItemClick,
+                            onNewEpisodeClick = onNewEpisodeClick,
                             onRemove = { virtual, item ->
                                 savedFocus.value = neighbourKey(rows, row, virtual)
                                 restoreKey = savedFocus.value
@@ -403,6 +412,7 @@ private fun CatalogRowView(
     restoreRequester: FocusRequester,
     onFocused: (Int) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
+    onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)?,
     onRemove: (Int, CatalogItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -450,6 +460,21 @@ private fun CatalogRowView(
                                     label = info?.label.orEmpty(),
                                     onClick = { onItemClick(item) },
                                     onLongClick = { onRemove(virtual, item) },
+                                    onFocused = { onFocused(virtual) },
+                                    modifier = itemModifier,
+                                )
+                            }
+                            RowStyle.NEW_EPISODES -> {
+                                val episode = row.newEpisodes[item.key]
+                                NewEpisodeCard(
+                                    item = item,
+                                    label = episode?.let {
+                                        listOf(it.code, formatEpisodeDate(it.airDate)).filter { part -> part.isNotEmpty() }.joinToString(" · ")
+                                    }.orEmpty(),
+                                    onClick = {
+                                        if (episode == null || onNewEpisodeClick == null) onItemClick(item)
+                                        else onNewEpisodeClick(item, episode)
+                                    },
                                     onFocused = { onFocused(virtual) },
                                     modifier = itemModifier,
                                 )

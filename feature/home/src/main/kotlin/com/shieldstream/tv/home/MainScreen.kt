@@ -18,6 +18,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Category
+import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.ui.component.TopBar
 import com.shieldstream.tv.ui.component.TopTab
@@ -30,6 +31,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 @Composable
 fun MainScreen(
     onOpenItem: (CatalogItem) -> Unit,
+    onOpenNewEpisode: (CatalogItem, Episode) -> Unit,
     onOpenSettings: () -> Unit,
     /** Perfil activo para el avatar del menú (null = sin avatar). */
     profileInitial: String? = null,
@@ -95,6 +97,7 @@ fun MainScreen(
                 HomeScreen(
                     filter = filter,
                     onItemClick = onOpenItem,
+                    onNewEpisodeClick = onOpenNewEpisode,
                     onOpenCategory = { category = it },
                     topBar = topBar,
                     topBarRequester = topBarRequester,

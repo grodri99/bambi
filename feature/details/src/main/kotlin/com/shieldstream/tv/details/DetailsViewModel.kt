@@ -239,7 +239,9 @@ class DetailsViewModel @Inject constructor(
                 spanishOnly = settings.spanishOnlySources.first(),
             )
             if (details.item.type == MediaType.TV) {
-                val (season, episode) = continueTarget(details)
+                val requested = holder.consumeEpisodeTarget()?.let { it.season to it.number }
+                val (season, episode) = requested
+                    ?: continueTarget(details)
                     ?: (details.seasons.firstOrNull()?.number to null)
                 if (season != null) {
                     selectSeason(season, preferredEpisode = episode)

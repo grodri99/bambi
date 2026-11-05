@@ -30,6 +30,8 @@ data class CatalogRow(
     val style: RowStyle = RowStyle.POSTER,
     /** Solo fila "Seguir viendo": progreso por [CatalogItem.key]. */
     val progress: Map<String, ContinueInfo> = emptyMap(),
+    /** Solo fila "Nuevos episodios": último episodio emitido por [CatalogItem.key]. */
+    val newEpisodes: Map<String, Episode> = emptyMap(),
 )
 
 /** Progreso que pinta una tarjeta de "Seguir viendo" (barra roja + "T1:E6 · 14 min"). */

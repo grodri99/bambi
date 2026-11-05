@@ -120,8 +120,12 @@ class SubtitleRepositoryImpl @Inject constructor(
                 }
             }
             check(candidates.isNotEmpty()) { tr("El zip no contiene subtítulos compatibles (srt/ass/vtt)", "The zip has no compatible subtitles (srt/ass/vtt)") }
-            // Packs de temporada: el archivo del episodio concreto.
-            val chosen = episodeMatch(candidates, query) ?: candidates.first()
+            // Packs de temporada: el episodio concreto o error; elegir el primero puede poner otro episodio.
+            val episode = episodeMatch(candidates, query)
+            check(query.media.season == null || candidates.size == 1 || episode != null) {
+                tr("El zip no identifica el episodio ${query.media.season}x${query.media.episode}", "The zip doesn't identify episode ${query.media.season}x${query.media.episode}")
+            }
+            val chosen = episode ?: candidates.first()
             return chosen.second to chosen.first.substringAfterLast('.').lowercase()
         }
         if (raw.size > 2 && raw[0] == 0x1f.toByte() && raw[1] == 0x8b.toByte()) {

@@ -9,6 +9,7 @@ import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.StreamSource
+import com.shieldstream.tv.model.ShowAiring
 
 /**
  * Contrato de catálogo (TMDB) + scraping de fuentes (Torrentio).
@@ -37,6 +38,9 @@ interface CatalogRepository {
 
     /** Título por id de TMDB (fila "Seguir viendo"). Cacheado en memoria; null si el id no es válido. */
     suspend fun getItem(type: MediaType, id: String): CatalogItem?
+
+    /** Último episodio emitido y próximo anunciado de una serie. Cacheado durante unas horas. */
+    suspend fun getShowAiring(id: String): ShowAiring?
 
     /** Episodios de una temporada. */
     suspend fun getEpisodes(item: CatalogItem, season: Int): List<Episode>

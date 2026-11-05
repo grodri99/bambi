@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.MyListRepository
+import com.shieldstream.tv.domain.NewEpisodes
 import com.shieldstream.tv.domain.ContinueEntry
 import com.shieldstream.tv.domain.ContinueWatching
 import com.shieldstream.tv.domain.WatchProgressRepository
@@ -32,6 +33,9 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 sealed interface HomeUiState {
@@ -39,6 +43,9 @@ sealed interface HomeUiState {
     data class Error(val message: String) : HomeUiState
     data class Content(val rows: List<CatalogRow>, val featured: List<FeaturedItem> = emptyList()) : HomeUiState
 }
+
+/** Solo estos cambios obligan a consultar emisiones; mover la barra de progreso no las vuelve a pedir. */
+private data class NewEpisodeQuery(val showIds: List<String>, val watchedKeys: Set<String>)
 
 /** Una instancia por pestaña (Inicio / Series / Películas): ver `hiltViewModel(key = …)` en HomeScreen. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,14 +72,17 @@ class HomeViewModel @Inject constructor(
     private val continueRows = MutableStateFlow<List<CatalogRow>?>(null)
     private val filterFlow = MutableStateFlow<HomeFilter?>(null)
 
+    /** Últimos episodios emitidos de las series del perfil. */
+    private val newEpisodeRows = MutableStateFlow<List<CatalogRow>?>(null)
+
     /** Fila "Mi lista" (0 o 1). null = aún calculándose (como "Seguir viendo", para no mover las filas). */
     private val myListRows = MutableStateFlow<List<CatalogRow>?>(null)
 
-    val uiState: StateFlow<HomeUiState> = combine(_uiState, continueRows, myListRows) { catalog, continueRow, listRow ->
+    val uiState: StateFlow<HomeUiState> = combine(_uiState, continueRows, newEpisodeRows, myListRows) { catalog, continueRow, newRow, listRow ->
         when {
             catalog !is HomeUiState.Content -> catalog
-            continueRow == null || listRow == null -> HomeUiState.Loading
-            else -> catalog.copy(rows = continueRow + listRow + catalog.rows)
+            continueRow == null || newRow == null || listRow == null -> HomeUiState.Loading
+            else -> catalog.copy(rows = continueRow + newRow + listRow + catalog.rows)
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState.Loading)
 
@@ -87,6 +97,18 @@ class HomeViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .mapLatest { entries -> listOfNotNull(buildContinueRow(entries)) }
                 .collect { continueRows.value = it }
+        }
+        // Nuevos episodios: series con historial o en Mi lista. La caché evita consultas al volver del reproductor.
+        viewModelScope.launch {
+            combine(filterFlow.filterNotNull(), watchProgress.progress, myList.entries) { filter, progress, list ->
+                NewEpisodeQuery(
+                    showIds = NewEpisodes.candidateIds(progress, list, filter),
+                    watchedKeys = progress.filterValues { it.isWatched }.keys,
+                )
+            }
+                .distinctUntilChanged()
+                .mapLatest { query -> listOfNotNull(buildNewEpisodesRow(query)) }
+                .collect { newEpisodeRows.value = it }
         }
         // "Mi lista": en su pestaña (películas o series); se rehace al añadir o quitar desde la ficha.
         viewModelScope.launch {
@@ -136,6 +158,38 @@ class HomeViewModel @Inject constructor(
         )
     }
 
+    private suspend fun buildNewEpisodesRow(query: NewEpisodeQuery): CatalogRow? {
+        if (query.showIds.isEmpty()) return null
+        val now = System.currentTimeMillis()
+        val today = isoDate(Date(now))
+        val cutoff = isoDate(Date(now - NewEpisodes.RECENT_DAYS * 24 * 60 * 60 * 1000L))
+        val loaded = coroutineScope {
+            query.showIds.map { showId ->
+                async {
+                    withTimeoutOrNull(5_000) {
+                        runCatching { catalogRepository.getShowAiring(showId) }.getOrNull()
+                    }?.let { airing ->
+                        val episode = airing.latestEpisode
+                            ?.takeIf { NewEpisodes.isNew(showId, it, query.watchedKeys, cutoff, today) }
+                            ?: return@let null
+                        if (airing.item.posterUrl == null) null else airing.item to episode
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+        if (loaded.isEmpty()) return null
+        val entries = loaded.sortedByDescending { it.second.airDate }.take(NewEpisodes.MAX_ITEMS)
+        return CatalogRow(
+            id = NEW_EPISODES_ROW_ID,
+            title = tr("Nuevos episodios", "New episodes"),
+            items = entries.map { it.first },
+            style = RowStyle.NEW_EPISODES,
+            newEpisodes = entries.associate { (item, episode) -> item.key to episode },
+        )
+    }
+
+    private fun isoDate(date: Date): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+
     private suspend fun buildMyListRow(entries: List<com.shieldstream.tv.domain.MyListEntry>): CatalogRow? {
         if (entries.isEmpty()) return null
         val items = coroutineScope {
@@ -165,6 +219,7 @@ class HomeViewModel @Inject constructor(
 
     private companion object {
         const val CONTINUE_ROW_ID = "continue_watching"
+        const val NEW_EPISODES_ROW_ID = "new_episodes"
         const val MY_LIST_ROW_ID = "my_list"
         const val MY_LIST_MAX = 40
     }

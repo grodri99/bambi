@@ -22,6 +22,8 @@ data class Profile(
     val spanishOnlySources: Boolean = kids,
     /** Botones de categoría ocultos en el Inicio de este perfil (nombres de Category). */
     val hiddenCategories: Set<String> = Category.DEFAULT_HIDDEN,
+    /** Idioma de subtítulos automático; OFF no cambia la selección normal del reproductor. */
+    val subtitlePreference: SubtitlePreference = SubtitlePreference.OFF,
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
 

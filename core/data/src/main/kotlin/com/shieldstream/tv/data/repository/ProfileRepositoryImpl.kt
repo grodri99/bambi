@@ -9,6 +9,7 @@ import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.ProfileAvatars
+import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.model.tr
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,18 +130,20 @@ class ProfileRepositoryImpl @Inject constructor(
         val spanishFirst: Boolean? = null,
         val spanishOnlySources: Boolean? = null,
         val hiddenCategories: Set<String>? = null,
+        val subtitlePreference: SubtitlePreference? = null,
     ) {
         fun toProfile(legacyFirst: Boolean, legacyOnly: Boolean, legacyHidden: Set<String>) = Profile(
             id, name, avatar, traktUser, pinHash, kids,
             spanishFirst = spanishFirst ?: (kids || legacyFirst),
             spanishOnlySources = spanishOnlySources ?: (kids || legacyOnly),
             hiddenCategories = hiddenCategories ?: legacyHidden,
+            subtitlePreference = subtitlePreference ?: SubtitlePreference.OFF,
         )
 
         companion object {
             fun from(p: Profile) = StoredProfile(
                 p.id, p.name, p.avatar, p.traktUser, p.pinHash, p.kids,
-                p.spanishFirst, p.spanishOnlySources, p.hiddenCategories,
+                p.spanishFirst, p.spanishOnlySources, p.hiddenCategories, p.subtitlePreference,
             )
         }
     }

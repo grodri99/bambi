@@ -77,6 +77,7 @@ import com.shieldstream.tv.ui.component.SourceMediaBadges
 import com.shieldstream.tv.ui.component.ProvideMinimalScroll
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.TvButton
+import com.shieldstream.tv.ui.component.formatEpisodeDate
 import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import java.util.Locale
@@ -272,6 +273,19 @@ private fun InfoBlock(
         if (details.genres.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
+        }
+        details.nextEpisode?.let { next ->
+            val release = listOf(next.code, next.title, formatEpisodeDate(next.airDate, includeYear = true))
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = tr("Próximamente: $release", "Coming soon: $release"),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         Spacer(Modifier.height(12.dp))
         Text(
