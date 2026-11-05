@@ -113,6 +113,7 @@ class PlayerViewModelTest {
         val policy = PlaybackPolicy.automatic(512L * 1024 * 1024)
         val media3Factory = mockk<Media3Factory>()
         every { media3Factory.createPlayer(any()) } answers { players.create() }
+        every { media3Factory.dataSourceFactory } returns mockk()
         val playbackPolicies = mockk<PlaybackPolicyProvider> {
             every { automatic() } returns policy
             every { resolve(any(), any(), any()) } returns policy

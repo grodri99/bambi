@@ -75,6 +75,7 @@
     <string name="data_the_zip_contains_too_many_files">El zip contiene demasiados archivos</string>
     <string name="data_the_decompressed_subtitles_are_too_large">Los subtítulos descomprimidos son demasiado grandes</string>
     <string name="data_the_zip_has_no_compatible_subtitles_srt">El zip no contiene subtítulos compatibles (srt/ass/vtt)</string>
+    <string name="data_the_zip_has_ambiguous_movie_subtitles">El zip contiene varias partes de subtítulos; elige una versión que coincida con el CD/disco del vídeo</string>
     <string name="data_the_subtitle_is_too_large">El subtítulo es demasiado grande</string>
     <string name="data_couldn_t_open_the_installer">No se pudo abrir el instalador.</string>
     <string name="data_installation_cancelled">Instalación cancelada.</string>

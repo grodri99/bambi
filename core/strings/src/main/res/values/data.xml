@@ -75,6 +75,7 @@
     <string name="data_the_zip_contains_too_many_files">The zip contains too many files</string>
     <string name="data_the_decompressed_subtitles_are_too_large">The decompressed subtitles are too large</string>
     <string name="data_the_zip_has_no_compatible_subtitles_srt">The zip has no compatible subtitles (srt/ass/vtt)</string>
+    <string name="data_the_zip_has_ambiguous_movie_subtitles">The zip contains multiple movie subtitle parts; select a matching CD/disc release</string>
     <string name="data_the_subtitle_is_too_large">The subtitle is too large</string>
     <string name="data_couldn_t_open_the_installer">Couldn\'t open the installer.</string>
     <string name="data_installation_cancelled">Installation cancelled.</string>

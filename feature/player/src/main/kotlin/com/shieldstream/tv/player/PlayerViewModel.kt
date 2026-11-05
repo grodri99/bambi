@@ -12,7 +12,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
-import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DecoderReuseEvaluation
@@ -96,9 +95,10 @@ class PlayerViewModel @Inject constructor(
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
-    private val queueSnapshot = holder.queue.value
-    private val mediaSnapshot = holder.media.value
-    val title: StateFlow<String> = MutableStateFlow(holder.playLabel.value).asStateFlow()
+    private val playbackSnapshot = holder.playback.value
+    private val queueSnapshot = playbackSnapshot?.sources.orEmpty()
+    private val mediaSnapshot = playbackSnapshot?.media
+    val title: StateFlow<String> = MutableStateFlow(playbackSnapshot?.label.orEmpty()).asStateFlow()
 
     val seekThumbnails: StateFlow<Boolean> = combine(
         settings.deviceOptimization,
@@ -108,7 +108,7 @@ class PlayerViewModel @Inject constructor(
         playbackPolicies.resolve(optimization, buffer, thumbnails).seekThumbnails
     }.stateIn(viewModelScope, SharingStarted.Eagerly, playbackPolicies.automatic().seekThumbnails)
 
-    private val progressKey: String? = holder.progressKey.value
+    private val progressKey: String? = playbackSnapshot?.progressKey
 
     private var segments: SkipSegments = SkipSegments.NONE
     private var segmentsJob: Job? = null
@@ -116,7 +116,7 @@ class PlayerViewModel @Inject constructor(
     private var nextUpShownAt = -1L
     private val _skipPrompt = MutableStateFlow<SkipPromptUiState>(SkipPromptUiState.Hidden)
     val skipPrompt: StateFlow<SkipPromptUiState> = _skipPrompt.asStateFlow()
-    private val nextSnapshot = holder.next.value
+    private val nextSnapshot = playbackSnapshot?.next
     private val _nextUp = MutableStateFlow<NextUpUiState>(NextUpUiState.Hidden)
     val nextUp: StateFlow<NextUpUiState> = _nextUp.asStateFlow()
     private val _goNext = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -158,8 +158,10 @@ class PlayerViewModel @Inject constructor(
         texts = texts,
         media = { mediaSnapshot },
         playingFileName = { playingFileName },
+        sourceUrl = { resolvedUrl },
         player = { _player.value },
         notify = { _notice.value = it },
+        referenceReader = Media3EmbeddedReferenceReader(media3Factory.dataSourceFactory),
     )
     val externalSubs: StateFlow<ExternalSubsState> = subtitleCoordinator.externalSubs
     val activeExternal: StateFlow<ActiveExternalSubtitle?> = subtitleCoordinator.activeExternal
@@ -248,7 +250,7 @@ class PlayerViewModel @Inject constructor(
     // -----------------------------------------------------------------------
 
     private fun savedResumePosition(): Long {
-        if (holder.startFromBeginning.value) return 0L
+        if (playbackSnapshot?.fromStart == true) return 0L
         val key = progressKey ?: return 0L
         return watchProgress.get(key)?.takeIf { it.isResumable }?.positionMs ?: 0L
     }
@@ -418,6 +420,7 @@ class PlayerViewModel @Inject constructor(
 
     fun onStop() {
         playbackVisible = false
+        subtitleCoordinator.onPlaybackStopped()
         playerGeneration++
         playerCreationJob?.cancel()
         playerCreationJob = null
@@ -426,7 +429,6 @@ class PlayerViewModel @Inject constructor(
         _player.value?.let { p ->
             resumePositionMs = p.currentPosition
             trackSelectionToRestore = p.trackSelectionParameters
-            subtitleCoordinator.pause(p.currentPosition)
             p.release()
         }
         _player.value = null
@@ -551,22 +553,8 @@ class PlayerViewModel @Inject constructor(
                     checkSpanishAudio(player, tracks)
                 }
 
-                override fun onCues(cueGroup: CueGroup) {
-                    subtitleCoordinator.onCues(cueGroup.presentationTimeUs / 1000, cueGroup.cues.isNotEmpty())
-                }
-
-                override fun onPositionDiscontinuity(
-                    oldPosition: Player.PositionInfo,
-                    newPosition: Player.PositionInfo,
-                    reason: Int,
-                ) {
-                    if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
-                        subtitleCoordinator.onSeek(oldPosition.positionMs, newPosition.positionMs)
-                    }
-                }
             },
         )
-        subtitleCoordinator.preparePlayer()
         player.setMediaItem(buildMediaItem(url), startPositionMs)
         sourceFailover.onPlayerCreated()
         _player.value = player

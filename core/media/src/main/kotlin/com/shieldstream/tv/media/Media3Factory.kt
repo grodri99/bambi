@@ -12,6 +12,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -36,6 +38,8 @@ import android.media.MediaCodecInfo.CodecProfileLevel as AndroidProfileLevel
 class Media3Factory @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context)
+
     fun createPlayer(policy: PlaybackPolicy): ExoPlayer {
         val codecSelector = MediaCodecSelector { mimeType, secure, tunneling ->
             val infos = MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)
@@ -73,7 +77,7 @@ class Media3Factory @Inject constructor(
         return ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context, LenientExtractorsFactory()))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory, LenientExtractorsFactory()))
             .build()
             .also { if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) it.addAnalyticsListener(EventLogger()) }
     }

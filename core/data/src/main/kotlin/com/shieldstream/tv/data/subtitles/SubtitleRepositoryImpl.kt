@@ -28,6 +28,25 @@ import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal fun hasConflictingLanguageName(language: String, release: String): Boolean =
+    language == "es" && release.contains("portugu", ignoreCase = true)
+
+internal fun mediaPart(name: String?): Int? = name?.let {
+    Regex("(?:cd|disc|disk|part)\\s*0*(\\d+)", RegexOption.IGNORE_CASE)
+        .find(it)?.groupValues?.get(1)?.toIntOrNull()
+}
+
+internal fun hasPartMismatch(release: String, playingFileName: String?): Boolean =
+    mediaPart(release)?.let { it != mediaPart(playingFileName) } == true
+
+internal fun movieArchiveCandidate(names: List<String>, playingFileName: String?): Int? {
+    if (names.size <= 1) return 0
+    val parts = names.map(::mediaPart)
+    if (parts.all { it == null }) return 0
+    val wanted = mediaPart(playingFileName) ?: return null
+    return parts.indices.filter { parts[it] == wanted }.singleOrNull()
+}
+
 @Singleton
 class SubtitleRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -54,6 +73,7 @@ class SubtitleRepositoryImpl @Inject constructor(
             }
             .awaitAll()
             .flatten()
+            .filterNot { sub -> hasConflictingLanguageName(sub.language, sub.release) }
             .map { sub ->
                 val score = if (sub.release.isNotBlank() && query.fileName != null) {
                     similarity(sub.release, query.fileName!!)
@@ -63,7 +83,11 @@ class SubtitleRepositoryImpl @Inject constructor(
                 sub.copy(matchScore = score)
             }
             .distinctBy { it.provider to it.id }
-            .sortedWith(compareByDescending<ExternalSubtitle> { it.matchScore }.thenBy { it.hearingImpaired })
+            .sortedWith(
+                compareBy<ExternalSubtitle> { hasPartMismatch(it.release, query.fileName) }
+                    .thenByDescending { it.matchScore }
+                    .thenBy { it.hearingImpaired },
+            )
     }
 
     override suspend fun download(subtitle: ExternalSubtitle, query: SubtitleQuery): SubtitleFile =
@@ -123,7 +147,13 @@ class SubtitleRepositoryImpl @Inject constructor(
             check(query.media.season == null || candidates.size == 1 || episode != null) {
                 texts.get(StringsR.string.data_zip_episode_mismatch, query.media.season.toString(), query.media.episode.toString())
             }
-            val chosen = episode ?: candidates.first()
+            val chosen = episode ?: if (query.media.season == null) {
+                val index = movieArchiveCandidate(candidates.map { it.first }, query.fileName)
+                check(index != null) { texts.get(StringsR.string.data_the_zip_has_ambiguous_movie_subtitles) }
+                candidates[index]
+            } else {
+                candidates.first()
+            }
             return chosen.second to chosen.first.substringAfterLast('.').lowercase()
         }
         if (raw.size > 2 && raw[0] == 0x1f.toByte() && raw[1] == 0x8b.toByte()) {

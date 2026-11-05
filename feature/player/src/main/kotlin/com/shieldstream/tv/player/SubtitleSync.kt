@@ -29,6 +29,7 @@ sealed interface SyncStatus {
     data class Auto(val timing: SubtitleTiming) : SyncStatus
     data class Manual(val timing: SubtitleTiming) : SyncStatus
     data object NoReference : SyncStatus
+    data class ReferenceError(val failure: ReferenceReadFailure) : SyncStatus
     data object Unsure : SyncStatus
 }
 
@@ -39,10 +40,15 @@ internal data class SyncResult(
     val referenceCues: Int,
 ) {
     val strong: Boolean
-        get() = if (timing.scale == 1.0) correlation >= 0.55f && ratio >= 1.5f else correlation >= 0.6f && ratio >= 1.8f
+        get() = when {
+            timing.scale == 1.0 ->
+                (correlation >= 0.55f && ratio >= 1.5f) || (correlation >= 0.60f && ratio >= 1.4f)
+            correlation >= 0.75f -> ratio >= 1.1f
+            else -> correlation >= 0.6f && ratio >= 1.8f
+        }
 
     val plausible: Boolean
-        get() = timing.scale == 1.0 && correlation >= 0.33f && ratio >= 1.15f
+        get() = timing.scale == 1.0 && correlation >= 0.25f && ratio >= 2.0f
 
     val consistent: Boolean
         get() = timing.scale == 1.0 && correlation >= 0.35f && ratio >= 1.03f
@@ -59,7 +65,12 @@ internal object SubtitleSync {
     private const val PEAK_EXCLUSION_BINS = 20 // 2 s
     private val SCALES = doubleArrayOf(1.0, 25.0 / 23.976, 23.976 / 25.0)
 
-    fun align(reference: List<SubInterval>, windows: List<SubInterval>, external: List<SubInterval>): SyncResult? {
+    fun align(
+        reference: List<SubInterval>,
+        windows: List<SubInterval>,
+        external: List<SubInterval>,
+        isActive: () -> Boolean = { true },
+    ): SyncResult? {
         val usable = windows.filter { it.endMs - it.startMs >= MIN_WINDOW_MS }
         if (usable.isEmpty() || external.isEmpty()) return null
         val refs = reference.filter { r -> usable.any { w -> r.startMs >= w.startMs && r.endMs <= w.endMs } }
@@ -68,13 +79,15 @@ internal object SubtitleSync {
 
         var best: Candidate? = null
         for (scale in SCALES) {
-            val c = bestOffset(signals, external, scale) ?: continue
+            if (!isActive()) return null
+            val c = bestOffset(signals, external, scale, isActive) ?: continue
             val adjusted = if (scale == 1.0) c.score.toDouble() else c.score * 0.97
             if (best == null || adjusted > best.adjusted) best = c.copy(adjusted = adjusted)
         }
         val b = best ?: return null
         val ratio = if (b.second <= 0f) 99f else b.score / b.second
-        val fine = refine(refs, usable, external, b.scale, b.offsetMs)
+        val fine = refine(refs, usable, external, b.scale, b.offsetMs, isActive)
+        if (!isActive()) return null
         return SyncResult(SubtitleTiming(fine, b.scale), b.score, ratio, refs.size)
     }
 
@@ -136,7 +149,12 @@ internal object SubtitleSync {
         return sig
     }
 
-    private fun bestOffset(signals: List<Signal>, external: List<SubInterval>, scale: Double): Candidate? {
+    private fun bestOffset(
+        signals: List<Signal>,
+        external: List<SubInterval>,
+        scale: Double,
+        isActive: () -> Boolean,
+    ): Candidate? {
         val lo = floor(external.minOf { it.startMs } * scale / BIN_MS).toLong() - 1
         val hi = ceil(external.maxOf { it.endMs } * scale / BIN_MS).toLong() + 1
         val size = (hi - lo + 1).toInt()
@@ -154,6 +172,7 @@ internal object SubtitleSync {
         val maxBins = (MAX_OFFSET_MS / BIN_MS).toInt()
         val scores = FloatArray(2 * maxBins + 1)
         for (k in scores.indices) {
+            if (k % 256 == 0 && !isActive()) return null
             val ob = k - maxBins
             var sumX = 0
             var sumRX = 0
@@ -181,11 +200,19 @@ internal object SubtitleSync {
         )
     }
 
-    private fun refine(refs: List<SubInterval>, windows: List<SubInterval>, external: List<SubInterval>, scale: Double, coarse: Long): Long {
+    private fun refine(
+        refs: List<SubInterval>,
+        windows: List<SubInterval>,
+        external: List<SubInterval>,
+        scale: Double,
+        coarse: Long,
+        isActive: () -> Boolean,
+    ): Long {
         var bestOffset = coarse
         var bestScore = Long.MIN_VALUE
         var o = coarse - BIN_MS
         while (o <= coarse + BIN_MS) {
+            if (!isActive()) return coarse
             var score = 0L
             for (e in external) {
                 val s = (e.startMs * scale).toLong() + o
@@ -210,54 +237,6 @@ internal object SubtitleSync {
             o += 10
         }
         return bestOffset
-    }
-}
-
-internal class ReferenceCollector {
-    private val intervals = ArrayList<SubInterval>()
-    private val windows = ArrayList<SubInterval>()
-    private var cueStart: Long? = null
-    private var windowStart: Long? = null
-
-    val cueCount: Int get() = intervals.size
-    val isRunning: Boolean get() = windowStart != null
-
-    fun reset() {
-        intervals.clear()
-        windows.clear()
-        cueStart = null
-        windowStart = null
-    }
-
-    fun begin(positionMs: Long) {
-        windowStart = positionMs
-        cueStart = null
-    }
-
-    fun pause(positionMs: Long) {
-        val s = windowStart ?: return
-        if (positionMs > s) windows += SubInterval(s, positionMs)
-        windowStart = null
-        cueStart = null
-    }
-
-    fun jump(fromMs: Long, toMs: Long) {
-        if (windowStart == null) return
-        pause(fromMs)
-        begin(toMs)
-    }
-
-    fun onCues(timeMs: Long, hasText: Boolean) {
-        if (windowStart == null) return
-        val s = cueStart
-        if (s != null && timeMs > s) intervals += SubInterval(s, timeMs)
-        cueStart = if (hasText) timeMs else null
-    }
-
-    fun snapshot(positionMs: Long): Pair<List<SubInterval>, List<SubInterval>> {
-        val w = ArrayList(windows)
-        windowStart?.let { if (positionMs > it) w += SubInterval(it, positionMs) }
-        return ArrayList(intervals) to w
     }
 }
 
@@ -288,5 +267,10 @@ fun SyncStatus.describe(texts: Texts): String = when (this) {
     is SyncStatus.Auto -> texts.get(StringsR.string.player_sync_auto, timing.describe(texts))
     is SyncStatus.Manual -> texts.get(StringsR.string.player_sync_manual, timing.describe(texts))
     SyncStatus.NoReference -> texts.get(StringsR.string.player_this_file_has_no_subtitles_to_use)
+    is SyncStatus.ReferenceError -> if (failure.retryable) {
+        texts.get(StringsR.string.player_no_reliable_offset_found_adjust_it_manually)
+    } else {
+        texts.get(StringsR.string.player_this_file_has_no_subtitles_to_use)
+    }
     SyncStatus.Unsure -> texts.get(StringsR.string.player_no_reliable_offset_found_adjust_it_manually)
 }

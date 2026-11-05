@@ -45,6 +45,28 @@ class SubtitleSyncTest {
     }
 
     @Test
+    fun `high correlation constant rate match accepts a small peak ratio margin`() {
+        val result = SyncResult(
+            timing = SubtitleTiming(-14_100, 1.0),
+            correlation = 0.6376586f,
+            ratio = 1.4869413f,
+            referenceCues = 40,
+        )
+        assertTrue(result.strong)
+    }
+
+    @Test
+    fun `high correlation frame rate match does not require a large peak ratio`() {
+        val result = SyncResult(
+            timing = SubtitleTiming(4_900, 25.0 / 23.976),
+            correlation = 0.778573f,
+            ratio = 1.1044441f,
+            referenceCues = 40,
+        )
+        assertTrue(result.strong)
+    }
+
+    @Test
     fun `align rejects insufficient references and playback windows`() {
         val references = cues(12)
         val longWindow = listOf(SubInterval(0, 60_000))
@@ -55,33 +77,16 @@ class SubtitleSyncTest {
     }
 
     @Test
-    fun `reference collector closes cues and playback windows on pause`() {
-        val collector = ReferenceCollector()
-        collector.begin(1_000)
-        collector.onCues(1_500, hasText = true)
-        collector.onCues(2_500, hasText = false)
-        collector.pause(5_000)
-
-        val (cues, windows) = collector.snapshot(6_000)
-
-        assertEquals(listOf(SubInterval(1_500, 2_500)), cues)
-        assertEquals(listOf(SubInterval(1_000, 5_000)), windows)
-        assertEquals(1, collector.cueCount)
-    }
-
-    @Test
-    fun `reference collector starts a fresh window after a seek`() {
-        val collector = ReferenceCollector()
-        collector.begin(1_000)
-        collector.onCues(1_200, hasText = true)
-        collector.jump(fromMs = 2_000, toMs = 10_000)
-        collector.onCues(11_000, hasText = true)
-        collector.onCues(12_000, hasText = false)
-
-        val (cues, windows) = collector.snapshot(15_000)
-
-        assertEquals(listOf(SubInterval(11_000, 12_000)), cues)
-        assertEquals(listOf(SubInterval(1_000, 2_000), SubInterval(10_000, 15_000)), windows)
+    fun `align stops when cancelled`() {
+        val references = cues(40)
+        assertNull(
+            SubtitleSync.align(
+                references,
+                listOf(SubInterval(0, 180_000)),
+                references,
+                isActive = { false },
+            ),
+        )
     }
 
     @Test

@@ -22,15 +22,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.abs
@@ -58,8 +54,10 @@ internal class SubtitleCoordinator(
     private val texts: Texts,
     private val media: () -> PlaybackMedia?,
     private val playingFileName: () -> String?,
+    private val sourceUrl: () -> String?,
     private val player: () -> Player?,
     private val notify: (String) -> Unit,
+    private val referenceReader: EmbeddedReferenceReader,
 ) {
     private val _externalSubs = MutableStateFlow<ExternalSubsState>(ExternalSubsState.Idle)
     val externalSubs: StateFlow<ExternalSubsState> = _externalSubs.asStateFlow()
@@ -77,27 +75,38 @@ internal class SubtitleCoordinator(
     private var subsJob: Job? = null
     private var syncJob: Job? = null
     private var currentExternal: ExternalSubtitle? = null
+    private var cachedReference: Pair<String, ReferenceReadResult>? = null
+    private var operationGeneration = 0L
 
-    private val reference = ReferenceCollector()
-    private var referencePending = false
-    private var referenceAwaitingStart = false
-    private var referenceAvailable = false
-    private var textSelectionBeforeReference: androidx.media3.common.TrackSelectionParameters? = null
-
-    private data class SubtitleCandidate(
+    private data class PendingCandidate(
         val item: ExternalSubtitle,
-        val label: String,
-        val segments: List<CuesWithTiming>,
-        val intervals: List<SubInterval>,
-        val run: MutableList<SyncResult> = mutableListOf(),
+        val active: ActiveExternalSubtitle,
     )
 
+    private var pendingCandidate: PendingCandidate? = null
+
     fun onNewSource() {
+        operationGeneration++
         subtitleDefaultHandled = false
         subsJob?.cancel()
-        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) {
-            cancelCandidateEvaluation()
-        }
+        syncJob?.cancel()
+        cachedReference = null
+        pendingCandidate = null
+        currentExternal = null
+        _activeExternal.value = null
+        _subtitleTiming.value = SubtitleTiming()
+        _syncStatus.value = SyncStatus.Off
+        _externalSubs.value = ExternalSubsState.Idle
+    }
+
+    fun onPlaybackStopped() {
+        operationGeneration++
+        subsJob?.cancel()
+        syncJob?.cancel()
+        pendingCandidate = null
+        val active = _activeExternal.value
+        _externalSubs.value = if (active != null) ExternalSubsState.Attached(active.label) else ExternalSubsState.Idle
+        if (active == null) subtitleDefaultHandled = false
     }
 
     fun search(language: String, automatic: Boolean = false) {
@@ -107,24 +116,30 @@ internal class SubtitleCoordinator(
             return
         }
         subsJob?.cancel()
-        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) cancelCandidateEvaluation()
+        val generation = ++operationGeneration
         _externalSubs.value = ExternalSubsState.Searching(language)
+        Log.i(TAG, "SUBTITLE_SEARCH_START automatic=$automatic language=$language ${queryContext(query)}")
         subsJob = scope.launch {
             runCatching { subtitles.search(query) }
                 .onSuccess { items ->
+                    if (generation != operationGeneration) return@onSuccess
+                    Log.i(TAG, "SUBTITLE_SEARCH_RESULT total=${items.size} providers=${items.groupingBy { it.provider }.eachCount()}")
                     if (items.isEmpty()) {
                         _externalSubs.value = ExternalSubsState.Results(language, items)
-                        if (automatic) {
-                            notify(texts.get(StringsR.string.player_no_external_subtitles_found_in_this_language))
-                        }
+                        if (automatic) notify(texts.get(StringsR.string.player_no_external_subtitles_found_in_this_language))
+                    } else if (automatic) {
+                        val best = items.sortedWith(
+                            compareByDescending<ExternalSubtitle> { it.matchScore }.thenBy { it.hearingImpaired },
+                        ).first()
+                        downloadAndSync(best, query)
                     } else {
-                        val count = candidateShortlist(items).size
-                        _externalSubs.value = ExternalSubsState.Results(language, items, evaluating = true, candidateCount = count)
-                        startCandidateEvaluation(language, items, query)
+                        _externalSubs.value = ExternalSubsState.Results(language, items)
                     }
                 }
                 .onFailure {
                     if (it is CancellationException) throw it
+                    if (generation != operationGeneration) return@onFailure
+                    Log.w(TAG, "SUBTITLE_SEARCH_FAILURE language=$language error=${it.message}")
                     _externalSubs.value = ExternalSubsState.Error(language, it.message ?: texts.get(StringsR.string.player_error_searching_subtitles))
                     if (automatic) notify(texts.get(StringsR.string.player_couldn_t_search_for_external_subtitles))
                 }
@@ -132,17 +147,18 @@ internal class SubtitleCoordinator(
     }
 
     fun download(item: ExternalSubtitle) {
-        subtitleDefaultHandled = true
         val query = buildQuery(item.language) ?: return
+        downloadAndSync(item, query)
+    }
+
+    private fun downloadAndSync(item: ExternalSubtitle, query: SubtitleQuery) {
+        subtitleDefaultHandled = true
         val previous = _externalSubs.value
-        cancelCandidateEvaluation()
-        if (currentExternal != null) {
-            Log.w(TAG, "AUTO_SYNC_FAILURE reason=replaced_by_user ${externalContext(currentExternal)}")
-            disable()
-        }
         subsJob?.cancel()
-        Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
+        syncJob?.cancel()
+        val generation = ++operationGeneration
         _externalSubs.value = ExternalSubsState.Downloading(item.language, item)
+        Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
         subsJob = scope.launch {
             runCatching {
                 val file = subtitles.download(item, query)
@@ -151,18 +167,23 @@ internal class SubtitleCoordinator(
                 file to segments
             }
                 .onSuccess { (file, segments) ->
-                    currentExternal = item
-                    attachExternal(file.label, segments)
+                    if (generation != operationGeneration) return@onSuccess
+                    val candidate = PendingCandidate(
+                        item = item,
+                        active = ActiveExternalSubtitle(file.label, segments, SubtitleSync.intervalsOf(segments)),
+                    )
+                    pendingCandidate = candidate
                     Log.i(TAG, "SUBTITLE_DOWNLOAD_SUCCESS ${externalContext(item)}")
-                    _externalSubs.value = ExternalSubsState.Attached(file.label)
+                    startSync(candidate)
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
-                    Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}", e)
-                    _externalSubs.value = ExternalSubsState.Error(item.language, e.message ?: texts.get(StringsR.string.player_couldn_t_download))
-                    if (previous is ExternalSubsState.Results) {
-                        delay(2_500)
-                        _externalSubs.value = previous.copy(evaluating = false)
+                    if (generation != operationGeneration) return@onFailure
+                    Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}")
+                    _externalSubs.value = when {
+                        _activeExternal.value != null -> ExternalSubsState.Attached(_activeExternal.value!!.label)
+                        previous is ExternalSubsState.Results -> previous
+                        else -> ExternalSubsState.Error(item.language, e.message ?: texts.get(StringsR.string.player_couldn_t_download))
                     }
                 }
         }
@@ -170,7 +191,6 @@ internal class SubtitleCoordinator(
 
     fun reset() {
         subsJob?.cancel()
-        if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) cancelCandidateEvaluation()
         _externalSubs.value = ExternalSubsState.Idle
     }
 
@@ -179,8 +199,10 @@ internal class SubtitleCoordinator(
     }
 
     fun disable() {
+        operationGeneration++
+        subsJob?.cancel()
         syncJob?.cancel()
-        restoreReferenceSelection()
+        pendingCandidate = null
         _activeExternal.value = null
         currentExternal = null
         _subtitleTiming.value = SubtitleTiming()
@@ -189,213 +211,122 @@ internal class SubtitleCoordinator(
 
     fun adjustOffset(deltaMs: Long) {
         if (_activeExternal.value == null) return
+        operationGeneration++
         syncJob?.cancel()
         val timing = _subtitleTiming.value.let { it.copy(offsetMs = it.offsetMs + deltaMs) }
-        Log.w(
-            TAG,
-            "AUTO_SYNC_FAILURE reason=manual_adjustment newOffsetMs=${timing.offsetMs} " +
-                "scale=${timing.scale} ${externalContext(currentExternal)}",
-        )
         _subtitleTiming.value = timing
         _syncStatus.value = SyncStatus.Manual(timing)
     }
 
     fun autoSyncNow() {
-        val ext = _activeExternal.value ?: return
-        if (!referenceAvailable) {
-            Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reference ${externalContext(currentExternal)}")
-            _syncStatus.value = SyncStatus.NoReference
-            notify(texts.get(StringsR.string.player_this_file_has_no_reference_subtitles_it))
-            return
-        }
-        syncJob?.cancel()
-        scope.launch {
-            val position = player()?.currentPosition ?: return@launch
-            val (refs, windows) = reference.snapshot(position)
-            val result = withContext(Dispatchers.Default) { SubtitleSync.align(refs, windows, ext.intervals) }
-            logResult(result)
-            if (result != null && (result.strong || result.plausible)) {
-                applyAuto(result.timing, announce = true, force = true)
-            } else {
-                _syncStatus.value = SyncStatus.Collecting(reference.cueCount)
-                notify(texts.get(StringsR.string.player_not_enough_data_yet_let_the_movie))
-                startAutoSync()
-            }
-        }
-    }
-
-    fun preparePlayer() {
-        val evaluating = (_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true
-        if ((_activeExternal.value != null || evaluating) && referenceAvailable) referencePending = true
+        val active = _activeExternal.value ?: return
+        val item = currentExternal ?: return
+        startSync(PendingCandidate(item, active), forceFresh = true)
     }
 
     fun onPlayerReady(player: Player, tracks: Tracks) = applySubtitlePreference(player, tracks)
 
-    fun onTracksChanged(player: Player, tracks: Tracks) {
-        applySubtitlePreference(player, tracks)
-        selectReferenceTrack(player, tracks)
-        if (referenceAwaitingStart && tracks.isTypeSelected(C.TRACK_TYPE_TEXT)) {
-            referenceAwaitingStart = false
-            reference.begin(player.currentPosition)
-        }
-    }
+    fun onTracksChanged(player: Player, tracks: Tracks) = applySubtitlePreference(player, tracks)
 
-    fun onCues(positionMs: Long, hasText: Boolean) = reference.onCues(positionMs, hasText)
-
-    fun onSeek(fromMs: Long, toMs: Long) = reference.jump(fromMs, toMs)
-
-    fun pause(positionMs: Long) = reference.pause(positionMs)
-
-    private fun startCandidateEvaluation(language: String, items: List<ExternalSubtitle>, query: SubtitleQuery) {
+    private fun startSync(candidate: PendingCandidate, forceFresh: Boolean = false) {
+        val ext = candidate.active
         syncJob?.cancel()
-        if (currentExternal != null) {
-            Log.w(TAG, "AUTO_SYNC_FAILURE reason=replaced_by_user ${externalContext(currentExternal)}")
-            disable()
-        }
-        beginReferenceCapture()
+        val generation = ++operationGeneration
+        pendingCandidate = candidate
+        if (_activeExternal.value == null) _syncStatus.value = SyncStatus.Collecting(0)
         syncJob = scope.launch {
-            val shortlist = candidateShortlist(items)
-            Log.i(TAG, "AUTO_SELECTION_START candidates=${shortlist.size} ${externalContext(null)}")
-            if (!referenceAvailable && !referencePending) {
-                failCandidateEvaluation(language, items, "no_reference")
-                return@launch
-            }
-            val downloaded = supervisorScope {
-                shortlist.map { item ->
-                    async {
-                        try {
-                            Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
-                            downloadCandidate(item, query)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}")
-                            null
-                        }
-                    }
-                }.awaitAll().filterNotNull().distinctBy { it.intervals }
-            }
-            if (!isActive) return@launch
-            if (downloaded.isEmpty()) {
-                failCandidateEvaluation(language, items, "no_downloads")
-                return@launch
-            }
-            Log.i(TAG, "AUTO_SELECTION_DOWNLOADED unique=${downloaded.size} of=${shortlist.size}")
-
-            var nextAt = SubtitleSync.MIN_REFERENCE_CUES
-            while (isActive) {
-                delay(3_000)
-                val count = reference.cueCount
-                _externalSubs.value = ExternalSubsState.Results(
-                    language, items, evaluating = true, candidateCount = downloaded.size, referenceCues = count,
-                )
-                if (!referenceAvailable && !referencePending) {
-                    failCandidateEvaluation(language, items, "no_reference")
-                    return@launch
+            when (val referenceResult = readReference(generation, forceFresh)) {
+                null -> if (generation == operationGeneration) failCandidate(candidate, SyncStatus.Unsure)
+                is ReferenceReadResult.Failure -> if (generation == operationGeneration) {
+                    failCandidate(candidate, SyncStatus.ReferenceError(referenceResult.failure))
                 }
-                if (count < nextAt) continue
-                val position = player()?.currentPosition ?: continue
-                val (refs, windows) = reference.snapshot(position)
-                nextAt = count + 5
-
-                val accepted = ArrayList<Pair<SubtitleCandidate, SyncResult>>()
-                for (candidate in downloaded) {
-                    val result = withContext(Dispatchers.Default) {
-                        SubtitleSync.align(refs, windows, candidate.intervals)
-                    } ?: continue
+                is ReferenceReadResult.Success -> {
+                    if (generation != operationGeneration) return@launch
+                    val reference = referenceResult.reference
+                    val refs = reference.intervals
+                    val windows = listOf(reference.sampledWindow)
                     Log.i(
                         TAG,
-                        "CANDIDATE_SCORE offsetMs=${result.timing.offsetMs} scale=${result.timing.scale} " +
-                            "correlation=${result.correlation} ratio=${result.ratio} refs=${result.referenceCues} " +
-                            externalContext(candidate.item),
+                        "SYNC_INPUT refs=${refs.size} window=${reference.sampledWindow.startMs}-${reference.sampledWindow.endMs} " +
+                            "track=${reference.track} external=${ext.intervals.size}",
                     )
-                    if (result.strong || result.plausible || result.consistent) {
-                        if (candidate.run.isNotEmpty() && !result.agreesWith(candidate.run.last())) candidate.run.clear()
-                        candidate.run += result
-                    } else {
-                        candidate.run.clear()
+                    val result = withContext(Dispatchers.Default) {
+                        SubtitleSync.align(refs, windows, ext.intervals, isActive = { isActive })
                     }
-                    val confirmed = result.strong || (result.plausible && candidate.run.size >= 2) || candidate.run.size >= 3
-                    if (confirmed) accepted += candidate to result
-                }
-
-                val winner = accepted.maxWithOrNull(
-                    compareByDescending<Pair<SubtitleCandidate, SyncResult>> { it.second.correlation }
-                        .thenByDescending { it.second.ratio }
-                        .thenByDescending { it.first.item.matchScore }
-                        .thenBy { it.first.item.hearingImpaired }
-                        .thenBy { it.first.item.provider }
-                        .thenBy { it.first.item.id },
-                )
-                if (winner != null) {
-                    selectCandidate(winner.first, winner.second)
-                    return@launch
-                }
-                if (count >= MAX_AUTO_REFERENCE_CUES) {
-                    failCandidateEvaluation(language, items, "no_reliable_match")
-                    return@launch
+                    if (generation != operationGeneration) return@launch
+                    Log.i(TAG, "SYNC_RESULT ${externalContext(candidate.item)} result=$result")
+                    if (result != null && (result.strong || result.plausible)) {
+                        commitCandidate(candidate, result.timing)
+                    } else {
+                        failCandidate(candidate, SyncStatus.Unsure)
+                    }
                 }
             }
         }
     }
 
-    private fun candidateShortlist(items: List<ExternalSubtitle>): List<ExternalSubtitle> {
-        val sorted = items.sortedWith(
-            compareByDescending<ExternalSubtitle> { it.matchScore }.thenBy { it.hearingImpaired },
-        )
-        val providers = sorted.groupBy { it.provider }.values.toList()
-        val diverse = ArrayList<ExternalSubtitle>()
-        var index = 0
-        while (diverse.size < AUTO_CANDIDATE_LIMIT && providers.any { index < it.size }) {
-            for (provider in providers) {
-                if (index < provider.size && diverse.size < AUTO_CANDIDATE_LIMIT) diverse += provider[index]
+    private suspend fun readReference(generation: Long, forceFresh: Boolean): ReferenceReadResult? {
+        val url = sourceUrl() ?: return null
+        val position = player()?.currentPosition ?: 0L
+        if (!forceFresh) {
+            cachedReference?.takeIf { it.first == url }?.second?.let { cached ->
+                val reusable = when (cached) {
+                    is ReferenceReadResult.Success -> position <= cached.reference.sampledWindow.endMs
+                    is ReferenceReadResult.Failure -> !cached.failure.retryable
+                }
+                if (reusable) return cached
             }
-            index++
         }
-        return diverse
+        val result = referenceReader.read(url, position)
+        if (generation == operationGeneration &&
+            (result !is ReferenceReadResult.Failure || !result.failure.retryable)
+        ) {
+            cachedReference = url to result
+        }
+        return result
     }
 
-    private suspend fun downloadCandidate(item: ExternalSubtitle, query: SubtitleQuery): SubtitleCandidate {
-        val file = subtitles.download(item, query)
-        val segments = withContext(Dispatchers.IO) { parseSubtitle(file.path, file.mimeType) }
-        check(segments.isNotEmpty()) { texts.get(StringsR.string.player_the_subtitle_is_empty_or_unreadable) }
-        return SubtitleCandidate(item, file.label, segments, SubtitleSync.intervalsOf(segments))
-    }
-
-    private fun selectCandidate(candidate: SubtitleCandidate, result: SyncResult) {
+    private fun commitCandidate(candidate: PendingCandidate, timing: SubtitleTiming) {
+        pendingCandidate = null
         currentExternal = candidate.item
-        _activeExternal.value = ActiveExternalSubtitle(candidate.label, candidate.segments, candidate.intervals)
-        Log.i(
-            TAG,
-            "AUTO_SELECTION_SUCCESS correlation=${result.correlation} ratio=${result.ratio} " +
-                externalContext(candidate.item),
-        )
-        applyAuto(result.timing, announce = true, force = true)
-        _externalSubs.value = ExternalSubsState.Attached(candidate.label)
-    }
-
-    private fun failCandidateEvaluation(language: String, items: List<ExternalSubtitle>, reason: String) {
-        Log.w(TAG, "AUTO_SELECTION_FAILURE reason=$reason")
-        _externalSubs.value = ExternalSubsState.Results(language, items)
-        _syncStatus.value = SyncStatus.Off
-        restoreReferenceSelection()
+        _activeExternal.value = candidate.active
+        _subtitleTiming.value = timing
+        _syncStatus.value = SyncStatus.Auto(timing)
+        _externalSubs.value = ExternalSubsState.Attached(candidate.active.label)
         notify(
-            if (reason == "no_reference") {
-                texts.get(StringsR.string.player_no_reference_subtitles_choose_one_and_adjust)
+            if (abs(timing.offsetMs) < 200 && timing.scale == 1.0) {
+                texts.get(StringsR.string.player_subtitles_checked_already_in_sync)
             } else {
-                texts.get(StringsR.string.player_no_subtitle_matched_automatically_choose_one_manually)
+                texts.get(StringsR.string.player_subtitles_synced, timing.describe(texts))
             },
         )
     }
 
-    private fun cancelCandidateEvaluation() {
-        syncJob?.cancel()
-        syncJob = null
-        if (_activeExternal.value == null) restoreReferenceSelection()
-        val current = _externalSubs.value
-        if (current is ExternalSubsState.Results && current.evaluating) {
-            _externalSubs.value = current.copy(evaluating = false)
+    private fun failCandidate(candidate: PendingCandidate, status: SyncStatus) {
+        pendingCandidate = null
+        val previous = _activeExternal.value
+        if (previous != null) {
+            _externalSubs.value = ExternalSubsState.Attached(previous.label)
+            notifyFailure(status)
+            return
         }
+        currentExternal = candidate.item
+        _activeExternal.value = candidate.active
+        _subtitleTiming.value = SubtitleTiming()
+        _syncStatus.value = status
+        _externalSubs.value = ExternalSubsState.Attached(candidate.active.label)
+        notifyFailure(status)
+    }
+
+    private fun notifyFailure(status: SyncStatus) {
+        val missingReference = status is SyncStatus.ReferenceError && !status.failure.retryable
+        notify(
+            if (missingReference) {
+                texts.get(StringsR.string.player_subtitles_added_if_they_re_out_of)
+            } else {
+                texts.get(StringsR.string.player_couldn_t_sync_the_subtitles_automatically_audio)
+            },
+        )
     }
 
     private fun buildQuery(language: String): SubtitleQuery? {
@@ -404,8 +335,14 @@ internal class SubtitleCoordinator(
     }
 
     private fun externalContext(item: ExternalSubtitle?): String = item?.let {
-        "provider=${it.provider} id=${it.id} release=${it.release.take(100).ifBlank { "unknown" }}"
+        "provider=${it.provider} id=${it.id.hashCode().toUInt()} release=${it.release.take(100).ifBlank { "unknown" }}"
     } ?: "subtitle=none"
+
+    private fun queryContext(query: SubtitleQuery): String {
+        val media = query.media
+        return "title=${media.title.take(80)} original=${media.originalTitle?.take(80)} year=${media.year} " +
+            "season=${media.season} episode=${media.episode} file=${query.fileName?.take(100)}"
+    }
 
     private fun parseSubtitle(path: String, mimeType: String): List<CuesWithTiming> {
         val format = Format.Builder().setSampleMimeType(mimeType).build()
@@ -418,92 +355,8 @@ internal class SubtitleCoordinator(
         return out.filter { it.startTimeUs != C.TIME_UNSET }.sortedBy { it.startTimeUs }
     }
 
-    private fun beginReferenceCapture() {
-        if (textSelectionBeforeReference == null) {
-            textSelectionBeforeReference = player()?.trackSelectionParameters
-        }
-        reference.reset()
-        referencePending = true
-        referenceAwaitingStart = false
-        referenceAvailable = false
-        player()?.let { selectReferenceTrack(it, it.currentTracks) }
-    }
-
-    private fun restoreReferenceSelection() {
-        referencePending = false
-        referenceAwaitingStart = false
-        referenceAvailable = false
-        textSelectionBeforeReference?.let { saved ->
-            player()?.trackSelectionParameters = saved
-        }
-        textSelectionBeforeReference = null
-        reference.reset()
-    }
-
-    private fun attachExternal(label: String, segments: List<CuesWithTiming>) {
-        syncJob?.cancel()
-        _activeExternal.value = ActiveExternalSubtitle(label, segments, SubtitleSync.intervalsOf(segments))
-        _subtitleTiming.value = SubtitleTiming()
-        _syncStatus.value = SyncStatus.Collecting(0)
-        beginReferenceCapture()
-        if (referenceAvailable) {
-            notify(texts.get(StringsR.string.player_subtitles_added, label))
-            startAutoSync()
-        }
-    }
-
-    private fun selectReferenceTrack(player: Player, tracks: Tracks) {
-        if (!referencePending || tracks.isEmpty) return
-        referencePending = false
-        val candidate = tracks.groups
-            .filter { it.type == C.TRACK_TYPE_TEXT }
-            .flatMap { g -> (0 until g.length).filter { g.isTrackSupported(it) }.map { g to it } }
-            .filterNot { (g, i) -> isForced(g.getTrackFormat(i)) }
-            .maxByOrNull { (g, i) -> referenceScore(g.getTrackFormat(i)) }
-        if (candidate == null) {
-            Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reference ${externalContext(currentExternal)}")
-            referenceAvailable = false
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                .build()
-            if (_activeExternal.value != null) {
-                if (_syncStatus.value !is SyncStatus.Manual) _syncStatus.value = SyncStatus.NoReference
-                notify(texts.get(StringsR.string.player_subtitles_added_if_they_re_out_of))
-            }
-            return
-        }
-        referenceAvailable = true
-        referenceAwaitingStart = true
-        val (group, index) = candidate
-        Log.i(TAG, "Referencia: ${group.getTrackFormat(index).language} ${group.getTrackFormat(index).label}")
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
-            .build()
-    }
-
-    private fun isForced(f: Format): Boolean {
-        val label = f.label.orEmpty().lowercase()
-        return f.selectionFlags and C.SELECTION_FLAG_FORCED != 0 ||
-            "forced" in label || "forzad" in label || "forcé" in label
-    }
-
-    private fun referenceScore(f: Format): Int {
-        val label = f.label.orEmpty().lowercase()
-        val sdh = "sdh" in label || "sordos" in label || "udenti" in label || "hearing" in label || "cc" == label
-        var score = if (sdh) 0 else 50
-        score += when (f.language?.take(2)) {
-            "en" -> 3
-            "es" -> 2
-            else -> 0
-        }
-        if (f.sampleMimeType != androidx.media3.common.MimeTypes.APPLICATION_PGS) score += 1
-        return score
-    }
-
     private fun applySubtitlePreference(player: Player, tracks: Tracks) {
-        if (subtitleDefaultHandled || tracks.isEmpty) return
+        if (subtitleDefaultHandled) return
         if (_activeExternal.value != null) {
             subtitleDefaultHandled = true
             return
@@ -557,82 +410,13 @@ internal class SubtitleCoordinator(
         search(subtitlePreference.code ?: return, automatic = true)
     }
 
-    private fun startAutoSync() {
-        syncJob?.cancel()
-        syncJob = scope.launch {
-            var nextAt = SubtitleSync.MIN_REFERENCE_CUES
-            val run = ArrayList<SyncResult>()
-            var applied: SyncResult? = null
-            while (isActive) {
-                delay(3_000)
-                val ext = _activeExternal.value ?: return@launch
-                val count = reference.cueCount
-                if (_syncStatus.value is SyncStatus.Collecting) _syncStatus.value = SyncStatus.Collecting(count)
-                if (count < nextAt) continue
-                val position = player()?.currentPosition ?: continue
-                val (refs, windows) = reference.snapshot(position)
-                val result = withContext(Dispatchers.Default) { SubtitleSync.align(refs, windows, ext.intervals) }
-                logResult(result)
-                if (result == null) continue
-                nextAt = count + 5
-                if (result.strong || result.plausible || result.consistent) {
-                    if (run.isNotEmpty() && !result.agreesWith(run.last())) run.clear()
-                    run += result
-                } else {
-                    run.clear()
-                }
-                val accepted = result.strong || (result.plausible && run.size >= 2) || run.size >= 3
-                if (accepted) {
-                    val first = applied
-                    applyAuto(result.timing, announce = first == null, force = false)
-                    if (first != null && result.agreesWith(first)) return@launch
-                    applied = result
-                } else if (count >= 80 && applied == null) {
-                    Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reliable_offset refs=$count ${externalContext(currentExternal)}")
-                    _syncStatus.value = SyncStatus.Unsure
-                    notify(texts.get(StringsR.string.player_couldn_t_sync_the_subtitles_automatically_audio))
-                    return@launch
-                }
-            }
-        }
-    }
-
-    private fun applyAuto(timing: SubtitleTiming, announce: Boolean, force: Boolean) {
-        if (!force && _syncStatus.value is SyncStatus.Manual) return
-        if (announce) {
-            Log.i(
-                TAG,
-                "AUTO_SYNC_SUCCESS offsetMs=${timing.offsetMs} scale=${timing.scale} ${externalContext(currentExternal)}",
-            )
-        }
-        _subtitleTiming.value = timing
-        _syncStatus.value = SyncStatus.Auto(timing)
-        if (announce) {
-            notify(
-                if (abs(timing.offsetMs) < 200 && timing.scale == 1.0) {
-                    texts.get(StringsR.string.player_subtitles_checked_already_in_sync)
-                } else {
-                    texts.get(StringsR.string.player_subtitles_synced, timing.describe(texts))
-                },
-            )
-        }
-    }
-
-    private fun logResult(result: SyncResult?) {
-        if (result == null) {
-            Log.i(TAG, "Sync: datos insuficientes (${reference.cueCount} frases)")
-        } else {
-            Log.i(
-                TAG,
-                "Sync: offset=${result.timing.offsetMs} scale=${result.timing.scale} r=${result.correlation} " +
-                    "ratio=${result.ratio} refs=${result.referenceCues} fuerte=${result.strong} plausible=${result.plausible}",
-            )
-        }
+    private fun isForced(f: Format): Boolean {
+        val label = f.label.orEmpty().lowercase()
+        return f.selectionFlags and C.SELECTION_FLAG_FORCED != 0 ||
+            "forced" in label || "forzad" in label || "forcé" in label
     }
 
     private companion object {
         const val TAG = "SubSync"
-        const val AUTO_CANDIDATE_LIMIT = 6
-        const val MAX_AUTO_REFERENCE_CUES = 80
     }
 }
