@@ -36,8 +36,8 @@ android {
         minSdk = 21
         targetSdk = 35
         // Al publicar una versión nueva: subir versionCode (+1) y versionName (1.0.1, 1.1.0…).
-        versionCode = 107
-        versionName = "1.0.7"
+        versionCode = 108
+        versionName = "1.0.8"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         buildConfigField("String", "RD_TOKEN", "\"$rdToken\"")
