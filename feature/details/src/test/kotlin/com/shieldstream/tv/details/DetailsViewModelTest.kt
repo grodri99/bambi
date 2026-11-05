@@ -107,15 +107,15 @@ class DetailsViewModelTest {
         testScheduler.advanceUntilIdle()
         viewModel.playEpisode(seasonOne)
         testScheduler.advanceUntilIdle()
-        assertEquals(1, holder.media.value?.season)
+        assertEquals(1, holder.playback.value?.media?.season)
 
         viewModel.selectSeason(2)
         testScheduler.advanceUntilIdle()
         viewModel.play()
         testScheduler.advanceUntilIdle()
 
-        assertEquals(2, holder.media.value?.season)
-        assertEquals(1, holder.media.value?.episode)
+        assertEquals(2, holder.playback.value?.media?.season)
+        assertEquals(1, holder.playback.value?.media?.episode)
     }
 
     private fun source(episode: Episode) = StreamSource(

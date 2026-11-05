@@ -206,11 +206,12 @@ class DetailsViewModel @Inject constructor(
     }
 
     private fun load() {
-        val item = holder.selectedItem.value
-        if (item == null) {
+        val request = holder.details.value
+        if (request == null) {
             _uiState.value = DetailsUiState.Error(texts.get(StringsR.string.details_no_title_selected))
             return
         }
+        val item = request.item
         viewModelScope.launch {
             val details = runCatching { catalogRepository.getDetails(item) }.getOrElse { CatalogDetails(item) }
             _uiState.value = DetailsUiState.Content(
@@ -220,9 +221,9 @@ class DetailsViewModel @Inject constructor(
                 spanishFirst = settings.spanishFirst.first(),
                 spanishOnly = settings.spanishOnlySources.first(),
             )
-            val playImmediately = holder.consumePlayImmediately()
+            val playImmediately = request.playImmediately
             if (details.item.type == MediaType.TV) {
-                val requested = holder.consumeEpisodeTarget()?.let { it.season to it.number }
+                val requested = request.target?.let { it.season to it.number }
                 val (season, episode) = requested
                     ?: continueTarget(details)
                     ?: (details.seasons.firstOrNull()?.number to null)

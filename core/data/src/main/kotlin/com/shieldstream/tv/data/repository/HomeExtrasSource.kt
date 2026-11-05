@@ -15,10 +15,8 @@ import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.network.dto.TmdbContentRatingsDto
 import com.shieldstream.tv.network.dto.TmdbImagesDto
-import com.shieldstream.tv.network.dto.TmdbMovieDto
 import com.shieldstream.tv.network.dto.TmdbReleaseDatesDto
 import com.shieldstream.tv.network.dto.TmdbSearchResultDto
-import com.shieldstream.tv.network.dto.TmdbTvDto
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -161,8 +159,8 @@ class HomeExtrasSource @Inject constructor(
                 type = MediaType.MOVIE,
                 title = d.title,
                 overview = d.overview,
-                posterUrl = d.poster_path?.let { "$IMG/w342$it" },
-                backdropUrl = d.backdrop_path?.let { "$IMG/w1280$it" } ?: return null,
+                posterUrl = d.poster_path?.let(TmdbImages::poster),
+                backdropUrl = d.backdrop_path?.let(TmdbImages::backdrop) ?: return null,
                 year = d.release_date?.take(4)?.toIntOrNull(),
                 rating = d.vote_average.toFloat(),
                 genres = d.genres.map { it.name },
@@ -185,8 +183,8 @@ class HomeExtrasSource @Inject constructor(
                 type = MediaType.TV,
                 title = d.name,
                 overview = d.overview,
-                posterUrl = d.poster_path?.let { "$IMG/w342$it" },
-                backdropUrl = d.backdrop_path?.let { "$IMG/w1280$it" } ?: return null,
+                posterUrl = d.poster_path?.let(TmdbImages::poster),
+                backdropUrl = d.backdrop_path?.let(TmdbImages::backdrop) ?: return null,
                 year = d.first_air_date?.take(4)?.toIntOrNull(),
                 rating = d.vote_average.toFloat(),
                 genres = d.genres.map { it.name },
@@ -358,12 +356,12 @@ class HomeExtrasSource @Inject constructor(
 
     private suspend fun movies(q: Query, extra: Map<String, String>, page: Int = 1): List<CatalogItem> {
         val p = params(q, extra, page) ?: return emptyList()
-        return tmdb.discoverMovieQuery(key, p).results.map { it.toItem() }
+        return tmdb.discoverMovieQuery(key, p).results.map { it.toCatalogItem() }
     }
 
     private suspend fun series(q: Query, extra: Map<String, String>, page: Int = 1): List<CatalogItem> {
         val p = params(q, extra, page) ?: return emptyList()
-        return tmdb.discoverTvQuery(key, p).results.map { it.toItem() }
+        return tmdb.discoverTvQuery(key, p).results.map { it.toCatalogItem() }
     }
 
     private suspend fun params(q: Query, extra: Map<String, String>, page: Int): Map<String, String>? {
@@ -409,44 +407,7 @@ class HomeExtrasSource @Inject constructor(
     // Utilidades
     // =====================================================================================
 
-    private fun TmdbMovieDto.toItem() = CatalogItem(
-        id = id.toString(),
-        imdbId = null,
-        type = MediaType.MOVIE,
-        title = title,
-        overview = overview,
-        posterUrl = poster_path?.let { "$IMG/w342$it" },
-        backdropUrl = backdrop_path?.let { "$IMG/w1280$it" },
-        year = release_date?.take(4)?.toIntOrNull(),
-        rating = vote_average.toFloat(),
-    )
-
-    private fun TmdbTvDto.toItem() = CatalogItem(
-        id = id.toString(),
-        imdbId = null,
-        type = MediaType.TV,
-        title = name,
-        overview = overview,
-        posterUrl = poster_path?.let { "$IMG/w342$it" },
-        backdropUrl = backdrop_path?.let { "$IMG/w1280$it" },
-        year = first_air_date?.take(4)?.toIntOrNull(),
-        rating = vote_average.toFloat(),
-    )
-
-    private fun pickLogo(images: TmdbImagesDto?): String? {
-        val logos = images?.logos.orEmpty().filter { it.file_path.isNotBlank() && !it.file_path.endsWith(".svg") }
-        val best = logos.sortedWith(
-            compareBy<com.shieldstream.tv.network.dto.TmdbImageDto> {
-                when (it.iso_639_1) {
-                    Lang.current.code -> 0
-                    "en" -> 1
-                    null -> 2
-                    else -> 3
-                }
-            }.thenByDescending { it.vote_average },
-        ).firstOrNull()
-        return best?.let { "$IMG/w500${it.file_path}" }
-    }
+    private fun pickLogo(images: TmdbImagesDto?): String? = TmdbImages.logo(images, Lang.current.code)
 
     private fun movieCertification(dates: TmdbReleaseDatesDto?): String? {
         fun of(country: String) = dates?.results?.firstOrNull { it.iso_3166_1 == country }
@@ -487,7 +448,6 @@ class HomeExtrasSource @Inject constructor(
     private fun isoDate(date: Date): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
 
     private companion object {
-        const val IMG = "https://image.tmdb.org/t/p"
         val POPULAR = mapOf("sort_by" to "popularity.desc", "vote_count.gte" to "30")
     }
 }

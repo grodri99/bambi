@@ -11,27 +11,27 @@ data class NextEpisode(val showId: String, val season: Int, val episode: Int, va
 
 data class EpisodeTarget(val season: Int, val number: Int)
 
+data class DetailsRequest(
+    val item: CatalogItem,
+    val target: EpisodeTarget? = null,
+    val playImmediately: Boolean = false,
+)
+
+data class PlaybackRequest(
+    val sources: List<StreamSource>,
+    val label: String,
+    val progressKey: String? = null,
+    val fromStart: Boolean = false,
+    val media: PlaybackMedia? = null,
+    val next: NextEpisode? = null,
+)
+
 class SelectedContentHolder {
-    private val _selectedItem = MutableStateFlow<CatalogItem?>(null)
-    val selectedItem: StateFlow<CatalogItem?> = _selectedItem.asStateFlow()
+    private val _details = MutableStateFlow<DetailsRequest?>(null)
+    val details: StateFlow<DetailsRequest?> = _details.asStateFlow()
 
-    private val _queue = MutableStateFlow<List<StreamSource>>(emptyList())
-    val queue: StateFlow<List<StreamSource>> = _queue.asStateFlow()
-
-    private val _playLabel = MutableStateFlow("")
-    val playLabel: StateFlow<String> = _playLabel.asStateFlow()
-
-    private val _progressKey = MutableStateFlow<String?>(null)
-    val progressKey: StateFlow<String?> = _progressKey.asStateFlow()
-
-    private val _startFromBeginning = MutableStateFlow(false)
-    val startFromBeginning: StateFlow<Boolean> = _startFromBeginning.asStateFlow()
-
-    private val _media = MutableStateFlow<PlaybackMedia?>(null)
-    val media: StateFlow<PlaybackMedia?> = _media.asStateFlow()
-
-    private val _next = MutableStateFlow<NextEpisode?>(null)
-    val next: StateFlow<NextEpisode?> = _next.asStateFlow()
+    private val _playback = MutableStateFlow<PlaybackRequest?>(null)
+    val playback: StateFlow<PlaybackRequest?> = _playback.asStateFlow()
 
     @Volatile private var nextRequested: NextEpisode? = null
 
@@ -48,19 +48,11 @@ class SelectedContentHolder {
         _prefetch.value = next
     }
 
-    @Volatile private var episodeTarget: EpisodeTarget? = null
-    @Volatile private var playImmediately: Boolean = false
-
     fun selectItem(item: CatalogItem, target: EpisodeTarget? = null, playImmediately: Boolean = false) {
-        episodeTarget = target
-        this.playImmediately = playImmediately
-        _selectedItem.value = item
-        _queue.value = emptyList()
+        _details.value = DetailsRequest(item, target, playImmediately)
+        _playback.value = null
         _prefetch.value = null
     }
-
-    fun consumeEpisodeTarget(): EpisodeTarget? = episodeTarget.also { episodeTarget = null }
-    fun consumePlayImmediately(): Boolean = playImmediately.also { playImmediately = false }
 
     fun playQueue(
         sources: List<StreamSource>,
@@ -70,11 +62,6 @@ class SelectedContentHolder {
         media: PlaybackMedia? = null,
         next: NextEpisode? = null,
     ) {
-        _next.value = next
-        _media.value = media
-        _queue.value = sources
-        _playLabel.value = label
-        _progressKey.value = progressKey
-        _startFromBeginning.value = fromStart
+        _playback.value = PlaybackRequest(sources, label, progressKey, fromStart, media, next)
     }
 }

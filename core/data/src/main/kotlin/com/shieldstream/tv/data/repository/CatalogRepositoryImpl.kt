@@ -40,12 +40,8 @@ import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
 import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.network.di.ApiConfig
-import com.shieldstream.tv.network.dto.TmdbImageDto
 import com.shieldstream.tv.network.dto.TmdbImagesDto
-import com.shieldstream.tv.network.dto.TmdbMovieDto
-import com.shieldstream.tv.network.dto.TmdbSearchResultDto
 import com.shieldstream.tv.network.dto.TmdbTranslationsDto
-import com.shieldstream.tv.network.dto.TmdbTvDto
 import com.shieldstream.tv.network.dto.TorrentioStreamDto
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -340,7 +336,7 @@ class CatalogRepositoryImpl @Inject constructor(
             number = episode_number,
             title = name.ifBlank { texts.get(StringsR.string.data_episode_name, episode_number) },
             overview = overview,
-            stillUrl = still_path?.let { "$IMG/w300$it" },
+            stillUrl = still_path?.let { TmdbImages.still(it) },
             runtimeMinutes = runtime,
             airDate = air_date,
         )
@@ -641,68 +637,10 @@ class CatalogRepositoryImpl @Inject constructor(
             ?.let { it.title ?: it.name }
             ?.takeIf { it.isNotBlank() }
 
-    private fun pickLogo(images: TmdbImagesDto?): String? {
-        val logos = images?.logos.orEmpty().filter { it.file_path.isNotBlank() && !it.file_path.endsWith(".svg") }
-        val best = logos.sortedWith(
-            compareBy<TmdbImageDto> {
-                when (it.iso_639_1) {
-                    Lang.current.code -> 0
-                    "en" -> 1
-                    null -> 2
-                    else -> 3
-                }
-            }.thenByDescending { it.vote_average },
-        ).firstOrNull()
-        return best?.let { "$IMG/w500${it.file_path}" }
-    }
+    private fun pickLogo(images: TmdbImagesDto?): String? = TmdbImages.logo(images, Lang.current.code)
 
-    // --- Mapeo TMDB -> CatalogItem ---
-
-    private fun poster(path: String) = "$IMG/w342$path"
-    private fun backdrop(path: String) = "$IMG/w1280$path"
-
-    private fun TmdbMovieDto.toCatalogItem(): CatalogItem = CatalogItem(
-        id = id.toString(),
-        imdbId = null,
-        type = MediaType.MOVIE,
-        title = title,
-        overview = overview,
-        posterUrl = poster_path?.let { poster(it) },
-        backdropUrl = backdrop_path?.let { backdrop(it) },
-        year = release_date?.take(4)?.toIntOrNull(),
-        rating = vote_average.toFloat(),
-    )
-
-    private fun TmdbTvDto.toCatalogItem(): CatalogItem = CatalogItem(
-        id = id.toString(),
-        imdbId = null,
-        type = MediaType.TV,
-        title = name,
-        overview = overview,
-        posterUrl = poster_path?.let { poster(it) },
-        backdropUrl = backdrop_path?.let { backdrop(it) },
-        year = first_air_date?.take(4)?.toIntOrNull(),
-        rating = vote_average.toFloat(),
-    )
-
-    private fun TmdbSearchResultDto.toCatalogItemOrNull(): CatalogItem? {
-        val type = when (media_type) {
-            "movie" -> MediaType.MOVIE
-            "tv" -> MediaType.TV
-            else -> return null
-        }
-        return CatalogItem(
-            id = id.toString(),
-            imdbId = null,
-            type = type,
-            title = title ?: name ?: "",
-            overview = overview,
-            posterUrl = poster_path?.let { poster(it) },
-            backdropUrl = backdrop_path?.let { backdrop(it) },
-            year = (release_date ?: first_air_date)?.take(4)?.toIntOrNull(),
-            rating = vote_average.toFloat(),
-        )
-    }
+    private fun poster(path: String) = TmdbImages.poster(path)
+    private fun backdrop(path: String) = TmdbImages.backdrop(path)
 
     // --- Mapeo Torrentio stream -> StreamSource ---
 
@@ -777,7 +715,6 @@ class CatalogRepositoryImpl @Inject constructor(
         const val PROVIDER_TIMEOUT_MS = 25_000L
         const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
         val MAGNET = Regex("magnet:\\?xt=urn:btih:([a-fA-F0-9]{40})([^\"'<>\\s]*)")
-        const val IMG = "https://image.tmdb.org/t/p"
         val SIZE_REGEX = Regex("([\\d.]+)\\s*(GB|GiB|MB|MiB)", RegexOption.IGNORE_CASE)
         val SEEDERS_REGEX = Regex("👤\\s*(\\d+)")
         val UNSUPPORTED_CODEC = Regex("(?<![a-z0-9])(x266|vvc|h\\.?266)(?![a-z0-9])", RegexOption.IGNORE_CASE)
