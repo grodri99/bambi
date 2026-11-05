@@ -188,8 +188,8 @@ private fun SettingsList(
             item {
                 Text(
                     if (state.debrid.viaTorrentio) {
-                        tr("${state.debrid.title} funciona a través de Torrentio, como en Stremio: tu clave se envía a ", "${state.debrid.title} works through Torrentio, like in Stremio: your key is sent to ") +
-                            tr("Torrentio para que consulte la caché y pida los enlaces. Real-Debrid, en cambio, se conecta ", "Torrentio so it can check the cache and request the links. Real-Debrid, on the other hand, connects ") +
+                        tr("${state.debrid.title} funciona a través de Torrentio y Peerflix, como en Stremio: tu clave se envía a ", "${state.debrid.title} works through Torrentio and Peerflix, like in Stremio: your key is sent to ") +
+                            tr("esos addons para que consulten la caché y pidan los enlaces. Real-Debrid, en cambio, se conecta ", "those addons so they can check the cache and request links. Real-Debrid, on the other hand, connects ") +
                             tr("directamente.", "directly.")
                     } else {
                         tr("Real-Debrid se conecta directamente desde la Shield: la clave no sale de tu casa.", "Real-Debrid connects directly from the Shield: your key never leaves your home.")
