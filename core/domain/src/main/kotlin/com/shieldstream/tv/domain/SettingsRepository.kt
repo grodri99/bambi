@@ -37,6 +37,9 @@ interface SettingsRepository {
     val subtitlePreference: Flow<SubtitlePreference>
     suspend fun setSubtitlePreference(preference: SubtitlePreference)
 
+    val experimentalSubtitleSync: Flow<Boolean>
+    suspend fun setExperimentalSubtitleSync(enabled: Boolean)
+
     val autoNextEpisode: Flow<Boolean>
     suspend fun setAutoNextEpisode(enabled: Boolean)
 

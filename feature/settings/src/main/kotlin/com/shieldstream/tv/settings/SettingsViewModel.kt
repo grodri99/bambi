@@ -54,6 +54,7 @@ private data class PlaybackSettings(
     val seekThumbnails: Boolean,
     val debrid: DebridService,
     val optimization: DeviceOptimization,
+    val experimentalSubtitleSync: Boolean,
 )
 
 sealed interface SettingsUiState {
@@ -65,6 +66,7 @@ sealed interface SettingsUiState {
         /** Servicio debrid en uso. */
         val debrid: DebridService,
         val optimization: DeviceOptimization,
+        val experimentalSubtitleSync: Boolean = true,
         val capabilities: DeviceCapabilities,
         val memoryProfile: MemoryProfile,
         val editor: KeyEditor?,
@@ -89,8 +91,9 @@ class SettingsViewModel @Inject constructor(
         settings.seekThumbnails,
         settings.debridService,
         settings.deviceOptimization,
-    ) { buffer, thumbnails, debrid, optimization ->
-        PlaybackSettings(buffer, thumbnails, debrid, optimization)
+        settings.experimentalSubtitleSync,
+    ) { buffer, thumbnails, debrid, optimization, experimentalSync ->
+        PlaybackSettings(buffer, thumbnails, debrid, optimization, experimentalSync)
     }
 
     val uiState: StateFlow<SettingsUiState> = combine(
@@ -117,6 +120,7 @@ class SettingsViewModel @Inject constructor(
             seekThumbnails = policy.seekThumbnails,
             debrid = playback.debrid,
             optimization = playback.optimization,
+            experimentalSubtitleSync = playback.experimentalSubtitleSync,
             capabilities = playbackPolicies.capabilities,
             memoryProfile = policy.memoryProfile,
             editor = edit,
@@ -151,6 +155,10 @@ class SettingsViewModel @Inject constructor(
 
     val providers: StateFlow<Set<SourceProvider>> =
         settings.sourceProviders.stateIn(viewModelScope, SharingStarted.Eagerly, SourceProvider.entries.toSet())
+
+    fun setExperimentalSubtitleSync(enabled: Boolean) {
+        viewModelScope.launch { settings.setExperimentalSubtitleSync(enabled) }
+    }
 
     fun toggleProvider(p: SourceProvider) {
         viewModelScope.launch {

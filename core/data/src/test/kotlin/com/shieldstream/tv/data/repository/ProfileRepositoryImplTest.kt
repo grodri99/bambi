@@ -7,6 +7,7 @@ import com.shieldstream.tv.strings.Texts
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,20 @@ class ProfileRepositoryImplTest {
     fun clearProfiles() {
         context = ApplicationProvider.getApplicationContext()
         context.getSharedPreferences("profiles", Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    @Test
+    fun `experimental sync preference persists across repository reloads`() {
+        val cleanup = mockk<ProfileDataCleaner>(relaxed = true)
+        val texts = mockk<Texts>(relaxed = true)
+        val repository = ProfileRepositoryImpl(context, cleanup, texts)
+        val profile = Profile(id = "sync", name = "Sync", avatar = 0, experimentalSubtitleSync = false)
+        repository.save(profile)
+        repository.select(profile.id)
+
+        val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
+        assertFalse(reloaded.active.value.experimentalSubtitleSync)
+        assertTrue(Profile(id = "default", name = "Default", avatar = 0).experimentalSubtitleSync)
     }
 
     @Test

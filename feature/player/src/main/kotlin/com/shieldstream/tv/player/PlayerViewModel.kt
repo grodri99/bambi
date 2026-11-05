@@ -129,6 +129,7 @@ class PlayerViewModel @Inject constructor(
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private val subtitlePreference = profiles.active.value.subtitlePreference
+    private val experimentalSubtitleSync = profiles.active.value.experimentalSubtitleSync
 
     private var started = false
     private var playbackVisible = true
@@ -162,6 +163,7 @@ class PlayerViewModel @Inject constructor(
         player = { _player.value },
         notify = { _notice.value = it },
         referenceReader = Media3EmbeddedReferenceReader(media3Factory.dataSourceFactory),
+        experimentalSyncEnabled = experimentalSubtitleSync,
     )
     val externalSubs: StateFlow<ExternalSubsState> = subtitleCoordinator.externalSubs
     val activeExternal: StateFlow<ActiveExternalSubtitle?> = subtitleCoordinator.activeExternal

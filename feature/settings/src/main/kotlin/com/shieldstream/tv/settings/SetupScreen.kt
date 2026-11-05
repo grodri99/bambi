@@ -118,10 +118,12 @@ fun SetupScreen(
                 SetupStep.PLAYBACK -> PlaybackPreferencesStep(
                     audio = s.audio,
                     subtitles = s.subtitles,
+                    experimentalSubtitleSync = s.experimentalSubtitleSync,
                     language = s.language,
                     onLanguage = viewModel::setLanguage,
                     onAudio = viewModel::setAudio,
                     onSubtitles = viewModel::setSubtitles,
+                    onExperimentalSync = viewModel::setExperimentalSubtitleSync,
                     onNext = viewModel::next,
                 )
                 SetupStep.TMDB -> KeyStep(
@@ -305,10 +307,12 @@ private fun StepNumber(text: String, color: Color = Accent, size: Dp = 30.dp) {
 private fun ColumnScope.PlaybackPreferencesStep(
     audio: SetupAudioPreference,
     subtitles: SubtitlePreference,
+    experimentalSubtitleSync: Boolean,
     language: AppLanguage,
     onLanguage: (AppLanguage) -> Unit,
     onAudio: (SetupAudioPreference) -> Unit,
     onSubtitles: (SubtitlePreference) -> Unit,
+    onExperimentalSync: (Boolean) -> Unit,
     onNext: () -> Unit,
 ) {
     val firstRequester = remember { FocusRequester() }
@@ -391,6 +395,25 @@ private fun ColumnScope.PlaybackPreferencesStep(
                 description = localizedStringResource(SR.setup_embedded_external),
                 selected = subtitles == SubtitlePreference.ENGLISH,
                 onClick = { onSubtitles(SubtitlePreference.ENGLISH) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(localizedStringResource(SR.settings_experimental_subtitle_sync), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SetupChoice(
+                title = localizedStringResource(SR.settings_on),
+                description = localizedStringResource(SR.settings_sync_demux_explanation),
+                selected = experimentalSubtitleSync,
+                onClick = { onExperimentalSync(true) },
+                modifier = Modifier.weight(1f),
+            )
+            SetupChoice(
+                title = localizedStringResource(SR.settings_off_9847b4),
+                description = localizedStringResource(SR.settings_sync_demux_explanation),
+                selected = !experimentalSubtitleSync,
+                onClick = { onExperimentalSync(false) },
                 modifier = Modifier.weight(1f),
             )
         }

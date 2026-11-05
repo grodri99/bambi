@@ -313,6 +313,7 @@ class SubtitleCoordinatorTest {
             coordinator.onNewSource()
             coordinator.onPlaybackStopped()
             coordinator.disable()
+            notifications = 0
             demuxResult.complete(ReferenceReadResult.Failure(fakeReferenceFailure()))
             delay(100)
 
@@ -320,6 +321,54 @@ class SubtitleCoordinatorTest {
             assertEquals(SyncStatus.Off, coordinator.syncStatus.value)
             assertEquals(ExternalSubsState.Idle, coordinator.externalSubs.value)
             assertEquals(0, notifications)
+        } finally {
+            scope.cancel()
+            subtitleFile.delete()
+        }
+    }
+
+    @Test
+    fun `disabled experimental sync attaches best subtitle without demuxing`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val subtitleFile = File.createTempFile("sync-disabled", ".srt").apply {
+            writeText("1\n00:00:01,000 --> 00:00:03,000\nHola\n")
+        }
+        val repository = FakeSubtitleRepository(subtitleFile)
+        val player = mockk<Player>(relaxed = true) {
+            every { currentTracks } returns Tracks.EMPTY
+            every { currentPosition } returns 0L
+        }
+        var readerCalls = 0
+        val reader = object : EmbeddedReferenceReader {
+            override suspend fun read(sourceUrl: String, positionMs: Long): ReferenceReadResult {
+                readerCalls++
+                return ReferenceReadResult.Failure(fakeReferenceFailure())
+            }
+        }
+        val coordinator = SubtitleCoordinator(
+            scope = scope,
+            subtitles = repository,
+            subtitlePreference = SubtitlePreference.SPANISH,
+            texts = mockk<Texts>(relaxed = true),
+            media = { PlaybackMedia(MediaType.MOVIE, "tt1", "Movie", "Movie", 2026) },
+            playingFileName = { "Movie.2026.mkv" },
+            sourceUrl = { "https://video.test/movie.mkv" },
+            player = { player },
+            notify = {},
+            referenceReader = reader,
+            experimentalSyncEnabled = false,
+        )
+
+        try {
+            coordinator.download(repository.result)
+            withTimeout(5_000) { while (coordinator.activeExternal.value == null) delay(25) }
+
+            assertEquals("Spanish", coordinator.activeExternal.value?.label)
+            assertEquals(SubtitleTiming(), coordinator.subtitleTiming.value)
+            assertEquals(SyncStatus.Off, coordinator.syncStatus.value)
+            assertEquals(0, readerCalls)
+            coordinator.autoSyncNow()
+            assertEquals(0, readerCalls)
         } finally {
             scope.cancel()
             subtitleFile.delete()

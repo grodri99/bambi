@@ -37,6 +37,7 @@ private data class SetupPlaybackPreferences(
     val spanishFirst: Boolean,
     val spanishOnly: Boolean,
     val subtitles: SubtitlePreference,
+    val experimentalSubtitleSync: Boolean,
 )
 
 sealed interface SetupUiState {
@@ -50,6 +51,7 @@ sealed interface SetupUiState {
         val error: String?,
         val audio: SetupAudioPreference,
         val subtitles: SubtitlePreference,
+        val experimentalSubtitleSync: Boolean = true,
         val language: AppLanguage,
     ) : SetupUiState {
         val languageChanged: Boolean get() = language != com.shieldstream.tv.model.Lang.current
@@ -76,6 +78,7 @@ class SetupViewModel @Inject constructor(
         settings.spanishFirst,
         settings.spanishOnlySources,
         settings.subtitlePreference,
+        settings.experimentalSubtitleSync,
         ::SetupPlaybackPreferences,
     )
 
@@ -99,6 +102,7 @@ class SetupViewModel @Inject constructor(
                 else -> SetupAudioPreference.ORIGINAL
             },
             subtitles = preferences.subtitles,
+            experimentalSubtitleSync = preferences.experimentalSubtitleSync,
             language = preferences.language,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SetupUiState.Loading)
@@ -137,6 +141,10 @@ class SetupViewModel @Inject constructor(
 
     fun setSubtitles(preference: SubtitlePreference) {
         viewModelScope.launch { settings.setSubtitlePreference(preference) }
+    }
+
+    fun setExperimentalSubtitleSync(enabled: Boolean) {
+        viewModelScope.launch { settings.setExperimentalSubtitleSync(enabled) }
     }
 
     fun submitKey(service: ApiService, input: String) {

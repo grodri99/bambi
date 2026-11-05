@@ -292,11 +292,7 @@ fun SubtitleTiming.describe(texts: Texts): String {
 
 fun SyncStatus.describe(texts: Texts): String = when (this) {
     SyncStatus.Off -> ""
-    is SyncStatus.Collecting -> if (referenceCues < SubtitleSync.MIN_REFERENCE_CUES) {
-        texts.get(StringsR.string.player_sync_reading, referenceCues, SubtitleSync.MIN_REFERENCE_CUES)
-    } else {
-        texts.get(StringsR.string.player_sync_finding, referenceCues)
-    }
+    is SyncStatus.Collecting -> texts.get(StringsR.string.player_sync_please_wait)
     is SyncStatus.Auto -> texts.get(StringsR.string.player_sync_auto, timing.describe(texts))
     is SyncStatus.Manual -> texts.get(StringsR.string.player_sync_manual, timing.describe(texts))
     SyncStatus.NoReference -> texts.get(StringsR.string.player_this_file_has_no_subtitles_to_use)

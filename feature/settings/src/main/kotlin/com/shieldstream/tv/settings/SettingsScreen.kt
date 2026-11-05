@@ -119,6 +119,7 @@ fun SettingsScreen(
                     onSeekMode = viewModel::setSeekThumbnails,
                     onDebrid = viewModel::setDebrid,
                     onDeviceOptimization = viewModel::setDeviceOptimization,
+                    onExperimentalSync = viewModel::setExperimentalSubtitleSync,
                     onOpenSetup = onOpenSetup,
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
@@ -145,6 +146,7 @@ private fun SettingsList(
     onSeekMode: (Boolean) -> Unit,
     onDebrid: (DebridService) -> Unit,
     onDeviceOptimization: (DeviceOptimization) -> Unit,
+    onExperimentalSync: (Boolean) -> Unit,
     onOpenSetup: () -> Unit,
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
@@ -237,6 +239,7 @@ private fun SettingsList(
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
+            item { ExperimentalSyncCard(enabled = state.experimentalSubtitleSync, onChange = onExperimentalSync) }
             item {
                 DeviceOptimizationCard(
                     optimization = state.optimization,
@@ -605,6 +608,45 @@ private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewMode
             }
             Spacer(Modifier.width(24.dp))
             Row(Modifier.background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50)).padding(4.dp)) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExperimentalSyncCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    FocusCard(
+        onClick = { onChange(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { onChange(true); true }
+                Key.DirectionRight -> { onChange(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_experimental_subtitle_sync),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_sync_demux_explanation),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
                 SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }

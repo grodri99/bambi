@@ -65,12 +65,14 @@
     <string name="player_that_source_doesn_t_have_the_episode">That source doesn\'t have the episode: trying another</string>
     <string name="player_subtitle_offset_later">+%1$s s (later)</string>
     <string name="player_subtitle_offset_earlier">−%1$s s (earlier)</string>
+    <string name="player_sync_please_wait">Syncing subtitles, please wait…</string>
     <string name="player_sync_reading">Auto-sync: reading the file\'s subtitles (%1$d/%2$d lines)…</string>
     <string name="player_sync_finding">Auto-sync: finding the offset (%1$d lines read)…</string>
     <string name="player_sync_auto">Synced automatically: %1$s</string>
     <string name="player_sync_manual">Manual adjustment: %1$s</string>
     <string name="player_queue_source">Source %1$d of %2$d · </string>
     <string name="player_resume_from">Resuming from %1$s</string>
+    <string name="player_subtitles_attached">Subtitles added: %1$s</string>
     <string name="player_subtitles_added">Subtitles added: %1$s · syncing…</string>
     <string name="player_subtitles_synced">Subtitles synced automatically: %1$s</string>
     <string name="player_source_open_error">The source couldn\'t be opened (%1$s).</string>

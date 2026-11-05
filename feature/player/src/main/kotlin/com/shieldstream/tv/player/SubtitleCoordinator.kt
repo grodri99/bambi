@@ -58,6 +58,7 @@ internal class SubtitleCoordinator(
     private val player: () -> Player?,
     private val notify: (String) -> Unit,
     private val referenceReader: EmbeddedReferenceReader,
+    private val experimentalSyncEnabled: Boolean = true,
 ) {
     private val _externalSubs = MutableStateFlow<ExternalSubsState>(ExternalSubsState.Idle)
     val externalSubs: StateFlow<ExternalSubsState> = _externalSubs.asStateFlow()
@@ -174,7 +175,7 @@ internal class SubtitleCoordinator(
                     )
                     pendingCandidate = candidate
                     Log.i(TAG, "SUBTITLE_DOWNLOAD_SUCCESS ${externalContext(item)}")
-                    startSync(candidate)
+                    if (experimentalSyncEnabled) startSync(candidate) else attachWithoutSync(candidate)
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
@@ -219,6 +220,7 @@ internal class SubtitleCoordinator(
     }
 
     fun autoSyncNow() {
+        if (!experimentalSyncEnabled) return
         val active = _activeExternal.value ?: return
         val item = currentExternal ?: return
         startSync(PendingCandidate(item, active), forceFresh = true)
@@ -234,6 +236,7 @@ internal class SubtitleCoordinator(
         val generation = ++operationGeneration
         pendingCandidate = candidate
         if (_activeExternal.value == null) _syncStatus.value = SyncStatus.Collecting(0)
+        notify(texts.get(StringsR.string.player_sync_please_wait))
         syncJob = scope.launch {
             when (val referenceResult = readReference(generation, forceFresh)) {
                 null -> if (generation == operationGeneration) failCandidate(candidate, SyncStatus.Unsure)
@@ -300,6 +303,16 @@ internal class SubtitleCoordinator(
                 texts.get(StringsR.string.player_subtitles_synced, timing.describe(texts))
             },
         )
+    }
+
+    private fun attachWithoutSync(candidate: PendingCandidate) {
+        pendingCandidate = null
+        currentExternal = candidate.item
+        _activeExternal.value = candidate.active
+        _subtitleTiming.value = SubtitleTiming()
+        _syncStatus.value = SyncStatus.Off
+        _externalSubs.value = ExternalSubsState.Attached(candidate.active.label)
+        notify(texts.get(StringsR.string.player_subtitles_attached, candidate.active.label))
     }
 
     private fun failCandidate(candidate: PendingCandidate, status: SyncStatus) {

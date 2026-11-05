@@ -116,6 +116,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val spanishOnlySources: Boolean? = null,
         val hiddenCategories: Set<String>? = null,
         val subtitlePreference: SubtitlePreference? = null,
+        val experimentalSubtitleSync: Boolean? = null,
     ) {
         fun toProfile(legacyFirst: Boolean, legacyOnly: Boolean, legacyHidden: Set<String>) = Profile(
             id, name, avatar, traktUser, pinHash, kids,
@@ -123,12 +124,13 @@ class ProfileRepositoryImpl @Inject constructor(
             spanishOnlySources = spanishOnlySources ?: (kids || legacyOnly),
             hiddenCategories = hiddenCategories ?: legacyHidden,
             subtitlePreference = subtitlePreference ?: SubtitlePreference.OFF,
+            experimentalSubtitleSync = experimentalSubtitleSync ?: true,
         )
 
         companion object {
             fun from(p: Profile) = StoredProfile(
                 p.id, p.name, p.avatar, p.traktUser, p.pinHash, p.kids,
-                p.spanishFirst, p.spanishOnlySources, p.hiddenCategories, p.subtitlePreference,
+                p.spanishFirst, p.spanishOnlySources, p.hiddenCategories, p.subtitlePreference, p.experimentalSubtitleSync,
             )
         }
     }

@@ -74,6 +74,13 @@ class SettingsRepositoryImpl @Inject constructor(
         profiles.save(profiles.active.value.copy(subtitlePreference = preference))
     }
 
+    override val experimentalSubtitleSync: Flow<Boolean> = profiles.active
+        .map { it.experimentalSubtitleSync }.distinctUntilChanged()
+
+    override suspend fun setExperimentalSubtitleSync(enabled: Boolean) {
+        profiles.save(profiles.active.value.copy(experimentalSubtitleSync = enabled))
+    }
+
     private val autoNextFlow = MutableStateFlow(prefs.getBoolean(KEY_AUTO_NEXT, true))
     override val autoNextEpisode: Flow<Boolean> = autoNextFlow
 
