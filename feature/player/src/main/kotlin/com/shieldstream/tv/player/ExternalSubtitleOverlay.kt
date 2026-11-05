@@ -33,12 +33,6 @@ import androidx.media3.ui.SubtitleView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-/**
- * Pinta el subtítulo externo encima del vídeo. Lo hace la app (no ExoPlayer) para poder desplazarlo en el
- * tiempo al instante, sin recargar el vídeo: cada 40 ms se mira la posición del reproductor, se le aplica
- * el ajuste ([timing]) y se muestra el segmento que toca. Mismo estilo que los subtítulos del PlayerView
- * (los de Accesibilidad › Subtítulos de Android TV).
- */
 @OptIn(UnstableApi::class)
 @Composable
 internal fun ExternalSubtitleOverlay(
@@ -74,10 +68,6 @@ internal fun ExternalSubtitleOverlay(
     }
 }
 
-/**
- * Barra "Sincronizar subtítulos". Arriba, para que el subtítulo (abajo) se siga viendo mientras se ajusta.
- * Las teclas las gestiona PlayerScreen: ◀ ▶ ±0,1 s · ▼ ▲ ±1 s · OK sincronización automática · Atrás cerrar.
- */
 @Composable
 internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifier: Modifier = Modifier) {
     Column(

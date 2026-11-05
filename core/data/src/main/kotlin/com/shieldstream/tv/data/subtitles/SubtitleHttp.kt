@@ -11,11 +11,6 @@ import java.net.UnknownHostException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Cliente HTTP para subtítulos con DNS de respaldo.
- * Algunas operadoras/filtros DNS no resuelven webs de subtítulos (p. ej. podnapisi.net):
- * si el DNS del sistema falla, se resuelve por DNS-over-HTTPS.
- */
 @Singleton
 class SubtitleHttp @Inject constructor(base: OkHttpClient) {
     val client: OkHttpClient = base.newBuilder()
@@ -23,10 +18,6 @@ class SubtitleHttp @Inject constructor(base: OkHttpClient) {
         .build()
 }
 
-/**
- * Sistema → Google → Quad9 → Cloudflare. Varios porque el almacén de certificados de Android 11
- * (Shield) no confía en todas las CA actuales (Cloudflare falla con "Trust anchor not found").
- */
 private class FallbackDns(bootstrap: OkHttpClient) : Dns {
     private val resolvers: List<Pair<String, Dns>> = listOf(
         doh(bootstrap, "Google", "https://dns.google/dns-query", "8.8.8.8", "8.8.4.4"),
@@ -45,7 +36,6 @@ private class FallbackDns(bootstrap: OkHttpClient) : Dns {
                 return resolver.lookup(hostname).also { Log.i("Subtitles", "$hostname resuelto vía $name") }
             } catch (e: Exception) {
                 Log.w("Subtitles", "DoH $name falló para $hostname: ${e.message}")
-                // NXDOMAIN = respuesta válida "no existe": no tiene sentido preguntar a otro.
                 if (e.message?.contains("NXDOMAIN") == true) break
             }
         }

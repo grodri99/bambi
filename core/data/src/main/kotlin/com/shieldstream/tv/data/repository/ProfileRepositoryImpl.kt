@@ -22,10 +22,6 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Perfiles en SharedPreferences ("profiles"): la lista como JSON y el id del activo.
- * Son pocos y pequeños; se leen una vez al arrancar y se mantienen en memoria.
- */
 @Singleton
 class ProfileRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -77,7 +73,6 @@ class ProfileRepositoryImpl @Inject constructor(
         if (list.size <= 1 || list.none { it.id == id }) return
         val updated = list.filterNot { it.id == id }
         store(updated)
-        // Lo suyo: progreso y cuenta de Trakt.
         for (name in listOf(WatchProgressRepositoryImpl.prefsNameFor(id), MyListRepositoryImpl.prefsNameFor(id))) {
             if (Build.VERSION.SDK_INT >= 24) {
                 context.deleteSharedPreferences(name)
@@ -95,7 +90,6 @@ class ProfileRepositoryImpl @Inject constructor(
     }
 
     private fun load(): List<Profile> {
-        // Migrar los ajustes generales una sola vez; los perfiles infantiles empiezan solo en español.
         val legacy = context.getSharedPreferences(AppLanguage.PREFS, Context.MODE_PRIVATE)
         val spanishFirst = legacy.getBoolean("spanish_first", !Lang.isEnglish)
         val spanishOnly = legacy.getBoolean("spanish_only_sources", false)
@@ -108,7 +102,6 @@ class ProfileRepositoryImpl @Inject constructor(
             prefs.edit().putString(KEY_LIST, json.encodeToString(stored.map { StoredProfile.from(it) })).apply()
             return stored
         }
-        // Primera vez: un perfil con el progreso que ya había (ver Profile.DEFAULT_ID).
         val first = listOf(Profile(
             Profile.DEFAULT_ID, tr("Principal", "Main"), avatar = 0,
             spanishFirst = spanishFirst, spanishOnlySources = spanishOnly,
@@ -124,7 +117,6 @@ class ProfileRepositoryImpl @Inject constructor(
         val name: String,
         val avatar: Int,
         val traktUser: String? = null,
-        // Campos nuevos con valor por defecto: los perfiles guardados antes se leen igual.
         val pinHash: String? = null,
         val kids: Boolean = false,
         val spanishFirst: Boolean? = null,

@@ -93,7 +93,6 @@ fun DetailsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Solo con la ficha visible (STARTED; tapada por el reproductor baja a CREATED): lo que llegue tarde se descarta.
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -105,7 +104,6 @@ fun DetailsScreen(
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenHidden() }
-    // De vuelta del reproductor: si pidió el siguiente episodio, arranca aquí (ver onScreenResumed).
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onScreenResumed() }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -139,7 +137,6 @@ private fun DetailsContent(
         withFrameNanos { }
         runCatching { playRequester.requestFocus() }
     }
-    // Al cerrar el panel el foco vuelve al botón principal.
     LaunchedEffect(panelOpen) {
         if (!panelOpen) {
             withFrameNanos { }
@@ -150,7 +147,6 @@ private fun DetailsContent(
     val item = state.details.item
 
     Box(Modifier.fillMaxSize().onBackKey(enabled = panelOpen) { panelOpen = false }) {
-        // Fondo: backdrop a pantalla completa con degradados a negro (izquierda y abajo).
         AsyncImage(
             model = item.backdropUrl ?: item.posterUrl,
             contentDescription = null,
@@ -192,6 +188,7 @@ private fun DetailsContent(
                 },
                 onToggleWatched = { if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched() },
                 onToggleMyList = viewModel::toggleMyList,
+                onToggleFollowing = viewModel::toggleFollowing,
                 modifier = Modifier.padding(start = 56.dp, end = 56.dp),
             )
 
@@ -245,11 +242,11 @@ private fun InfoBlock(
     onOpenSources: () -> Unit,
     onToggleWatched: () -> Unit,
     onToggleMyList: () -> Unit,
+    onToggleFollowing: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val item = details.item
     Column(modifier.widthIn(max = 600.dp)) {
-        // Logo del título si TMDB lo tiene (como Netflix); si no, texto grande.
         if (details.logoUrl != null) {
             AsyncImage(
                 model = details.logoUrl,
@@ -275,9 +272,11 @@ private fun InfoBlock(
             Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
         }
         details.nextEpisode?.let { next ->
-            val release = listOf(next.code, next.title, formatEpisodeDate(next.airDate, includeYear = true))
-                .filter { it.isNotBlank() }
-                .joinToString(" · ")
+            val release = remember(next) {
+                listOf(next.code, next.title, formatEpisodeDate(next.airDate, includeYear = true))
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 text = tr("Próximamente: $release", "Coming soon: $release"),
@@ -297,7 +296,6 @@ private fun InfoBlock(
         )
         Spacer(Modifier.height(20.dp))
 
-        // Sin el tope de 600 dp del texto: con "Desde el principio" y "Marcar vista" son 4 botones y no caben.
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -331,7 +329,6 @@ private fun InfoBlock(
                 onClick = onOpenSources,
                 enabled = interactive,
             )
-            // Marcar a mano: la película, o la temporada que se ve (los episodios sueltos: mantener OK en su tarjeta).
             val watchedLabel = if (state.isSeries) {
                 val season = state.selectedSeason
                 val eps = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
@@ -357,7 +354,6 @@ private fun InfoBlock(
                     enabled = interactive,
                 )
             }
-            // Mi lista (como Netflix): + para añadir, ✓ si ya está (OK la quita).
             if (!state.pendingPlay) {
                 TvButton(
                     text = if (state.inMyList) tr("En mi lista", "In my list") else tr("Mi lista", "My list"),
@@ -365,9 +361,16 @@ private fun InfoBlock(
                     onClick = onToggleMyList,
                     enabled = interactive,
                 )
+                if (state.isSeries) {
+                    TvButton(
+                        text = if (state.following) tr("Siguiendo", "Following") else tr("Seguir", "Follow"),
+                        icon = if (state.following) AppIcons.Check else AppIcons.Add,
+                        onClick = onToggleFollowing,
+                        enabled = interactive,
+                    )
+                }
             }
         }
-        // Barra de visionado bajo los botones (película o episodio seleccionado), como Netflix.
         state.mainProgress?.takeIf { it.isResumable }?.let { p ->
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -414,7 +417,6 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
             Text(it, color = Color.White, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.width(14.dp))
         }
-        // Mejor calidad disponible según las fuentes ya cargadas.
         (state.sources as? SourcesState.Ready)?.sources?.firstOrNull()?.let { best ->
             Badge(best.quality.label)
             if (best.hdrType != HdrType.SDR) {
@@ -491,7 +493,7 @@ private fun SeasonsAndEpisodes(
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
         } else {
             Text(
                 text = tr("Episodios", "Episodes"),
@@ -499,6 +501,17 @@ private fun SeasonsAndEpisodes(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.padding(start = 56.dp, bottom = 10.dp),
             )
+        }
+        val loadedEpisodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+        if (loadedEpisodes.isNotEmpty()) {
+            val watched = loadedEpisodes.count { state.progressOf(it)?.isWatched == true }
+            Text(
+                text = tr("$watched / ${loadedEpisodes.size} episodios vistos", "$watched / ${loadedEpisodes.size} episodes watched"),
+                color = Grey,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 56.dp),
+            )
+            Spacer(Modifier.height(10.dp))
         }
 
         when (val eps = state.episodes) {
@@ -578,7 +591,6 @@ private fun EpisodeCard(
                 .background(Color(0xFF232327))
                 .then(if (focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
-                // Mantener OK: visto ⇄ no visto. Con el panel de fuentes abierto (enabled = false) ni se enfoca.
                 .then(if (enabled) Modifier.tvClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.tvClickable(enabled = false) {}),
         ) {
             if (episode.stillUrl != null) {
@@ -589,7 +601,6 @@ private fun EpisodeCard(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            // Visto → tick; a medias → barra roja de por dónde vas (abajo de la miniatura).
             if (progress?.isWatched == true) {
                 Box(
                     Modifier
@@ -639,7 +650,6 @@ private fun EpisodeCard(
     }
 }
 
-/** Panel lateral derecho con todas las fuentes, ordenadas por caché RD → HDR/DV → calidad → seeders. */
 @Composable
 private fun SourcesPanel(
     state: DetailsUiState.Content,
@@ -653,16 +663,12 @@ private fun SourcesPanel(
     val pending = (state.sources as? SourcesState.Ready)?.pending.orEmpty()
     val unavailable = (state.sources as? SourcesState.Ready)?.unavailable.orEmpty() +
         pending.associateWith { tr("Buscando…", "Searching…") }
-    // Buscadores con fuentes + los que no han dado nada (lista vacía → cabecera con el motivo), en orden fijo.
     val spanishFirst = state.spanishFirst
     val spanishOnly = state.spanishOnly
     val groups = remember(sources, unavailable, spanishFirst, spanishOnly) {
         val byProvider = sources.groupBy { it.provider }
-        // Dentro de cada sección: (con "Castellano primero") las de audio en español; luego la mejor calidad y, a
-        // igual calidad, la más grande.
         (byProvider.keys + unavailable.keys).distinct().sortedBy { order.indexOf(it) }.map { section ->
             section to byProvider[section].orEmpty()
-                // "Solo en español": castellano o "Spanish"/"Dual" (puntuación ≥ 2); fuera latino dudoso y VOSE.
                 .filter { !spanishOnly || it.advertisesSpanishAudio }
                 .sortedWith(
                 compareByDescending<StreamSource> { if (spanishFirst) it.spanishAudioScore else 0 }
@@ -671,7 +677,6 @@ private fun SourcesPanel(
             )
         }
     }
-    // Lo que el usuario abre/cierra se mantiene aunque sigan llegando buscadores; solo se abre solo el primero con fuentes.
     var open by remember { mutableStateOf(emptySet<String>()) }
     var autoOpened by remember { mutableStateOf(false) }
     LaunchedEffect(groups) {
@@ -700,7 +705,6 @@ private fun SourcesPanel(
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.weight(1f),
                 )
-                // ▲ desde la primera sección. Se recuerda para las siguientes fichas.
                 SpanishOnlyChip(enabled = spanishOnly, onClick = onToggleSpanishOnly)
             }
             state.selectedEpisode?.takeIf { state.isSeries }?.let {
@@ -722,7 +726,6 @@ private fun SourcesPanel(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(bottom = 32.dp),
                     ) {
-                        // Una sección por buscador (Torrentio, KnightCrawler…); OK en la cabecera la abre o la cierra.
                         groups.forEachIndexed { index, (name, list) ->
                             item(key = "h:$name") {
                                 ProviderHeader(
@@ -747,7 +750,6 @@ private fun SourcesPanel(
     }
 }
 
-/** Píldora "Solo en español" del panel de Fuentes (marcada = filtro puesto). */
 @Composable
 private fun SpanishOnlyChip(enabled: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
@@ -809,7 +811,6 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Bloqueada por Real-Debrid (ya se intentó): apagada y con el motivo, para no volver a elegirla.
         val fg = when {
             focused -> Color.Black
             blocked -> Color.White.copy(alpha = 0.4f)
@@ -857,7 +858,6 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
     }
 }
 
-/** Barra de visionado estilo Netflix: gris con el tramo visto en rojo. */
 @Composable
 private fun WatchBar(fraction: Float, modifier: Modifier = Modifier) {
     Box(

@@ -11,7 +11,6 @@ data class TorrentioStreamResponse(
 data class TorrentioStreamDto(
     val name: String = "",
     val title: String = "",
-    /** Algunas versiones del protocolo Stremio usan description en vez de title. */
     val description: String? = null,
     val infoHash: String? = null,
     val fileIdx: Int? = null,

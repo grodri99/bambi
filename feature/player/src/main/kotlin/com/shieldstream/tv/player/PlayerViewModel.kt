@@ -70,14 +70,11 @@ sealed interface PlayerUiState {
     data class Error(val message: String) : PlayerUiState
 }
 
-/** Estado del apartado "Subtítulos externos" del panel. */
-/** Botón "Saltar intro" / "Saltar resumen" (OK salta a [targetMs]). */
 sealed interface SkipPromptUiState {
     data object Hidden : SkipPromptUiState
     data class Showing(val label: String, val targetMs: Long) : SkipPromptUiState
 }
 
-/** Tarjeta "Siguiente episodio" (series, al final del episodio). */
 sealed interface NextUpUiState {
     data object Hidden : NextUpUiState
     data class Showing(val label: String, val secondsLeft: Int) : NextUpUiState
@@ -94,7 +91,6 @@ sealed interface ExternalSubsState {
         val referenceCues: Int = 0,
     ) : ExternalSubsState
     data class Downloading(val language: String, val item: ExternalSubtitle) : ExternalSubsState
-    /** Cargado en el vídeo: la pantalla cierra el panel. */
     data class Attached(val label: String) : ExternalSubsState
     data class Error(val language: String, val message: String) : ExternalSubsState
 }
@@ -123,20 +119,16 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving(tr("Preparando…", "Preparing…"), 1, 1))
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    /** Aviso breve arriba ("Reanudando desde 42:10", "Subtítulos añadidos…"). */
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
     private val _externalSubs = MutableStateFlow<ExternalSubsState>(ExternalSubsState.Idle)
     val externalSubs: StateFlow<ExternalSubsState> = _externalSubs.asStateFlow()
 
-    // Lo que se reproduce se fija al crear el reproductor: si luego cambia la selección compartida
-    // (otra ficha), este reproductor sigue con su título, sus fuentes y sus subtítulos.
     private val queueSnapshot = holder.queue.value
     private val mediaSnapshot = holder.media.value
     val title: StateFlow<String> = MutableStateFlow(holder.playLabel.value).asStateFlow()
 
-    /** Valor efectivo: automático según memoria o la preferencia personalizada. */
     val seekThumbnails: StateFlow<Boolean> = combine(
         settings.deviceOptimization,
         settings.maxBufferSeconds,
@@ -147,13 +139,9 @@ class PlayerViewModel @Inject constructor(
 
     private val progressKey: String? = holder.progressKey.value
 
-    // --- Siguiente episodio y saltar intro --------------------------------------------------------------
-    // Tramos del episodio (IntroDB) → "Saltar intro/resumen" y el momento de la tarjeta "Siguiente episodio".
-    // Al pasar (cuenta atrás, OK o fin) se sale a la ficha pidiendo el siguiente, que ya lo tiene buscado.
     private var segments: SkipSegments = SkipSegments.NONE
     private var segmentsJob: Job? = null
     private var prefetched = false
-    /** Posición en la que salió la tarjeta (-1 = no está). */
     private var nextUpShownAt = -1L
     private val _skipPrompt = MutableStateFlow<SkipPromptUiState>(SkipPromptUiState.Hidden)
     val skipPrompt: StateFlow<SkipPromptUiState> = _skipPrompt.asStateFlow()
@@ -161,17 +149,12 @@ class PlayerViewModel @Inject constructor(
     private val _nextUp = MutableStateFlow<NextUpUiState>(NextUpUiState.Hidden)
     val nextUp: StateFlow<NextUpUiState> = _nextUp.asStateFlow()
     private val _goNext = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    /** La pantalla sale del reproductor (a la ficha, que arranca el siguiente). */
     val goNext: SharedFlow<Unit> = _goNext.asSharedFlow()
     private var nextUpDismissed = false
     private var wentNext = false
-    /** Ajustes → "Siguiente episodio automático". */
     private val autoNext: StateFlow<Boolean> = settings.autoNextEpisode.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // --- Castellano de verdad ---------------------------------------------------------------------------
-    // La bandera 🇪🇸 o el nombre pueden mentir. Con "Castellano primero", si la fuente decía ser en español y sus
-    // pistas de audio (con idioma) no lo son, se prueba la siguiente en español de la cola. Si ninguna vale, se
-    // vuelve a la que sí se reproducía.
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private val subtitlePreference = profiles.active.value.subtitlePreference
@@ -181,28 +164,24 @@ class PlayerViewModel @Inject constructor(
     private var spanishFallback: Int? = null
 
     private var started = false
+    private var playbackVisible = true
+    private var playerGeneration = 0L
+    private var playerCreationJob: Job? = null
+    private var trackSelectionToRestore: TrackSelectionParameters? = null
     private var resolvedUrl: String? = null
-    /** Archivo que se está reproduciendo (para afinar qué subtítulo va sincronizado). */
     private var playingFileName: String? = null
     private var resumePositionMs = 0L
 
-    /** Reintentos seguidos tras un error del reproductor (se pone a 0 cuando vuelve a reproducir). */
     private var playbackRetries = 0
 
-    /** Posición en la cola de la fuente que se está reproduciendo. */
     private var queueIndex = 0
-    /** Ya salió imagen con esta fuente: a partir de ahí un error es un corte, no una fuente que no vale. */
     private var everPlayed = false
-    /** Ya se miró la duración de esta fuente (vídeo de error del addon, ver [checkErrorSlate]). */
     private var slateChecked = false
     private var lastQueueError = ""
     private var allNotCached = true
     private var saverJob: Job? = null
     private var subsJob: Job? = null
 
-    // --- Subtítulo externo -------------------------------------------------------------------------
-    // Lo pinta la pantalla (ExternalSubtitleOverlay), no ExoPlayer: así se puede mover en el tiempo al
-    // instante (calibración) sin recargar el vídeo. Sobrevive a recrear el player (Home → volver).
     private val _activeExternal = MutableStateFlow<ActiveExternalSubtitle?>(null)
     val activeExternal: StateFlow<ActiveExternalSubtitle?> = _activeExternal.asStateFlow()
     private var currentExternal: ExternalSubtitle? = null
@@ -213,11 +192,8 @@ class PlayerViewModel @Inject constructor(
     private val _syncStatus = MutableStateFlow<SyncStatus>(SyncStatus.Off)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
-    /** Tiempos de una pista de subtítulos del propio archivo, seleccionada pero oculta (referencia). */
     private val reference = ReferenceCollector()
-    /** Hay que elegir la pista de referencia en cuanto el player publique sus pistas. */
     private var referencePending = false
-    /** Elegida: la ventana de referencia empieza cuando ExoPlayer la marca como seleccionada. */
     private var referenceAwaitingStart = false
     private var referenceAvailable = false
     private var textSelectionBeforeReference: TrackSelectionParameters? = null
@@ -230,10 +206,6 @@ class PlayerViewModel @Inject constructor(
         val intervals: List<SubInterval>,
         val run: MutableList<SyncResult> = mutableListOf(),
     )
-    /**
-     * Prueba la cola de fuentes en orden. Sin instantAvailability, la única forma de saber si
-     * una fuente está en la caché de RD es intentarlo: si no lo está, se pasa a la siguiente.
-     */
     fun start() {
         if (started) return
         started = true
@@ -247,7 +219,6 @@ class PlayerViewModel @Inject constructor(
         playFrom(0)
     }
 
-    /** Series: se piden a IntroDB mientras se resuelve la fuente (no retrasa el arranque). */
     private fun loadSegments() {
         val m = mediaSnapshot ?: return
         val imdb = m.imdbId ?: return
@@ -256,7 +227,6 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { segments = skipSegmentsRepository.episode(imdb, season, episode) }
     }
 
-    /** Prueba la cola desde [from]; también la usa onPlayerError si una fuente falla antes de dar imagen. */
     private fun playFrom(from: Int) {
         val queue = queueSnapshot
         viewModelScope.launch {
@@ -286,11 +256,11 @@ class PlayerViewModel @Inject constructor(
                         if ((_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true) {
                             cancelCandidateEvaluation()
                         }
-                        // Diagnóstico: en packs de temporada el enlace del debrid acaba en el archivo elegido.
                         Log.i("PlayerVM", "Fuente ${index + 1}/${queue.size}: ${(source.fileName ?: source.title).take(120)}")
                         playingFileName = source.fileName ?: source.title
                         val resumeAt = savedResumePosition()
-                        createAndPlay(result.url, startPositionMs = resumeAt)
+                        trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
+                        launchPlayer(result.url, startPositionMs = resumeAt)
                         if (resumeAt > 0) _notice.value = tr("Reanudando desde ${formatTime(resumeAt)}", "Resuming from ${formatTime(resumeAt)}")
                         _uiState.value = PlayerUiState.Playing
                         startProgressSaver()
@@ -298,7 +268,6 @@ class PlayerViewModel @Inject constructor(
                         return@launch
                     }
                     is ResolveState.Failed -> {
-                        // Bloqueada por RD: instantánea y sin rastro en la cuenta → no gasta intento.
                         if (!result.blocked) attempts++
                         lastQueueError = result.message
                         if (!result.notCached) allNotCached = false
@@ -306,15 +275,13 @@ class PlayerViewModel @Inject constructor(
                     else -> Unit
                 }
             }
-            // Se había dejado una fuente que funcionaba por no traer castellano y las otras no van: se vuelve a ella.
             spanishFallback?.let { back ->
                 spanishFallback = null
-                spanishSkips = MAX_SPANISH_SKIPS // no volver a saltar
+                spanishSkips = MAX_SPANISH_SKIPS
                 _notice.value = tr("No hay otra fuente en castellano que funcione: vuelve la anterior", "No other working Spanish source: back to the previous one")
                 playFrom(back)
                 return@launch
             }
-            // "Caché" solo si de verdad fallaron por eso; si no (addon caído, error 404…), el motivo real.
             _uiState.value = PlayerUiState.Error(
                 if (allNotCached) {
                     tr("Ninguna de las fuentes probadas está en la caché de ", "None of the sources tried is cached on ") +
@@ -331,7 +298,6 @@ class PlayerViewModel @Inject constructor(
     }
 
     // -----------------------------------------------------------------------
-    // Subtítulos externos
     // -----------------------------------------------------------------------
 
     fun searchExternalSubtitles(language: String) = searchExternalSubtitles(language, automatic = false)
@@ -410,7 +376,6 @@ class PlayerViewModel @Inject constructor(
         _externalSubs.value = ExternalSubsState.Idle
     }
 
-    /** Descarga una selección pequeña de todos los proveedores y elige solo una coincidencia confirmada. */
     private fun startCandidateEvaluation(language: String, items: List<ExternalSubtitle>, query: SubtitleQuery) {
         syncJob?.cancel()
         if (currentExternal != null) {
@@ -572,7 +537,6 @@ class PlayerViewModel @Inject constructor(
 
     private fun buildMediaItem(url: String): MediaItem = MediaItem.Builder().setUri(url).build()
 
-    /** SRT / ASS / VTT → segmentos con sus tiempos (los mismos parsers que usa ExoPlayer). */
     private fun parseSubtitle(path: String, mimeType: String): List<CuesWithTiming> {
         val format = Format.Builder().setSampleMimeType(mimeType).build()
         val factory = DefaultSubtitleParserFactory()
@@ -618,12 +582,10 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** Cualquier elección manual tiene prioridad sobre el idioma automático durante esta fuente. */
     fun onManualSubtitleSelection() {
         subtitleDefaultHandled = true
     }
 
-    /** Quitar el subtítulo externo (se ha elegido otra pista o "Desactivados" en el panel). */
     fun disableExternalSubtitle() {
         syncJob?.cancel()
         restoreReferenceSelection()
@@ -633,9 +595,6 @@ class PlayerViewModel @Inject constructor(
         _syncStatus.value = SyncStatus.Off
     }
 
-    // --- Calibración manual -------------------------------------------------------------------------
-
-    /** + = el subtítulo aparece más tarde. El ajuste manual detiene la sincronización automática. */
     fun adjustSubtitleOffset(deltaMs: Long) {
         if (_activeExternal.value == null) return
         syncJob?.cancel()
@@ -649,7 +608,6 @@ class PlayerViewModel @Inject constructor(
         _syncStatus.value = SyncStatus.Manual(timing)
     }
 
-    /** OK en la barra de sincronizar: intentarlo ya con lo recogido (o seguir recogiendo). */
     fun autoSyncNow() {
         val ext = _activeExternal.value ?: return
         if (!referenceAvailable) {
@@ -674,9 +632,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // --- Sincronización automática ------------------------------------------------------------------
-
-    /** Pista de referencia: la más completa del archivo (sin forzados), preferiblemente inglés o español. */
     private fun selectReferenceTrack(player: Player, tracks: Tracks) {
         if (!referencePending || tracks.isEmpty) return
         referencePending = false
@@ -714,10 +669,6 @@ class PlayerViewModel @Inject constructor(
             "forced" in label || "forzad" in label || "forcé" in label
     }
 
-    /**
-     * El idioma da igual para los tiempos. Lo que importa es que sea una pista "normal": las de sordos (SDH)
-     * llevan [MÚSICA], [JADEOS]… casi continuos y la señal pierde forma. Texto mejor que imagen (PGS).
-     */
     private fun referenceScore(f: Format): Int {
         val label = f.label.orEmpty().lowercase()
         val sdh = "sdh" in label || "sordos" in label || "udenti" in label || "hearing" in label || "cc" == label
@@ -731,7 +682,6 @@ class PlayerViewModel @Inject constructor(
         return score
     }
 
-    /** Selecciona el idioma integrado o, si no existe, delega en la evaluación de externos. */
     private fun applySubtitlePreference(player: Player, tracks: Tracks) {
         if (subtitleDefaultHandled || tracks.isEmpty) return
         if (_activeExternal.value != null) {
@@ -771,7 +721,6 @@ class PlayerViewModel @Inject constructor(
             return
         }
 
-        // Mientras se busca el externo, no enseñar una pista forzada en otro idioma.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
@@ -793,17 +742,10 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Cada 3 s, con al menos 10 frases de referencia (≈ 1–2 min de película), se busca el ajuste (y luego
-     * cada 5 frases más). Se aplica si el resultado es claro, si es plausible y se repite 2 veces, o si tiene
-     * buena correlación y se repite 3 veces: con subtítulos que no corresponden, el "mejor" desfase salta de
-     * un sitio a otro y no se confirma. Aplicado → una confirmación más y se deja de leer la referencia.
-     */
     private fun startAutoSync() {
         syncJob?.cancel()
         syncJob = viewModelScope.launch {
             var nextAt = SubtitleSync.MIN_REFERENCE_CUES
-            /** Resultados seguidos que coinciden (±0,3 s). */
             val run = ArrayList<SyncResult>()
             var applied: SyncResult? = null
             while (isActive) {
@@ -875,24 +817,12 @@ class PlayerViewModel @Inject constructor(
     // Progreso y ciclo de vida
     // -----------------------------------------------------------------------
 
-    /** Punto guardado salvo que se haya pedido "Desde el principio" o ya estuviera visto. */
     private fun savedResumePosition(): Long {
         if (holder.startFromBeginning.value) return 0L
         val key = progressKey ?: return 0L
         return watchProgress.get(key)?.takeIf { it.isResumable }?.positionMs ?: 0L
     }
 
-    /**
-     * Cada medio segundo, mientras se reproduce: botón "Saltar intro/resumen" y tarjeta "Siguiente episodio".
-     *
-     * Siguiente episodio (lo que antes "no iba fino": la tarjeta salía con una estimación y cortaba finales):
-     *  - Con los créditos de IntroDB y sin escena poscréditos: la tarjeta sale al EMPEZAR los créditos y, tras
-     *    [NEXT_UP_COUNTDOWN_MS] de créditos, pasa sola (como Netflix). Si después de los créditos aún queda
-     *    contenido (>30 s sin marcar), se espera al final.
-     *  - Con escena poscréditos: la tarjeta sale al terminar la escena y pasa al acabar el archivo.
-     *  - Sin datos: la tarjeta sale en el último 1 % (mín. 20 s, como Nuvio) y pasa al acabar el archivo.
-     * La cuenta va por la posición del vídeo: en pausa se para, y si se va hacia atrás desaparece.
-     */
     private fun startSegmentsWatcher() {
         if (segmentsJob?.isActive == true) return
         segmentsJob = viewModelScope.launch {
@@ -939,7 +869,7 @@ class PlayerViewModel @Inject constructor(
             else -> duration - maxOf(duration / 100, NEXT_UP_FALLBACK_MIN_MS) to duration
         }
         if (position < cardFrom) {
-            nextUpDismissed = false // se ha ido hacia atrás: se puede volver a ofrecer
+            nextUpDismissed = false
             nextUpShownAt = -1L
             _nextUp.value = NextUpUiState.Hidden
             return
@@ -948,35 +878,26 @@ class PlayerViewModel @Inject constructor(
             _nextUp.value = NextUpUiState.Hidden
             return
         }
-        // La cuenta atrás siempre se ve entera: si se salta a mitad de los créditos, cuenta desde ahí (no se pasa de
-        // golpe al siguiente por buscar un punto).
         if (nextUpShownAt < 0) nextUpShownAt = position
         val goAt = if (autoAt < duration) minOf(maxOf(autoAt, nextUpShownAt + NEXT_UP_COUNTDOWN_MS), duration) else duration
-        // Cuenta atrás en los créditos (con datos): al llegar, siguiente. Al final del archivo lo hace STATE_ENDED.
         if (goAt < duration && position >= goAt) {
             playNextNow()
             return
         }
         val secondsLeft = ((goAt - position + 999) / 1000).toInt().coerceAtLeast(0)
         _nextUp.value = NextUpUiState.Showing(next.label, secondsLeft)
-        // Mientras sale la tarjeta, la ficha ya va buscando las fuentes del siguiente: al pasar, arranca antes.
         if (!prefetched) {
             prefetched = true
             holder.prefetchNext(next)
         }
     }
 
-    /** OK con el botón "Saltar intro/resumen" a la vista. */
     fun skipSegment() {
         val prompt = _skipPrompt.value as? SkipPromptUiState.Showing ?: return
         _player.value?.seekTo(prompt.targetMs)
         _skipPrompt.value = SkipPromptUiState.Hidden
     }
 
-    /**
-     * Las banderas pueden mentir. "Solo español" exige una pista reproducible identificada como español:
-     * no reproduce audio desconocido ni vuelve a una fuente rechazada si se agotan las alternativas.
-     */
     private fun checkSpanishAudio(player: ExoPlayer, tracks: Tracks) {
         if (spanishChecked || !spanishFirst) return
         val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
@@ -1018,12 +939,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Algunos addons (Comet de ElfHosted…) no fallan cuando no encuentran el archivo: devuelven un vídeo corto con el
-     * mensaje de error ("EPISODE_MATCH_NOT_FOUND") y se reproducía como si fuera el episodio. Si un enlace de addon
-     * dura menos de [SLATE_MAX_MS] pero la fuente dice pesar más de [SLATE_MIN_BYTES], es eso: se pasa a la
-     * siguiente fuente de la cola. Devuelve true si la ha saltado.
-     */
     private fun checkErrorSlate(player: ExoPlayer): Boolean {
         if (slateChecked) return false
         val duration = player.duration
@@ -1045,12 +960,10 @@ class PlayerViewModel @Inject constructor(
         return true
     }
 
-    /** OK en la tarjeta o fin del episodio. */
     fun playNextNow() {
         val next = nextSnapshot ?: return
         if (wentNext) return
         wentNext = true
-        // El actual queda visto (tick) aunque falten los créditos.
         progressKey?.let { key ->
             val duration = _player.value?.duration ?: 0L
             if (duration > 0) watchProgress.save(key, duration, duration)
@@ -1061,13 +974,11 @@ class PlayerViewModel @Inject constructor(
         _goNext.tryEmit(Unit)
     }
 
-    /** Atrás con la tarjeta: se queda viendo los créditos. */
     fun dismissNextUp() {
         nextUpDismissed = true
         _nextUp.value = NextUpUiState.Hidden
     }
 
-    /** Guarda el progreso cada 10 s mientras se reproduce (por si la Shield se apaga de golpe). */
     private fun startProgressSaver() {
         saverJob?.cancel()
         saverJob = viewModelScope.launch {
@@ -1078,11 +989,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Trakt (si el perfil lo tiene): start al empezar a verse, pause al pausar o salir a Home, stop al cerrar el
-     * reproductor o terminar. Con stop pasado el 80 %, Trakt lo marca visto; si no, guarda por dónde vas y la otra
-     * Shield lo verá en "Seguir viendo".
-     */
     private var lastScrobble: ScrobbleAction? = null
 
     private fun scrobble(action: ScrobbleAction, fraction: Float? = null) {
@@ -1103,15 +1009,16 @@ class PlayerViewModel @Inject constructor(
         if (duration > 0 && position > 0) watchProgress.save(key, position, duration)
     }
 
-    /**
-     * Ciclo de vida: al pulsar Home en la Shield (ON_STOP) se guarda el progreso y se libera el
-     * decoder y el modo HDMI (DV/HDR). Al volver (ON_START) se recrea el player en la misma posición.
-     */
     fun onStop() {
+        playbackVisible = false
+        playerGeneration++
+        playerCreationJob?.cancel()
+        playerCreationJob = null
         saveProgress()
         scrobble(ScrobbleAction.PAUSE)
         _player.value?.let { p ->
             resumePositionMs = p.currentPosition
+            trackSelectionToRestore = p.trackSelectionParameters
             reference.pause(p.currentPosition)
             p.release()
         }
@@ -1120,18 +1027,31 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun onStart() {
+        playbackVisible = true
+        if (_player.value != null || playerCreationJob?.isActive == true) return
         val url = resolvedUrl ?: return
-        if (_player.value != null) return
-        viewModelScope.launch { createAndPlay(url, resumePositionMs) }
+        launchPlayer(url, resumePositionMs)
     }
 
-    private suspend fun createAndPlay(url: String, startPositionMs: Long) {
+    private fun launchPlayer(url: String, startPositionMs: Long) {
+        if (!playbackVisible) return
+        playerCreationJob?.cancel()
+        val generation = ++playerGeneration
+        playerCreationJob = viewModelScope.launch { createAndPlay(url, startPositionMs, generation) }
+    }
+
+    private suspend fun createAndPlay(url: String, startPositionMs: Long, generation: Long) {
         val policy = playbackPolicies.resolve(
             settings.deviceOptimization.first(),
             settings.maxBufferSeconds.first(),
             settings.seekThumbnails.first(),
         )
+        if (!playbackVisible || generation != playerGeneration) return
         val player = media3Factory.createPlayer(policy)
+        if (!playbackVisible || generation != playerGeneration) {
+            player.release()
+            return
+        }
         _videoInfo.value = null
         var activeDecoderName: String? = null
         fun updateVideoInfo(format: Format? = player.videoFormat) {
@@ -1163,6 +1083,8 @@ class PlayerViewModel @Inject constructor(
                 .setPreferredAudioLanguages("es", "spa")
                 .build()
         }
+        // Home/ON_STOP recrea el mismo recurso: conserva selección automática y manual de pistas.
+        trackSelectionToRestore?.let { player.trackSelectionParameters = it }
         player.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
@@ -1172,25 +1094,18 @@ class PlayerViewModel @Inject constructor(
                         checkSpanishAudio(player, player.currentTracks)
                         if (checkErrorSlate(player)) return
                     }
-                    // Terminado → visto (tick en Episodios) y la próxima vez empieza desde el principio.
                     if (playbackState == Player.STATE_ENDED) {
                         val key = progressKey ?: return
                         val duration = player.duration
                         if (duration > 0) watchProgress.save(key, duration, duration)
                         scrobble(ScrobbleAction.STOP, fraction = 1f)
-                        // Terminado del todo (con la tarjeta sin quitar y el ajuste activado): siguiente episodio.
                         if (!nextUpDismissed && autoNext.value) playNextNow()
                     }
                 }
 
-                // Antes un error a mitad de película dejaba la imagen congelada sin aviso. Se reintenta una vez en el
-                // mismo punto (cortes de red, falta de memoria puntual); si vuelve a fallar se avisa.
                 override fun onPlayerError(error: PlaybackException) {
                     Log.w("PlayerVM", "Error de reproducción (${error.errorCodeName})", error)
                     saveProgress()
-                    // Ciclo de vida: falla ANTES de la primera imagen y es de red/contenedor (el addon devolvió algo
-                    // que no es vídeo, 404…) → esa fuente no vale. Se suelta este player (libera el decoder y el modo
-                    // HDMI DV/HDR antes de crear el siguiente) y se sigue con la próxima fuente de la cola.
                     val sourceError = error.errorCode in
                         PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED
                     if (!everPlayed && sourceError && queueIndex + 1 < queueSnapshot.size) {
@@ -1220,12 +1135,10 @@ class PlayerViewModel @Inject constructor(
                         playbackRetries = 0
                         everPlayed = true
                     }
-                    // Al pausar se guarda en el momento.
                     if (!isPlaying) saveProgress()
                     if (isPlaying) scrobble(ScrobbleAction.START)
                 }
 
-                // Pausa del usuario (no un parón por carga, que también pone isPlaying = false).
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                     if (!playWhenReady) scrobble(ScrobbleAction.PAUSE)
                 }
@@ -1235,7 +1148,6 @@ class PlayerViewModel @Inject constructor(
                     checkSpanishAudio(player, tracks)
                 }
 
-                // Pista de referencia (oculta): se apuntan sus tiempos para la sincronización automática.
                 override fun onCues(cueGroup: CueGroup) {
                     reference.onCues(cueGroup.presentationTimeUs / 1000, cueGroup.cues.isNotEmpty())
                 }
@@ -1251,11 +1163,9 @@ class PlayerViewModel @Inject constructor(
                 }
             },
         )
-        // Player recreado: reanudar la referencia de un externo o de una evaluación todavía en curso.
         val evaluating = (_externalSubs.value as? ExternalSubsState.Results)?.evaluating == true
         if ((_activeExternal.value != null || evaluating) && referenceAvailable) referencePending = true
         player.setMediaItem(buildMediaItem(url), startPositionMs)
-        // No iniciar audio hasta verificarlo, ni siquiera durante el primer búfer.
         spanishChecked = false
         _player.value = player
         player.playWhenReady = !spanishOnly
@@ -1263,6 +1173,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        playbackVisible = false
+        playerGeneration++
+        playerCreationJob?.cancel()
         saveProgress()
         scrobble(ScrobbleAction.STOP)
         _player.value?.release()
@@ -1275,22 +1188,13 @@ class PlayerViewModel @Inject constructor(
         const val TAG = "SubSync"
         const val AUTO_CANDIDATE_LIMIT = 6
         const val MAX_AUTO_REFERENCE_CUES = 80
-        /** Fuentes que se prueban de verdad antes de rendirse (las bloqueadas por RD no cuentan). */
         const val MAX_ATTEMPTS = 8
-        /** La tarjeta "Siguiente episodio" sale en los créditos (5 % final, entre 45 s y 2 min). */
-        /** Con créditos de IntroDB: cuánto se ven antes de pasar solo al siguiente. */
         const val NEXT_UP_COUNTDOWN_MS = 10_000L
-        /** Sin datos: la tarjeta sale en el último 1 % del episodio, como mínimo 20 s antes del final. */
         const val NEXT_UP_FALLBACK_MIN_MS = 20_000L
-        /** Si tras los créditos queda más que esto sin marcar, puede haber escena: se espera al final del archivo. */
         const val AFTER_CREDITS_SLACK_MS = 30_000L
-        /** Fuentes que dicen ser en castellano y no lo son: como mucho se saltan estas antes de quedarse con una. */
         const val MAX_SPANISH_SKIPS = 3
-        /** Vídeo de error de un addon: dura menos de esto… */
         const val SLATE_MAX_MS = 4 * 60_000L
-        /** …y la fuente decía pesar más de esto (un episodio real tan corto no pesa tanto). */
         const val SLATE_MIN_BYTES = 150_000_000L
-        /** Por debajo (avances, extras) no se ofrece. */
         const val MIN_EPISODE_MS = 5 * 60_000L
     }
 

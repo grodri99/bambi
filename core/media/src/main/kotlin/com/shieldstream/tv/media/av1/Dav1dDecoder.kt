@@ -11,7 +11,6 @@ import androidx.media3.decoder.SimpleDecoder
 import androidx.media3.decoder.VideoDecoderOutputBuffer
 import java.nio.ByteBuffer
 
-/** libdav1dJNI.so (jniLibs de este módulo, compilada con _rebuild_av1.sh). */
 internal object Dav1dLibrary {
     val isAvailable: Boolean by lazy {
         runCatching { System.loadLibrary("dav1dJNI") }
@@ -22,15 +21,6 @@ internal object Dav1dLibrary {
 
 class Dav1dDecoderException(message: String, cause: Throwable? = null) : DecoderException(message, cause)
 
-/**
- * Decoder AV1 por CPU con dav1d (el de VLC/Kodi). Mismo esquema que el Gav1Decoder de Media3, salvo que
- * dav1d decodifica varios fotogramas a la vez: las imágenes salen con unos fotogramas de retraso y cada
- * una lleva su propio timestamp (no el del paquete que acaba de entrar).
- *
- * Ciclo de vida de una imagen: nativeDequeue la aparca en un slot nativo → el renderer la pinta
- * (renderToSurface) → releaseOutputBuffer libera el slot. Tras release() el contexto nativo ya no existe:
- * todo acceso pasa por [nativeLock] y comprueba [closed].
- */
 @Suppress("UNCHECKED_CAST")
 @OptIn(UnstableApi::class)
 internal class Dav1dDecoder(
@@ -39,7 +29,6 @@ internal class Dav1dDecoder(
     initialInputBufferSize: Int,
     threads: Int,
 ) : SimpleDecoder<DecoderInputBuffer, VideoDecoderOutputBuffer, Dav1dDecoderException>(
-    // Arrays vacíos: el constructor de SimpleDecoder los rellena con createInputBuffer/createOutputBuffer.
     arrayOfNulls<DecoderInputBuffer>(numInputBuffers) as Array<DecoderInputBuffer>,
     arrayOfNulls<VideoDecoderOutputBuffer>(numOutputBuffers) as Array<VideoDecoderOutputBuffer>,
 ) {
@@ -50,7 +39,6 @@ internal class Dav1dDecoder(
     @Volatile
     private var outputMode: Int = C.VIDEO_OUTPUT_MODE_NONE
 
-    /** {slot, timeUs, ancho, alto}. Solo lo usa el hilo del decoder. */
     private val frameInfo = LongArray(4)
 
     init {
@@ -65,7 +53,6 @@ internal class Dav1dDecoder(
     override fun createInputBuffer(): DecoderInputBuffer =
         DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DIRECT)
 
-    // Se llama desde el constructor de SimpleDecoder: no usar aquí propiedades de esta clase.
     override fun createOutputBuffer(): VideoDecoderOutputBuffer =
         VideoDecoderOutputBuffer { releaseOutputBuffer(it) }.apply { decoderPrivate = NO_SLOT }
 
@@ -74,7 +61,7 @@ internal class Dav1dDecoder(
         outputBuffer: VideoDecoderOutputBuffer,
         reset: Boolean,
     ): Dav1dDecoderException? {
-        if (reset) nativeFlush(context) // Seek: se tiran los fotogramas a medio decodificar.
+        if (reset) nativeFlush(context)
         outputBuffer.decoderPrivate = NO_SLOT
         val data: ByteBuffer = inputBuffer.data ?: return Dav1dDecoderException("Paquete vacío")
         val sent = nativeDecode(context, data, data.limit(), inputBuffer.timeUs)
@@ -83,13 +70,11 @@ internal class Dav1dDecoder(
         val got = nativeDequeue(context, frameInfo)
         if (got < 0) return Dav1dDecoderException("dav1d_get_picture: error $got")
         if (got == 0) {
-            // Aún en vuelo (frame threading): este paquete no produce imagen todavía.
             outputBuffer.shouldBeSkipped = true
             return null
         }
         val slot = frameInfo[0].toInt()
         val timeUs = frameInfo[1]
-        // SimpleDecoder decide "saltar" por el timestamp del paquete; aquí manda el de la imagen.
         if (!isAtLeastOutputStartTimeUs(timeUs)) {
             nativeRelease(context, slot)
             outputBuffer.shouldBeSkipped = true
@@ -117,7 +102,7 @@ internal class Dav1dDecoder(
     }
 
     override fun release() {
-        super.release() // Espera a que termine el hilo del decoder.
+        super.release()
         synchronized(nativeLock) {
             if (!closed) nativeClose(context)
             closed = true
@@ -128,7 +113,6 @@ internal class Dav1dDecoder(
         this.outputMode = outputMode
     }
 
-    /** Hilo de reproducción. Solo en modo Surface (SurfaceView del PlayerView). */
     fun renderToSurface(outputBuffer: VideoDecoderOutputBuffer, surface: Surface) {
         if (outputBuffer.mode != C.VIDEO_OUTPUT_MODE_SURFACE_YUV) {
             throw Dav1dDecoderException("Modo de salida no soportado: ${outputBuffer.mode}")
@@ -149,10 +133,6 @@ internal class Dav1dDecoder(
 
     private companion object {
         const val NO_SLOT = -1
-        /**
-         * Fotogramas decodificados en paralelo. 0 = automático (2 con 4 núcleos). Probado 4 con un 4K:
-         * usa los 4 núcleos al 100 % y +150 MB de RAM, y sigue en ~7 fps → no compensa.
-         */
         const val MAX_FRAME_DELAY = 0
     }
 }

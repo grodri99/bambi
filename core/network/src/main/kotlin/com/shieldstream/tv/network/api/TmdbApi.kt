@@ -16,9 +16,6 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.QueryMap
 
-/**
- * TMDB v3. El parámetro `language=es-ES` lo añade un interceptor (ver NetworkModule).
- */
 interface TmdbApi {
 
     @GET("3/trending/all/day")
@@ -33,7 +30,6 @@ interface TmdbApi {
         @Query("page") page: Int = 1,
     ): TmdbPaginated<TmdbSearchResultDto>
 
-    /** Discover con parámetros libres (géneros, palabras clave, idioma, orden…): categorías del Inicio. */
     @GET("3/discover/movie")
     suspend fun discoverMovieQuery(
         @Query("api_key") key: String,
@@ -116,7 +112,6 @@ interface TmdbApi {
         @Query("query") query: String,
     ): TmdbSearchResponse
 
-    /** Ficha + logos + imdb_id en una sola llamada. */
     @GET("3/movie/{id}")
     suspend fun movieDetails(
         @Path("id") id: Int,
@@ -125,7 +120,6 @@ interface TmdbApi {
         @Query("include_image_language") imageLanguages: String = if (Lang.isEnglish) "en,null" else "es,en,null",
     ): TmdbMovieDetailDto
 
-    /** Ficha + temporadas + logos + external_ids (imdb) en una sola llamada. */
     @GET("3/tv/{id}")
     suspend fun tvDetails(
         @Path("id") id: Int,

@@ -51,10 +51,6 @@ enum class RailDestination(val label: String, val icon: ImageVector) {
     SETTINGS(tr("Ajustes", "Settings"), AppIcons.Settings),
 }
 
-/**
- * Menú lateral estilo Netflix TV: iconos plegados; al entrar el foco se despliega con
- * etiquetas y oscurece el contenido. Se superpone al contenido (que deja [RailCollapsedWidth]).
- */
 @Composable
 fun NavRail(
     selected: RailDestination,

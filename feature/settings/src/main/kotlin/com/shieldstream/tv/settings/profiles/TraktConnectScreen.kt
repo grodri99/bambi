@@ -36,16 +36,11 @@ import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.TvButton
 import kotlinx.coroutines.delay
 
-/**
- * Enlazar Trakt como se enlaza Netflix en una tele: código grande a la izquierda (y la web donde escribirlo),
- * QR de esa web a la derecha. En cuanto lo escribes en el móvil, la pantalla pasa sola a "Conectado".
- */
 @Composable
 fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val buttonRequester = remember { FocusRequester() }
     LaunchedEffect(state::class) {
-        // Al cambiar de estado el botón es otro: se espera a que esté colocado antes de darle el foco.
         delay(60)
         runCatching { buttonRequester.requestFocus() }
     }
@@ -70,7 +65,6 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                 when (val s = state) {
                     TraktConnectUiState.Loading -> {
                         Text(tr("Pidiendo un código a Trakt…", "Getting a code from Trakt…"), color = ProfileMuted, fontSize = 22.sp)
-                        // Atrás también sirve, pero que haya algo enfocable.
                         Spacer(Modifier.height(24.dp))
                         TvButton(tr("Cancelar", "Cancel"), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
                     }

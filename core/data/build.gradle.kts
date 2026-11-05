@@ -29,12 +29,16 @@ dependencies {
     implementation(project(":core:network"))
 
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.okhttp) // subtítulos externos
-    implementation(libs.okhttp.dnsoverhttps) // DNS de respaldo para webs de subtítulos
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }

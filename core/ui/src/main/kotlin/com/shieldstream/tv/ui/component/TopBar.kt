@@ -37,20 +37,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** Pestañas del menú superior. */
 enum class TopTab(val label: String) {
     SEARCH(tr("Buscar", "Search")),
     HOME(tr("Inicio", "Home")),
+    EPISODES(tr("Episodios", "Episodes")),
     TV(tr("Series", "TV Shows")),
     MOVIES(tr("Películas", "Movies")),
-    /** Todo lo guardado con el botón «Mi lista» de las fichas (la fila del Inicio solo enseña lo último). */
     MY_LIST(tr("Mi lista", "My list")),
 }
 
-/**
- * Menú superior estilo Netflix: 🔍 · Inicio · Series · Películas · Mi lista centrados y ⚙ Ajustes a la derecha.
- * Para que ▲ desde la portada caiga en la pestaña activa, la pantalla usa focusProperties { up = selectedRequester }.
- */
 @Composable
 fun TopBar(
     selected: TopTab,
@@ -58,18 +53,16 @@ fun TopBar(
     onSettings: () -> Unit,
     selectedRequester: FocusRequester,
     modifier: Modifier = Modifier,
-    /** Perfil activo (inicial y color): avatar junto a Ajustes para cambiar de perfil, como en Netflix. */
     profileInitial: String? = null,
     profileAvatar: Int = 0,
     onProfile: () -> Unit = {},
+    newEpisodeCount: Int = 0,
 ) {
     Box(
         modifier
             .fillMaxWidth()
             .height(64.dp),
     ) {
-        // Marca arriba a la izquierda: gatito + "BAMBI" (no enfocable). Las esquinas redondeadas ya vienen
-        // en el PNG: sin clip, que en la Shield se perdía.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.CenterStart).padding(start = 32.dp),
@@ -96,6 +89,7 @@ fun TopBar(
                     icon = if (tab == TopTab.SEARCH) AppIcons.Search else null,
                     label = if (tab == TopTab.SEARCH) null else tab.label,
                     selected = tab == selected,
+                    badgeCount = if (tab == TopTab.EPISODES) newEpisodeCount else 0,
                     onClick = { onSelect(tab) },
                     modifier = if (tab == selected) Modifier.focusRequester(selectedRequester) else Modifier,
                 )
@@ -119,7 +113,6 @@ fun TopBar(
     }
 }
 
-/** Avatar pequeño del perfil activo: OK → "¿Quién está viendo?" para cambiar de perfil. */
 @Composable
 private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
@@ -154,12 +147,13 @@ private fun TopBarItem(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badgeCount: Int = 0,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale = if (LocalLightweightUi.current) {
-        if (focused) 1.06f else 1f
+        if (focused) 1.03f else 1f
     } else {
-        animateFloatAsState(if (focused) 1.06f else 1f, label = "topBarScale").value
+        animateFloatAsState(if (focused) 1.03f else 1f, label = "topBarScale").value
     }
     val background = when {
         focused -> Color.White
@@ -177,8 +171,6 @@ private fun TopBarItem(
                 scaleX = scale
                 scaleY = scale
             }
-            // Fondo dibujado ya redondeado (sin clip): en la Shield el clip de una capa escalada
-            // se perdía y la pastilla enfocada salía cuadrada.
             .background(background, RoundedCornerShape(50))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
@@ -188,13 +180,26 @@ private fun TopBarItem(
         if (icon != null) {
             Icon(icon, contentDescription = label, tint = foreground, modifier = Modifier.size(22.dp))
         } else if (label != null) {
-            Text(
-                text = label,
-                color = foreground,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Medium,
-                ),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = label,
+                    color = foreground,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Medium,
+                    ),
+                )
+                if (badgeCount > 0) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier
+                            .background(Color(0xFFE50914), RoundedCornerShape(50))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+            }
         }
     }
 }

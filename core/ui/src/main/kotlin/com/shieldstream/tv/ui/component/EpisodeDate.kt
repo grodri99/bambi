@@ -4,7 +4,6 @@ import com.shieldstream.tv.model.Lang
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-/** Fecha corta y localizada para episodios; conserva el valor original si TMDB manda un formato inesperado. */
 fun formatEpisodeDate(isoDate: String?, includeYear: Boolean = false): String {
     if (isoDate.isNullOrBlank()) return ""
     return runCatching {

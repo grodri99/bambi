@@ -43,7 +43,6 @@ class ApiKeysRepositoryImpl @Inject constructor(
 
     override suspend fun set(service: ApiService, value: String?) {
         val clean = value?.trim()?.takeIf { it.isNotEmpty() }
-        // El token de RD pasa por SettingsRepository para que su Flow (lo usa RealDebridRepository) se entere.
         if (service == ApiService.REAL_DEBRID) settings.setToken(clean) else store.setSecret(service.storeKey, clean)
         _keys.value = read()
     }
@@ -54,8 +53,6 @@ class ApiKeysRepositoryImpl @Inject constructor(
             when (service) {
                 ApiService.REAL_DEBRID -> checkRealDebrid(key)
                 ApiService.TMDB -> {
-                    // Error habitual: pegar el "token de lectura de la API" (v4, un JWT larguísimo que empieza por
-                    // eyJ) en vez de la "clave de la API" (v3, 32 caracteres). Se explica en vez de "clave no válida".
                     if (key.startsWith("eyJ") && key.length > 60) {
                         KeyCheck.Invalid(
                             tr(
@@ -87,10 +84,6 @@ class ApiKeysRepositoryImpl @Inject constructor(
         return KeyCheck.Valid(detail)
     }
 
-    /**
-     * Debrids vía Torrentio: se piden las fuentes de una película muy conocida (El club de la lucha) con la clave.
-     * Clave mala o cuenta caducada → Torrentio devuelve su fuente de error ("Invalid … ApiKey/Token!").
-     */
     private suspend fun checkViaTorrentio(service: ApiService, key: String): KeyCheck {
         val debrid = DebridService.of(service) ?: return KeyCheck.Invalid(tr("Servicio desconocido", "Unknown service"))
         val streams = torrentioApi.streamsWithConfig(torrentioConfig(debrid, key), "movie", "tt0137523").streams
@@ -101,9 +94,6 @@ class ApiKeysRepositoryImpl @Inject constructor(
         return KeyCheck.Valid(tr("Conectado (vía Torrentio)", "Connected (via Torrentio)"))
     }
 
-    /** Búsqueda mínima (El club de la lucha): con clave mala SubDL responde 401/403 o status=false. */
-    /** Se piden las fuentes de una película conocida: si responde con JSON válido, la URL vale. */
-    /** Uno o varios addons (URLs separadas por espacios): se prueba cada uno con Cadena perpetua. */
     private suspend fun checkAioStreams(url: String): KeyCheck {
         val bases = aioStreamBases(url)
         if (bases.isEmpty()) {
@@ -140,7 +130,6 @@ class ApiKeysRepositoryImpl @Inject constructor(
     }
 
     private fun describe(e: Throwable): KeyCheck.Invalid {
-        // Retrofit no es dependencia directa de este módulo: el código HTTP se lee del mensaje ("HTTP 401 …").
         val code = Regex("""HTTP (\d{3})""").find(e.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()
         return KeyCheck.Invalid(
             when {

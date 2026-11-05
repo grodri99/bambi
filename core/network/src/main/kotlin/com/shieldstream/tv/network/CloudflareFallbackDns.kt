@@ -11,14 +11,6 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Bloqueos de IPs de Cloudflare en España (LaLiga, fines de semana): torrentio.strem.fun o bitsearch.to resuelven a
- * IPs de Cloudflare que el operador descarta (100 % de paquetes perdidos), mientras otras IPs de Cloudflare
- * funcionan. Cloudflare atiende cualquier web suya desde cualquiera de sus IPs (por el nombre/SNI), así que:
- *  - si el host está en Cloudflare, además de sus IPs se ofrecen las de otro sitio de Cloudflare;
- *  - las IPs que fallan al conectar se apuntan y pasan al final de la lista: la siguiente vez se va directo a una buena.
- * Para hosts fuera de Cloudflare no cambia nada.
- */
 object CloudflareFallbackDns : Dns {
     private val failed = ConcurrentHashMap.newKeySet<InetAddress>()
     @Volatile private var extras: List<InetAddress> = emptyList()
@@ -27,8 +19,6 @@ object CloudflareFallbackDns : Dns {
         val primary = Dns.SYSTEM.lookup(hostname)
         if (primary.none { isCloudflare(it) }) return primary
         val alternatives = extras.ifEmpty {
-            // IPs del mismo tipo que las de torrentio (sitios normales de Cloudflare): las propias de cloudflare.com
-            // responden 403 para otros dominios. Se descartan las que ya hayan fallado.
             POOL_HOSTS.flatMap { h -> runCatching { Dns.SYSTEM.lookup(h) }.getOrDefault(emptyList()) }
                 .filterIsInstance<Inet4Address>().distinct().also { extras = it }
         }
@@ -36,7 +26,6 @@ object CloudflareFallbackDns : Dns {
         return all.filter { it !in failed } + all.filter { it in failed }
     }
 
-    /** Se engancha al cliente HTTP para saber qué IPs no conectan. */
     val failureListener = object : EventListener() {
         override fun connectFailed(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?, ioe: java.io.IOException) {
             val ip = inetSocketAddress.address ?: return

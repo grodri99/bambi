@@ -43,7 +43,6 @@ class SubtitleRepositoryImpl @Inject constructor(
             .filter { it.enabled }
             .map { provider ->
                 async {
-                    // Cada proveedor tiene 10 s; si cae uno, el resto sigue.
                     withTimeoutOrNull(PROVIDER_TIMEOUT_MS) {
                         runCatching { provider.search(query) }
                             .onFailure { Log.w(TAG, "${provider.name}: ${it.message}") }
@@ -54,7 +53,6 @@ class SubtitleRepositoryImpl @Inject constructor(
             .awaitAll()
             .flatten()
             .map { sub ->
-                // Parecido con el archivo que se reproduce → más probable que vaya sincronizado.
                 val score = if (sub.release.isNotBlank() && query.fileName != null) {
                     similarity(sub.release, query.fileName!!)
                 } else {
@@ -96,7 +94,6 @@ class SubtitleRepositoryImpl @Inject constructor(
             )
         }
 
-    /** Zip (SubDL, Podnapisi), gzip (algunos espejos) o texto plano (OpenSubtitles). */
     private fun unpack(raw: ByteArray, query: SubtitleQuery): Pair<ByteArray, String> {
         if (raw.size > 4 && raw[0] == 'P'.code.toByte() && raw[1] == 'K'.code.toByte()) {
             val candidates = mutableListOf<Pair<String, ByteArray>>()
@@ -120,7 +117,6 @@ class SubtitleRepositoryImpl @Inject constructor(
                 }
             }
             check(candidates.isNotEmpty()) { tr("El zip no contiene subtítulos compatibles (srt/ass/vtt)", "The zip has no compatible subtitles (srt/ass/vtt)") }
-            // Packs de temporada: el episodio concreto o error; elegir el primero puede poner otro episodio.
             val episode = episodeMatch(candidates, query)
             check(query.media.season == null || candidates.size == 1 || episode != null) {
                 tr("El zip no identifica el episodio ${query.media.season}x${query.media.episode}", "The zip doesn't identify episode ${query.media.season}x${query.media.episode}")
@@ -158,10 +154,6 @@ class SubtitleRepositoryImpl @Inject constructor(
         }
     }
 
-    /**
-     * Muchos .srt en castellano vienen en Windows-1252 (tildes y eñes rotas si se leen como UTF-8).
-     * Se intenta UTF-8 estricto y, si falla, la codificación habitual del idioma.
-     */
     private fun decode(bytes: ByteArray, language: String): String {
         val utf8 = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)

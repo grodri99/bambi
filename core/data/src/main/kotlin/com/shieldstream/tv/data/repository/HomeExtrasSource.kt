@@ -30,17 +30,12 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Portada grande (destacados de la semana) y pantallas de categoría del Inicio.
- * Separado de CatalogRepositoryImpl para no engordarlo; este delega aquí.
- */
 @Singleton
 class HomeExtrasSource @Inject constructor(
     private val tmdb: TmdbApi,
     @ApplicationContext context: Context,
     private val store: TokenStore,
 ) {
-    /** Clave de TMDB de Ajustes (ver CatalogRepositoryImpl). */
     private val key: String get() = store.tmdbKey.orEmpty()
     private val prefs = context.getSharedPreferences("featured", Context.MODE_PRIVATE)
     private val keywordIds = ConcurrentHashMap<String, Int>()
@@ -51,10 +46,6 @@ class HomeExtrasSource @Inject constructor(
 
     private data class Pick(val type: MediaType, val id: Int, val badge: FeaturedBadge)
 
-    /**
-     * Destacados de la semana. Se eligen el primer día que se abre la app en la semana (lunes a domingo) y
-     * se guardan: toda la semana sale lo mismo (con datos frescos: nota, logo…). La semana siguiente, nuevos.
-     */
     suspend fun featured(filter: HomeFilter): List<FeaturedItem> {
         val week = weekKey()
         val prefKey = "week_${filter.name}"
@@ -66,10 +57,6 @@ class HomeExtrasSource @Inject constructor(
         }
     }
 
-    /**
-     * Portada del perfil infantil: lo más popular para niños (películas de animación/familia hasta PG en EE. UU.
-     * y series del género Infantil), no las tendencias generales. Sin guardar por semanas: va en la caché del Inicio.
-     */
     suspend fun kidsFeatured(filter: HomeFilter): List<FeaturedItem> = coroutineScope {
         val movieParams = mapOf(
             "with_genres" to "16|10751",
@@ -117,7 +104,6 @@ class HomeExtrasSource @Inject constructor(
         picks.map { pick -> async { runCatching { loadFeatured(pick) }.getOrNull() } }.awaitAll().filterNotNull()
     }
 
-    /** Tendencias de la semana (TMDB) → hasta 5 destacados con su "motivo". */
     private suspend fun choosePicks(filter: HomeFilter): List<Pick> {
         val trending = (tmdb.trendingAllWeek(key, 1).results + runCatching { tmdb.trendingAllWeek(key, 2).results }.getOrDefault(emptyList()))
             .filter { it.media_type == "movie" || it.media_type == "tv" }
@@ -144,11 +130,8 @@ class HomeExtrasSource @Inject constructor(
         fun unused(predicate: (TmdbSearchResultDto) -> Boolean) =
             trending.firstOrNull { it.media_type + it.id !in used && predicate(it) }
 
-        // 1. Recién llegada: lo más visto de la semana estrenado en los últimos 60 días.
         add(unused { dateOf(it) in recentLimit..today }, FeaturedBadge.NEW)
-        // 2. La más popular: el número 1 de la semana.
         add(unused { true }, FeaturedBadge.POPULAR)
-        // 3. Del momento: la serie / película más vista que aún no haya salido.
         when (filter) {
             HomeFilter.ALL -> {
                 add(unused { it.media_type == "tv" }, FeaturedBadge.SERIES_NOW)
@@ -156,7 +139,6 @@ class HomeExtrasSource @Inject constructor(
             }
             else -> add(unused { true }, FeaturedBadge.RISING)
         }
-        // 4. Aclamada: la mejor nota entre las tendencias con suficientes votos.
         add(
             trending.filter { it.media_type + it.id !in used && it.vote_count >= 300 }.maxByOrNull { it.vote_average },
             FeaturedBadge.ACCLAIMED,
@@ -232,7 +214,6 @@ class HomeExtrasSource @Inject constructor(
     private fun writePicks(week: String, picks: List<Pick>) =
         week + "|" + picks.joinToString("|") { "${it.type.name}:${it.id}:${it.badge.name}" }
 
-    /** Año + número de semana (lunes a domingo). */
     private fun weekKey(): String {
         val c = Calendar.getInstance(Locale("es", "ES"))
         c.firstDayOfWeek = Calendar.MONDAY
@@ -241,24 +222,21 @@ class HomeExtrasSource @Inject constructor(
     }
 
     // =====================================================================================
-    // Categorías
     // =====================================================================================
 
-    /** Consulta de TMDB discover para películas o series. Las palabras clave se traducen a id al usarlas. */
     private data class Query(
         val genres: String? = null,
         val keyword: String? = null,
         val language: String? = null,
-        /** País de origen (ES, KR…): with_origin_country. */
         val country: String? = null,
     )
 
     private data class Spec(val movie: Query?, val tv: Query?)
 
     private fun spec(category: Category): Spec = when (category) {
-        Category.ACCLAIMED -> Spec(Query(), Query()) // filas propias: todas con nota alta y suficientes votos
+        Category.ACCLAIMED -> Spec(Query(), Query())
         Category.DRAMAS -> Spec(Query("18"), Query("18"))
-        Category.THRILLERS -> Spec(Query("53"), Query("9648")) // series: misterio (TMDB no tiene "thriller" en TV)
+        Category.THRILLERS -> Spec(Query("53"), Query("9648"))
         Category.CRIME -> Spec(Query("80"), Query("80"))
         Category.ACTION -> Spec(Query("28"), Query("10759"))
         Category.BOOKS -> Spec(Query(keyword = "based on novel or book"), Query(keyword = "based on novel or book"))
@@ -274,8 +252,8 @@ class HomeExtrasSource @Inject constructor(
         Category.DOCUMENTARY -> Spec(Query("99"), Query("99"))
         Category.ASTROLOGY -> Spec(Query(keyword = "astrology"), Query(keyword = "astrology"))
         Category.STANDUP -> Spec(Query(keyword = "stand-up comedy"), Query(keyword = "stand-up comedy"))
-        Category.MOODS -> Spec(null, null) // filas propias (ver moodRows)
-        Category.HORROR -> Spec(Query("27"), Query(keyword = "horror")) // TMDB no tiene "terror" en series
+        Category.MOODS -> Spec(null, null)
+        Category.HORROR -> Spec(Query("27"), Query(keyword = "horror"))
         Category.SPANISH -> Spec(Query(country = "ES"), Query(country = "ES"))
         Category.ADVENTURE -> Spec(Query("12"), Query("10759"))
         Category.MYSTERY -> Spec(Query("9648"), Query("9648"))
@@ -303,7 +281,6 @@ class HomeExtrasSource @Inject constructor(
         }.awaitAll().filterNotNull().filter { it.items.isNotEmpty() }
     }
 
-    /** Películas y series con nota ≥ 7,5 y bastantes votos; no usa géneros ni fechas. */
     private fun acclaimedRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> = when (filter) {
         HomeFilter.ALL -> listOf(
             tr("Las mejor valoradas", "Top rated") to suspend {
@@ -356,7 +333,6 @@ class HomeExtrasSource @Inject constructor(
         return rows
     }
 
-    /** "Estados de ánimo": una fila por estado. Géneros separados por | = cualquiera de ellos. */
     private fun moodRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> {
         val moods = listOf(
             Triple(tr("Para reír", "For a laugh"), Query("35"), Query("35")),
@@ -400,7 +376,6 @@ class HomeExtrasSource @Inject constructor(
         return p
     }
 
-    /** Id de palabra clave de TMDB por su nombre ("halloween" → 3335). Se busca una vez y se recuerda. */
     private suspend fun keywordId(name: String): Int? {
         keywordIds[name]?.let { return it }
         val results = tmdb.searchKeyword(key, name).results
@@ -409,7 +384,6 @@ class HomeExtrasSource @Inject constructor(
         return id
     }
 
-    /** Intercala películas y series: P, S, P, S… */
     private fun mix(a: List<CatalogItem>, b: List<CatalogItem>): List<CatalogItem> {
         val out = ArrayList<CatalogItem>(a.size + b.size)
         for (i in 0 until maxOf(a.size, b.size)) {
@@ -472,7 +446,6 @@ class HomeExtrasSource @Inject constructor(
         return best?.let { "$IMG/w500${it.file_path}" }
     }
 
-    /** Edad recomendada: la del país del idioma (España / EE. UU.); si no hay, la del otro. Misma escala para ambos. */
     private fun movieCertification(dates: TmdbReleaseDatesDto?): String? {
         fun of(country: String) = dates?.results?.firstOrNull { it.iso_3166_1 == country }
             ?.release_dates?.map { it.certification.trim() }?.firstOrNull { it.isNotEmpty() }

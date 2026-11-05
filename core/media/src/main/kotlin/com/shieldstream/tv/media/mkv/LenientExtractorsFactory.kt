@@ -10,20 +10,11 @@ import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 
-/**
- * El [DefaultExtractorsFactory] de siempre, pero para MKV entrega [LenientMatroskaExtractor]: si una pista viene
- * comprimida con zlib (u otra codificación que Media3 no soporta), se ignora esa pista en vez de rechazar el archivo
- * entero (antes: ERROR_CODE_PARSING_CONTAINER_MALFORMED con "ContentCompAlgo 0 not supported").
- *
- * Lo usan el reproductor (Media3Factory) y las miniaturas (ThumbFrameExtractor): si no, con esos archivos el vídeo
- * se vería pero las miniaturas fallarían.
- */
 @OptIn(UnstableApi::class)
 class LenientExtractorsFactory : ExtractorsFactory {
 
     private val delegate = DefaultExtractorsFactory()
 
-    // Mismos valores por defecto que DefaultExtractorsFactory; DefaultMediaSourceFactory los cambia con los setters.
     private var subtitleParserFactory: SubtitleParser.Factory = DefaultSubtitleParserFactory()
     private var textTrackTranscodingEnabled = true
 
@@ -54,7 +45,6 @@ class LenientExtractorsFactory : ExtractorsFactory {
     override fun createExtractors(uri: Uri, responseHeaders: Map<String, List<String>>): Array<Extractor> =
         swapMatroska(delegate.createExtractors(uri, responseHeaders))
 
-    /** Mismo orden y mismos flags que DefaultExtractorsFactory (Media3 1.6.0); solo cambia la clase del de MKV. */
     private fun swapMatroska(extractors: Array<Extractor>): Array<Extractor> = Array(extractors.size) { i ->
         val e = extractors[i]
         if (e is MatroskaExtractor) {

@@ -1,8 +1,5 @@
 package com.shieldstream.tv.model
 
-/**
- * Resolución/calidad de una fuente. [rank] mayor = mejor.
- */
 enum class Quality(val rank: Int, val label: String) {
     UNKNOWN(0, "?"),
     SD(1, "SD"),

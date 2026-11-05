@@ -18,12 +18,10 @@ sealed interface ProfilesUiState {
     data class Ready(
         val profiles: List<Profile>,
         val activeId: String,
-        /** Cabe uno más (máx. [Profile.MAX]). */
         val canAdd: Boolean,
     ) : ProfilesUiState
 }
 
-/** "¿Quién está viendo?": lista de perfiles y elegir uno. También da el perfil activo al menú superior. */
 @HiltViewModel
 class ProfilesViewModel @Inject constructor(
     private val profiles: ProfileRepository,
@@ -35,10 +33,8 @@ class ProfilesViewModel @Inject constructor(
             ProfilesUiState.Ready(list, active.id, canAdd = list.size < Profile.MAX)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, ProfilesUiState.Loading)
 
-    /** Perfil activo (avatar del menú superior). */
     val active: StateFlow<Profile> = profiles.active
 
-    /** Elegir perfil: pasa a ser el activo y se trae lo suyo de Trakt (aunque sea el mismo de antes). */
     fun select(id: String) {
         profiles.select(id)
         trakt.syncActive(force = true)

@@ -1,8 +1,4 @@
 /*
- * Copia de androidx.media3.extractor.mkv (Media3 1.6.0) para Bambi. Licencia Apache 2.0 (cabecera original abajo).
- * Solo se cambia el paquete (y se quitan las anotaciones de checkerframework, que solo sirven al compilar); los cambios de comportamiento están en LenientMatroskaExtractor (buscar "Bambi:").
- */
-/*
  * Copyright (C) 2016 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

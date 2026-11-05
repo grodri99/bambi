@@ -64,43 +64,14 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
-/** Separación entre miniaturas: cada ◀▶ (10 s) mueve la tira una posición. */
 internal const val THUMB_SLOT_MS = 10_000L
 
-/** Alto del fotograma extraído (px). 216 px basta para una tarjeta de ~140 dp y ocupa poco (≈330 KB). */
 private const val THUMB_HEIGHT_PX = 216
 
-/** Memoria máxima para miniaturas ya extraídas (≈70 fotogramas). */
 private const val CACHE_BYTES = 24 * 1024 * 1024
 
-/** Tras dejar de buscar, el extractor se mantiene este tiempo por si se vuelve a buscar enseguida. */
 private const val IDLE_RELEASE_MS = 30_000L
 
-/**
- * Miniaturas de búsqueda al estilo Netflix.
- *
- * Netflix las tiene pregeneradas en sus servidores; aquí no existen, así que se sacan al vuelo del MISMO archivo
- * de Real-Debrid con un segundo reproductor oculto (ExperimentalFrameExtractor de Media3):
- *  - CLOSEST_SYNC: salta al fotograma clave más cercano. Solo se descarga y decodifica ese fotograma, que es lo
- *    más rápido (la imagen puede ser de 1–3 s antes o después; para una miniatura da igual).
- *  - Presentation.createForHeight: el fotograma se reduce en la GPU antes de copiarlo a memoria.
- *  - HDR / HDR10: el extractor lo pasa a SDR (BT.709) para que la miniatura no salga lavada.
- *
- * HDR en la Shield (punto crítico): el driver del Tegra X1 no tiene GL_EXT_YUV_target, así que el pase HDR→SDR
- * de Media3 no funciona. Por eso se usa [ThumbFrameExtractor] (copia ajustada del de Media3), que trata la entrada
- * como SDR, y aquí se añade una tabla de color (LUT) que convierte los valores PQ (HDR10 / Dolby Vision 8) a SDR.
- * Dolby Vision: se decodifica con el decodificador HEVC normal (capa compatible HDR10 del perfil 8). El perfil 5
- * no tiene capa compatible: sin miniaturas.
- *
- * Ciclo de vida (puntos críticos):
- *  - Un único hilo: se crea y se usa SIEMPRE en el hilo principal (Media3 lo exige).
- *  - Mientras se busca, el reproductor principal está en pausa, así que el segundo decodificador no le quita
- *    nada a la película.
- *  - Se libera a los [IDLE_RELEASE_MS] de dejar de buscar, al cambiar de vídeo y al salir del reproductor, para
- *    no dejar un decodificador de vídeo ocupado.
- *  - Si el archivo no se puede decodificar así (p. ej. Dolby Vision perfil 5 o AV1 sin decodificador del
- *    sistema), [broken] pasa a true y la tira enseña solo los tiempos.
- */
 @OptIn(UnstableApi::class)
 internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
 
@@ -108,8 +79,6 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
         context,
         ThumbFrameExtractor.Configuration.Builder()
             .setSeekParameters(SeekParameters.CLOSEST_SYNC)
-            // Decodificador por hardware del Tegra (el de software de Android no admite HEVC de 10 bits), sin el
-            // de Dolby Vision: así se usa la capa HEVC compatible.
             .setMediaCodecSelector(HardwareWithoutDolbyVision)
             .build(),
     )
@@ -121,24 +90,18 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
     private var consecutiveFailures = 0
     private var released = false
 
-    // Cola propia en el hilo principal (Media3 exige un solo hilo). Vive con este objeto, no con la pantalla:
-    // si se moviera con cada ◀▶ habría que cancelar peticiones a medias, y eso es lo que cerraba la app.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var worker: Job? = null
 
-    /** Miniaturas que interesan ahora, por orden de importancia. La cola siempre lee la lista más reciente. */
     private var wanted: List<Long> = emptyList()
 
-    /** Sube cada vez que llega una miniatura nueva: la tira se recompone. */
     var version by mutableIntStateOf(0)
         private set
 
-    /** El archivo no da miniaturas (formato no soportado por el extractor): se enseñan solo los tiempos. */
     var broken by mutableStateOf(false)
         private set
 
     init {
-        // Primero se reduce (GPU) y luego se aplica la LUT: así la LUT trabaja sobre la imagen pequeña.
         val effects = buildList<Effect> {
             add(Presentation.createForHeight(THUMB_HEIGHT_PX))
             if (pqHdr) add(PqToSdr.lut)
@@ -148,11 +111,6 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
 
     fun get(slot: Long): Bitmap? = cache.get(slot)
 
-    /**
-     * Indica qué miniaturas hacen falta ahora (el centro primero). No espera: la cola las va sacando de una en una
-     * y, al terminar cada una, elige la siguiente según la ÚLTIMA lista pedida. Así, aunque se pulse ◀▶ muy
-     * deprisa, nunca se corta una extracción a medias y siempre se prioriza lo que está en pantalla.
-     */
     fun want(slots: List<Long>) {
         wanted = slots
         if (worker?.isActive != true && !released && !broken) worker = scope.launch { work() }
@@ -165,8 +123,6 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
             if (released) return
             when {
                 result == null -> {
-                    // Fotograma atascado (red muy lenta): el extractor sigue con él y las siguientes peticiones irían
-                    // detrás. Se deja de pedir para este vídeo; la búsqueda funciona igual, con los tiempos.
                     Log.w(TAG, "Fotograma ${slot * THUMB_SLOT_MS} ms: sin respuesta en $FRAME_TIMEOUT_MS ms")
                     broken = true
                 }
@@ -186,7 +142,6 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
         }
     }
 
-    /** La petición al extractor nunca se cancela (no lo soporta bien): si esta espera se corta, el resultado se ignora. */
     private suspend fun frameAt(positionMs: Long): Result<Bitmap> = suspendCancellableCoroutine { cont ->
         val future = extractor.getFrame(positionMs)
         future.addListener(
@@ -214,20 +169,12 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
     }
 }
 
-/** Decodificadores por hardware normales, pero sin el de Dolby Vision (ver [SeekThumbnails]). */
 @OptIn(UnstableApi::class)
 private val HardwareWithoutDolbyVision = MediaCodecSelector { mimeType, secure, tunneling ->
-    // Dolby Vision → decoder HEVC directamente: Media3 solo busca la alternativa HEVC para los perfiles 4/8,
-    // y los remux de Blu-ray (perfil 7) se quedaban sin miniaturas. El perfil 5 se descarta en PlayerScreen.
     if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) MediaCodecSelector.DEFAULT.getDecoderInfos(MimeTypes.VIDEO_H265, secure, tunneling)
     else MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)
 }
 
-/**
- * Tabla de color (LUT 3D, 33³) de PQ / BT.2020 (HDR10) a SDR / BT.709 para las miniaturas:
- * PQ → nits → compresión de luces (Reinhard extendido: 100 nits ≈ blanco de papel, 1000 nits → blanco) →
- * gama BT.2020 → BT.709 → gamma 2.2. Se calcula una vez (≈36 000 colores, milisegundos).
- */
 @OptIn(UnstableApi::class)
 private object PqToSdr {
     private const val SIZE = 33
@@ -246,7 +193,6 @@ private object PqToSdr {
         )
     }
 
-    /** Señal PQ (0–1) → luminancia lineal en nits (SMPTE ST 2084). */
     private fun pqToNits(signal: Double): Double {
         val p = signal.coerceIn(0.0, 1.0).pow(1.0 / M2)
         return (max(p - C1, 0.0) / (C2 - C3 * p)).pow(1.0 / M1) * 10_000.0
@@ -272,10 +218,6 @@ private object PqToSdr {
     }
 }
 
-/**
- * Extractor de miniaturas para el vídeo actual. Se crea al empezar a buscar ([active]) y se libera
- * [IDLE_RELEASE_MS] después de terminar, al cambiar de vídeo o al salir de la pantalla.
- */
 @Composable
 internal fun rememberSeekThumbnails(uri: Uri?, pqHdr: Boolean, active: Boolean): SeekThumbnails? {
     val context = LocalContext.current
@@ -303,10 +245,6 @@ internal fun rememberSeekThumbnails(uri: Uri?, pqHdr: Boolean, active: Boolean):
     return thumbs
 }
 
-/**
- * Tira de 5 miniaturas sobre la barra de progreso: la del centro es el punto elegido (borde blanco y hora) y las
- * de los lados, ±10 s y ±20 s. Las de los extremos se salen de la pantalla, como en Netflix.
- */
 @Composable
 internal fun SeekThumbnailStrip(
     thumbs: SeekThumbnails?,
@@ -317,17 +255,15 @@ internal fun SeekThumbnailStrip(
     val lastSlot = (durationMs / THUMB_SLOT_MS).coerceAtLeast(0L)
     val center = (targetMs / THUMB_SLOT_MS).coerceIn(0L, lastSlot)
     val slots = (-2..2).map { center + it }
-    // Orden de carga: centro, luego los inmediatos y por último los extremos.
     LaunchedEffect(thumbs, center) {
         thumbs?.want(listOf(0, -1, 1, -2, 2).map { center + it }.filter { it in 0..lastSlot })
     }
-    val version = thumbs?.version // lee el estado: recompone al llegar cada miniatura
+    val version = thumbs?.version
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = formatTime(targetMs),
             color = Color.White,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            // Fondo propio: la hora va sobre el vídeo y se perdía con títulos o escenas claras.
             modifier = Modifier
                 .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(50))
                 .padding(horizontal = 14.dp, vertical = 4.dp),

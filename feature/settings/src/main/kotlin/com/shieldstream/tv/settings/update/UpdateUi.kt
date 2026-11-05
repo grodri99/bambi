@@ -46,14 +46,9 @@ private val Panel = Color(0xFF1A1C27)
 private val Muted = Color.White.copy(alpha = 0.6f)
 private val Red = Color(0xFFE50914)
 
-/**
- * Aviso "Hay una versión nueva" (como el de las apps de la tienda), encima de lo que haya. Atrás = "Ahora no".
- * Se pone en "¿Quién está viendo?" y en el Inicio; nunca durante la reproducción.
- */
 @Composable
 fun UpdatePrompt(viewModel: UpdateViewModel = hiltViewModel()) {
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
-    // Al volver de la pantalla del permiso (Atrás), si ya está concedido se sigue solo con la descarga.
     LifecycleResumeEffect(Unit) {
         viewModel.onResumed()
         onPauseOrDispose { }
@@ -142,7 +137,6 @@ private fun UpdateBody(title: String, subtitle: String, update: AppUpdate?, acti
     actions()
 }
 
-/** Las notas de la release vienen en Markdown: fuera títulos (ya pone "Novedades"), asteriscos y la sección de instalación. */
 private fun cleanNotes(raw: String): String = raw
     .substringBefore("### Instalar")
     .lines()
@@ -182,10 +176,6 @@ private fun ProgressBar(progress: Float) {
     }
 }
 
-/**
- * Tarjeta de Ajustes → "Actualizaciones": OK busca ahora; si hay versión nueva, OK la instala.
- * En "Bambi (pruebas)" solo informa (esa app no se actualiza sola).
- */
 @Composable
 fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -222,8 +212,6 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
             .tvClickable {
                 when (val s = state) {
                     is UpdateState.Available -> viewModel.update()
-                    // OK abre la pantalla del sistema; al volver con el permiso dado sigue solo (UpdatePrompt.onResumed).
-                    // Si esta tele no tiene esa pantalla, se reintenta por si el permiso ya está dado.
                     is UpdateState.NeedsPermission -> if (!viewModel.openInstallPermission(context)) viewModel.update()
                     is UpdateState.Failed -> if (s.update != null) viewModel.update() else viewModel.checkNow()
                     UpdateState.Idle, is UpdateState.UpToDate -> viewModel.checkNow()

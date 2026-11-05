@@ -1,12 +1,10 @@
 package com.shieldstream.tv.model
 
-/** Configuración de reproducción del dispositivo, independiente de los perfiles de usuario. */
 enum class DeviceOptimization {
     AUTOMATIC,
     CUSTOM,
 }
 
-/** Codecs que Bambi sabe reconocer al consultar los decodificadores de Android. */
 enum class VideoCodec(val mimeType: String, val label: String) {
     H264("video/avc", "H.264"),
     HEVC("video/hevc", "HEVC"),
@@ -25,7 +23,6 @@ enum class MemoryProfile {
     CONSTRAINED,
 }
 
-/** Capacidades del dispositivo y del display conectado actualmente. */
 data class DeviceCapabilities(
     val model: String,
     val heapLimitBytes: Long,
@@ -33,7 +30,6 @@ data class DeviceCapabilities(
     val supportedHdr: Set<HdrType>,
 )
 
-/** Valores efectivos con los que se crea el reproductor. */
 data class PlaybackPolicy(
     val minBufferSeconds: Int,
     val maxBufferSeconds: Int,
@@ -48,7 +44,6 @@ data class PlaybackPolicy(
         private const val MIB = 1024 * 1024
         private const val CONSTRAINED_HEAP_LIMIT_BYTES = 256L * MIB
 
-        /** Los dispositivos con heap suficiente conservan exactamente los valores anteriores de Bambi. */
         fun automatic(heapLimitBytes: Long): PlaybackPolicy = if (heapLimitBytes <= CONSTRAINED_HEAP_LIMIT_BYTES) {
             PlaybackPolicy(
                 minBufferSeconds = 30,
@@ -73,7 +68,6 @@ data class PlaybackPolicy(
             )
         }
 
-        /** Modo manual: conserva los perfiles de búfer de 20–100 s introducidos en la 1.0.8. */
         fun custom(maxBufferSeconds: Int, seekThumbnails: Boolean): PlaybackPolicy {
             val seconds = maxBufferSeconds.coerceIn(20, 100)
             val lowMemory = seconds <= 40

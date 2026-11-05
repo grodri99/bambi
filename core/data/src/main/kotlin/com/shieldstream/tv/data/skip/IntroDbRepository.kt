@@ -20,18 +20,12 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * IntroDB (introdb.app): base de datos colaborativa de intros, resúmenes y créditos por episodio (id de IMDb +
- * temporada + episodio). Lectura pública, sin clave. Es la misma fuente que usan Nuvio o el plugin de Jellyfin.
- * Código propio de Bambi: de Nuvio (GPL) solo se ha tomado la idea de usar este servicio.
- */
 @Singleton
 class IntroDbRepository @Inject constructor(
     base: OkHttpClient,
     private val json: Json,
 ) : SkipSegmentsRepository {
 
-    // Corto: si IntroDB tarda, el episodio empieza igual (los botones simplemente no salen).
     private val client = base.newBuilder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -49,13 +43,12 @@ class IntroDbRepository @Inject constructor(
                     .addQueryParameter("episode", episode.toString())
                     .build()
                 client.newCall(Request.Builder().url(url).header("User-Agent", "Bambi").build()).execute().use { r ->
-                    if (r.code == 404) return@use SkipSegments.NONE // episodio aún sin datos
+                    if (r.code == 404) return@use SkipSegments.NONE
                     check(r.isSuccessful) { "IntroDB HTTP ${r.code}" }
                     parse(r.body?.string().orEmpty())
                 }
             }.onFailure { Log.w(TAG, "Sin segmentos de $key: ${it.message}") }.getOrNull()
         }
-        // Solo se recuerda lo que respondió: un fallo de red se vuelve a intentar en el siguiente episodio.
         return result?.also { cache[key] = it } ?: SkipSegments.NONE
     }
 
@@ -69,7 +62,6 @@ class IntroDbRepository @Inject constructor(
         ).also { Log.i(TAG, "Segmentos ${root["imdb_id"]?.jsonPrimitive?.contentOrNull}: $it") }
     }
 
-    /** {"start_ms":…, "end_ms":…} o en segundos. end null (créditos hasta el final) = Long.MAX_VALUE. */
     private fun JsonObject.range(name: String): TimeRange? {
         val o = this[name] as? JsonObject ?: return null
         val start = o.ms("start_ms", "start_sec") ?: return null

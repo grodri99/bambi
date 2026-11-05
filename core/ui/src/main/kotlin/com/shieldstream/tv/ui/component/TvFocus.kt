@@ -19,11 +19,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
-/**
- * Scroll "pivot" estilo Netflix: el elemento enfocado se coloca a [leadingPx] del borde
- * inicial del contenedor, en vez del comportamiento por defecto (scroll mínimo hasta el borde).
- * Es lo que hace que la tarjeta enfocada se quede fija a la izquierda y las filas suban.
- */
 @OptIn(ExperimentalFoundationApi::class)
 private class PivotBringIntoViewSpec(private val leadingPx: Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
@@ -37,7 +32,6 @@ private class PivotBringIntoViewSpec(private val leadingPx: Float) : BringIntoVi
     }
 }
 
-/** Aplica el scroll pivot a los LazyRow/LazyColumn de [content]. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProvidePivotScroll(leading: Dp, content: @Composable () -> Unit) {
@@ -46,15 +40,9 @@ fun ProvidePivotScroll(leading: Dp, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
 }
 
-/**
- * Scroll mínimo: solo desplaza lo justo para que el elemento enfocado se vea.
- * En Android TV Compose usa por defecto un "pivot" que centra el foco, y en pantallas
- * con cabecera (detalle) eso esconde el logo nada más entrar.
- */
 @OptIn(ExperimentalFoundationApi::class)
 private class MinimalBringIntoViewSpec(private val marginPx: Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, rawSize: Float, containerSize: Float): Float {
-        // Margen alrededor del elemento enfocado (p. ej. para que se vea el título bajo la miniatura).
         val offset = offset - marginPx
         val size = rawSize + 2 * marginPx
         val trailing = offset + size
@@ -75,25 +63,15 @@ fun ProvideMinimalScroll(margin: Dp = 0.dp, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
 }
 
-/**
- * Atrás del mando interceptado ANTES de que lo procese el sistema de foco.
- * Compose usa el primer Atrás para "salir" del grupo de foco (el elemento enfocado pierde el foco)
- * y el BackHandler no se entera: parece que la pantalla se queda bloqueada.
- * Se consumen KeyDown y KeyUp para que la Activity no lo procese además.
- */
 fun Modifier.onBackKey(enabled: Boolean, onBack: () -> Unit): Modifier = onKeyEvent { event ->
-    // onKeyEvent va del elemento enfocado hacia fuera: el nivel más interno (p. ej. "Subtítulos externos")
-    // se cierra antes que el panel que lo contiene, y todo ocurre antes de que Compose mueva el foco.
     if (!enabled || (event.key != Key.Back && event.key != Key.Escape)) return@onKeyEvent false
     if (event.type == KeyEventType.KeyUp) onBack()
     true
 }
 
-/** clickable sin ripple: en TV el foco ya se marca con escala/borde. Responde a D-pad center/Enter. */
 fun Modifier.tvClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier =
     clickable(interactionSource = null, indication = null, enabled = enabled, onClick = onClick)
 
-/** Igual que [tvClickable], con pulsación larga (mantener OK) si [onLongClick] no es null. */
 fun Modifier.tvClickable(onLongClick: (() -> Unit)?, onClick: () -> Unit): Modifier =
     if (onLongClick == null) {
         tvClickable(onClick = onClick)

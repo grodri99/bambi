@@ -24,8 +24,6 @@ object ApiConfig {
     const val REAL_DEBRID_BASE_URL = "https://api.real-debrid.com/"
     const val TORRENTIO_BASE_URL = "https://torrentio.strem.fun/"
     const val TMDB_BASE_URL = "https://api.themoviedb.org/"
-    // La clave de TMDB ya no va en el código: se guarda cifrada en el dispositivo y se cambia en Ajustes
-    // (la primera vez se rellena con tmdbApiKey de local.properties, que no se sube a git).
 }
 
 @Module
@@ -42,7 +40,6 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient = OkHttpClient.Builder()
-        // Conexión corta: con una IP bloqueada (ver CloudflareFallbackDns) se pasa enseguida a la siguiente.
         .connectTimeout(5, TimeUnit.SECONDS)
         .dns(com.shieldstream.tv.network.CloudflareFallbackDns)
         .eventListener(com.shieldstream.tv.network.CloudflareFallbackDns.failureListener)
@@ -50,7 +47,6 @@ object NetworkModule {
         .writeTimeout(30, TimeUnit.SECONDS)
         .apply {
             val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-            // Solo método, host y código: las rutas y query strings pueden contener claves.
             if (debuggable) addInterceptor { chain ->
                 val request = chain.request()
                 val response = chain.proceed(request)
@@ -73,8 +69,6 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideTmdbApi(client: OkHttpClient, json: Json): TmdbApi {
-        // Todo TMDB en el idioma de la app (títulos, sinopsis, géneros, episodios). Se lee en cada petición,
-        // pero solo cambia al reiniciar la app (ver Lang).
         val tmdbClient = client.newBuilder()
             .addInterceptor { chain ->
                 val request = chain.request()

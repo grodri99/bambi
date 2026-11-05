@@ -63,13 +63,8 @@ class CatalogRepositoryImpl @Inject constructor(
     private val profiles: com.shieldstream.tv.domain.ProfileRepository,
 ) : CatalogRepository {
 
-    /** Perfil infantil activo: Inicio, portada y búsqueda solo con contenido para niños. */
     private val kids: Boolean get() = profiles.active.value.kids
 
-    // --- Caché en memoria de Inicio / Series / Películas (portada + filas) ---
-    // Cambiar de pestaña no vuelve a pedir nada a TMDB durante [HOME_CACHE_MS], y el Inicio precarga las otras
-    // dos. El Mutex por clave hace que, si una precarga está en curso, la pestaña la espere en vez de repetirla.
-    // Los resultados vacíos (error de red) no se guardan: "Reintentar" vuelve a pedirlos.
     private class Cached(val at: Long, val value: Any)
     private val homeCache = ConcurrentHashMap<String, Cached>()
     private val homeLocks = ConcurrentHashMap<String, Mutex>()
@@ -82,19 +77,15 @@ class CatalogRepositoryImpl @Inject constructor(
             load().also { if (it.isNotEmpty()) homeCache[cacheKey] = Cached(System.currentTimeMillis(), it) }
         }
 
-    // Infantil: portada propia (la semanal se elige entre lo más visto de TMDB, que no es para niños).
     override suspend fun getFeatured(filter: HomeFilter): List<FeaturedItem> =
         if (kids) cachedHome("featured_kids_${filter.name}") { extras.kidsFeatured(filter) }
         else cachedHome("featured_${filter.name}") { extras.featured(filter) }
 
-    // Infantil: solo sus categorías (la pantalla tampoco enseña otras; esto cubre cualquier otro camino).
     override suspend fun getCategoryRows(category: Category, filter: HomeFilter): List<CatalogRow> =
         if (kids && category !in Category.KIDS_SAFE) emptyList() else extras.categoryRows(category, filter)
 
-    /** Clave de TMDB de Ajustes, leída en cada petición: si se cambia allí, vale al momento. */
     private val key: String get() = store.tmdbKey.orEmpty()
 
-    /** Una fila de la Home: se cargan todas en paralelo y las que fallan se omiten. */
     private class RowSpec(
         val id: String,
         val title: String,
@@ -168,13 +159,9 @@ class CatalogRepositoryImpl @Inject constructor(
 
     override suspend fun search(query: String): List<CatalogItem> =
         tmdb.search(key, query).results
-            .filter { !kids || it.genre_ids.any { g -> g in KIDS_GENRES } } // infantil: solo animación/familia/infantil
+            .filter { !kids || it.genre_ids.any { g -> g in KIDS_GENRES } }
             .mapNotNull { it.toCatalogItemOrNull() } // descarta personas
             .filter { it.posterUrl != null }
-
-    // ------------------------------------------------------------------ perfil infantil
-    // Películas: animación o familia con calificación de EE. UU. hasta PG (TMDB no tiene la española para todo).
-    // Series: el género "Infantil" (Kids) de TMDB. Nada de "Animación" a secas en series: incluye series de adultos.
 
     private suspend fun kidsMovies(extra: Map<String, String>, genres: String = "16|10751"): List<CatalogItem> =
         tmdb.discoverMovieQuery(
@@ -259,7 +246,6 @@ class CatalogRepositoryImpl @Inject constructor(
         val cacheKey = "${type.name}_$id"
         itemCache[cacheKey]?.let { return it }
         val tmdbId = id.toIntOrNull() ?: return null
-        // Llamada ligera (sin logos ni traducciones): solo lo que pinta la tarjeta.
         val item = if (type == MediaType.TV) {
             val d = tmdb.tvDetails(tmdbId, key, append = "external_ids")
             CatalogItem(
@@ -295,36 +281,51 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private class CachedAiring(val at: Long, val value: ShowAiring)
     private val airingCache = ConcurrentHashMap<String, CachedAiring>()
+    private val airingLocks = ConcurrentHashMap<String, Mutex>()
 
     override suspend fun getShowAiring(id: String): ShowAiring? {
         val tmdbId = id.toIntOrNull() ?: return null
-        airingCache[id]?.takeIf { System.currentTimeMillis() - it.at < AIRING_CACHE_MS }?.let { return it.value }
-        val d = tmdb.tvDetails(tmdbId, key, append = "external_ids")
-        val item = CatalogItem(
-            id = id,
-            imdbId = d.external_ids?.imdb_id,
-            type = MediaType.TV,
-            title = d.name,
-            overview = d.overview,
-            posterUrl = d.poster_path?.let { poster(it) },
-            backdropUrl = d.backdrop_path?.let { backdrop(it) },
-            year = d.first_air_date?.take(4)?.toIntOrNull(),
-            rating = d.vote_average.toFloat(),
-            genres = d.genres.map { it.name },
-        )
-        return ShowAiring(
-            item = item,
-            latestEpisode = d.last_episode_to_air?.toEpisode(),
-            nextEpisode = d.next_episode_to_air?.toEpisode(),
-        ).also {
-            itemCache["TV_$id"] = item
-            airingCache[id] = CachedAiring(System.currentTimeMillis(), it)
+        return airingLocks.getOrPut(id) { Mutex() }.withLock {
+            airingCache[id]?.takeIf { System.currentTimeMillis() - it.at < AIRING_CACHE_MS }?.let { return@withLock it.value }
+            val d = tmdb.tvDetails(tmdbId, key, append = "external_ids")
+            val item = CatalogItem(
+                id = id,
+                imdbId = d.external_ids?.imdb_id,
+                type = MediaType.TV,
+                title = d.name,
+                overview = d.overview,
+                posterUrl = d.poster_path?.let { poster(it) },
+                backdropUrl = d.backdrop_path?.let { backdrop(it) },
+                year = d.first_air_date?.take(4)?.toIntOrNull(),
+                rating = d.vote_average.toFloat(),
+                genres = d.genres.map { it.name },
+            )
+            ShowAiring(
+                item = item,
+                latestEpisode = d.last_episode_to_air?.toEpisode(),
+                nextEpisode = d.next_episode_to_air?.toEpisode(),
+                seasons = d.seasons
+                    .filter { it.season_number > 0 && it.episode_count > 0 }
+                    .map { Season(it.season_number, it.name, it.episode_count) },
+            ).also {
+                itemCache["TV_$id"] = item
+                airingCache[id] = CachedAiring(System.currentTimeMillis(), it)
+            }
         }
     }
 
+    private class CachedEpisodes(val at: Long, val value: List<Episode>)
+    private val episodesCache = ConcurrentHashMap<String, CachedEpisodes>()
+    private val episodeLocks = ConcurrentHashMap<String, Mutex>()
+
     override suspend fun getEpisodes(item: CatalogItem, season: Int): List<Episode> {
         val id = item.id.toIntOrNull() ?: return emptyList()
-        return tmdb.tvSeason(id, season, key).episodes.mapNotNull { it.toEpisode(defaultSeason = season) }
+        val cacheKey = "$id:$season"
+        return episodeLocks.getOrPut(cacheKey) { Mutex() }.withLock {
+            episodesCache[cacheKey]?.takeIf { System.currentTimeMillis() - it.at < AIRING_CACHE_MS }?.let { return@withLock it.value }
+            tmdb.tvSeason(id, season, key).episodes.mapNotNull { it.toEpisode(defaultSeason = season) }
+                .also { episodes -> if (episodes.isNotEmpty()) episodesCache[cacheKey] = CachedEpisodes(System.currentTimeMillis(), episodes) }
+        }
     }
 
     private fun com.shieldstream.tv.network.dto.TmdbEpisodeDto.toEpisode(defaultSeason: Int? = null): Episode? {
@@ -349,14 +350,11 @@ class CatalogRepositoryImpl @Inject constructor(
         } else {
             "movie" to imdbId
         }
-        // Todos los buscadores activados a la vez. Cada uno que responde se emite al momento (no se espera al
-        // más lento); uno caído o lento (25 s máx.) no frena a los demás. AIOStreams solo si tiene URL.
         val aioConfigured = !store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).isNullOrBlank()
         val enabled = settings.sourceProviders.first()
         val providers = SourceProvider.entries.filter { it in enabled && (it != SourceProvider.AIOSTREAMS || aioConfigured) }
         val done = LinkedHashMap<SourceProvider, Result<List<StreamSource>>>()
         val lock = Mutex()
-        // Secciones: Torrentio, AIOStreams y "The Pirate Bay" (todos los buscadores propios juntos, sin repetidos).
         fun snapshot(): StreamResults {
             val sources = providers.flatMap { p ->
                 done[p]?.getOrNull().orEmpty().map { it.copy(id = "${p.name}:${it.id}", provider = p.section) }
@@ -386,7 +384,6 @@ class CatalogRepositoryImpl @Inject constructor(
                 }
             }.joinAll()
         }
-        // Nada en ninguno y alguno falló: un error de debrid (clave…) se enseña tal cual; si no, quién no respondió.
         if (snapshot().sources.isEmpty()) {
             val failed = done.filter { it.value.isFailure }
             failed.values.firstNotNullOfOrNull { r -> r.exceptionOrNull()?.takeIf { it is IllegalStateException && it !is kotlinx.coroutines.CancellationException } }?.let { throw it }
@@ -399,7 +396,6 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private suspend fun providerStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String): List<StreamSource> =
         when (p) {
-            // Uno o varios addons (URLs separadas por espacios): todos a la vez, cada fuente con el nombre de su addon.
             SourceProvider.AIOSTREAMS -> coroutineScope {
                 val bases = aioStreamBases(store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).orEmpty())
                 bases.map { base ->
@@ -418,12 +414,6 @@ class CatalogRepositoryImpl @Inject constructor(
             else -> torrentioStreams(p, item, type, streamId)
         }
 
-    /**
-     * Buscadores propios (como los scrapers de Umbrella en Kodi): piden la lista de torrents a la web y la pasan
-     * al mismo formato que Torrentio ("Release\n👤 seeds 💾 tamaño"), así el resto de Bambi no cambia.
-     * Solo con Real-Debrid: los torrents se resuelven en la Shield. Series: solo el episodio exacto (sin packs,
-     * que no sabrían qué archivo elegir).
-     */
     private suspend fun scraperStreams(p: SourceProvider, item: CatalogItem, streamId: String): List<StreamSource> {
         if (settings.debridService.first().viaTorrentio) return emptyList()
         val parts = streamId.split(':')
@@ -434,28 +424,18 @@ class CatalogRepositoryImpl @Inject constructor(
         val base = checkNotNull(p.baseUrl)
         val title = releaseTitle(item)
         val wanted = normalize(title)
-        // Series, como CocoScrapers: el episodio y también los packs de temporada (Real-Debrid elige dentro del
-        // pack el archivo del episodio, ver ResolveStreamUseCase.pickFile). Dos búsquedas: "SxxEyy" y "Sxx".
         val queries = if (episodeTag != null) listOf("$title $episodeTag", "$title $seasonTag") else listOf("$title ${item.year ?: ""}".trim())
-        // Anime: además "Título 1100" (numeración absoluta, la de casi todas sus releases). Va después de
-        // releaseTitle, que es quien sabe si es anime.
         val absolute = if (season != null && episode != null) absoluteEpisode(item, season, episode) else null
-        // Anime: Nyaa y la categoría Anime de Knaben. Los géneros no siempre vienen en el item (búsqueda): vale
-        // también lo que sabe releaseTitle (japonés + Animación).
         val anime = item.genres.any { it.contains("anim", ignoreCase = true) } || animeSeasons.containsKey(item.key)
         val allQueries = if (absolute != null) queries + "$title ${"%02d".format(absolute)}" else queries
         val packRx = season?.let { Regex("(?i)(\\bS0*$it\\b(?!\\s*E\\d)|season\\s*0*$it\\b|temporada\\s*0*$it\\b|complete)") }
         var seen = 0
-        // El título tiene que ir al principio (tras etiquetas [Grupo]) y seguido de año, temporada o calidad:
-        // así "Lupin III - 01" no cuela como "Lupin", ni "Dune Messiah" como "Dune".
         val titleRx = Regex(
             "^(?:\\[[^\\]]*\\]\\s*)*" + title.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotBlank() }
                 .joinToString("[\\W_]+") { Regex.escape(it) } +
                 "[\\W_]+(?:\\(?(?:19|20)\\d{2}|s\\d|season|temporada|complete|\\d{3,4}p|\\d+x\\d)",
             RegexOption.IGNORE_CASE,
         )
-        // "[Grupo] One Piece - 1100 (1080p)" / "One Piece E1100": el título y justo después el número absoluto
-        // (no un rango "1100-1110", que sería un pack sin forma de elegir el archivo).
         val absoluteRx = absolute?.let {
             Regex(
                 "^(?:\\[[^\\]]*\\]\\s*)*" + title.split(Regex("[^\\p{L}\\p{N}]+")).filter { w -> w.isNotBlank() }
@@ -509,7 +489,6 @@ class CatalogRepositoryImpl @Inject constructor(
                             else -> "$base/?f=0&c=0_0&q=$enc"
                         }
                         val html = torrentio.page(url, BROWSER_UA).string()
-                        // Enlaces magnet de la página de resultados: hash + nombre (dn). Tamaño si viene (xl).
                         MAGNET.findAll(html).forEach { m ->
                             val params = m.groupValues[2].replace("&amp;", "&")
                             val name = Regex("[?&]dn=([^&]+)").find(params)?.groupValues?.get(1)
@@ -528,10 +507,6 @@ class CatalogRepositoryImpl @Inject constructor(
             .sortedByDescending { it.seeders ?: 0 }
     }
 
-    /**
-     * Comet como en CocoScrapers: configuración en base64 con tu token de Real-Debrid. Da enlaces de reproducción
-     * de Comet (redirigen al archivo de Real-Debrid): van por resolveUrl como los de AIOStreams.
-     */
     private suspend fun cometStreams(item: CatalogItem, type: String, streamId: String): List<StreamSource> {
         if (settings.debridService.first().viaTorrentio) return emptyList()
         val token = store.getSecret(TokenStore.RD_TOKEN)?.takeIf { it.isNotBlank() } ?: return emptyList()
@@ -545,17 +520,12 @@ class CatalogRepositoryImpl @Inject constructor(
         return aioStreams("${SourceProvider.COMET.baseUrl}/$b64", item, type, streamId, label = "Comet")
     }
 
-    /**
-     * Título en inglés de TMDB (las releases van en inglés); si falla, el que se ve en la app.
-     * Una sola petición por título: antes cada buscador propio (TPB, Knaben, Nyaa) la repetía a la vez.
-     */
     private suspend fun releaseTitle(item: CatalogItem): String = releaseTitleLock.withLock {
         releaseTitles[item.key]?.let { return@withLock it }
         val title = runCatching {
             val id = item.id.toInt()
             if (item.type == MediaType.TV) {
                 tmdb.tvDetails(id, key).also { d ->
-                    // Anime: episodios por temporada, para la numeración absoluta (ver absoluteEpisode).
                     if (d.original_language == "ja" && d.genres.any { it.id == 16 }) {
                         animeSeasons[item.key] = d.seasons.filter { it.season_number > 0 }.associate { it.season_number to it.episode_count }
                     }
@@ -567,17 +537,10 @@ class CatalogRepositoryImpl @Inject constructor(
         title?.also { releaseTitles[item.key] = it } ?: item.title
     }
 
-    /** Anime (TMDB: japonés + Animación) → episodios de cada temporada. Lo rellena [releaseTitle]. */
     private val animeSeasons = java.util.concurrent.ConcurrentHashMap<String, Map<Int, Int>>()
 
-    /** Primer número de episodio de cada temporada de anime ("clave:temporada"): > 1 = TMDB ya numera absoluto. */
     private val seasonStarts = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
-    /**
-     * Número absoluto del episodio en un anime (T3E5 → todos los de T1 y T2 + 5), como lo numeran sus releases.
-     * Si TMDB ya lo numera así (One Piece: la T21 empieza en el 892), es el mismo número.
-     * null si no es anime o faltan datos de alguna temporada anterior.
-     */
     private suspend fun absoluteEpisode(item: CatalogItem, season: Int, episode: Int): Int? {
         val counts = animeSeasons[item.key] ?: return null
         val start = seasonStarts.getOrPut("${item.key}:$season") {
@@ -600,12 +563,6 @@ class CatalogRepositoryImpl @Inject constructor(
         infoHash = hash.lowercase(),
     )
 
-    /**
-     * AIOStreams devuelve enlaces ya listos del debrid que tenga configurado (redirigen al archivo): van por
-     * resolveUrl como los /resolve/ de Torrentio. No traen infoHash → se inventa uno estable con la URL.
-     * Se lee mejor con el formateador \"Torrentio\" en la configuración de AIOStreams (calidad, 👤, 💾).
-     */
-    /** Nombre corto del addon para la lista de fuentes ("aiostreams.elfhosted.com" → "aiostreams"). */
     private fun addonLabel(base: String, count: Int): String =
         if (count <= 1) tr("el addon de Stremio", "the Stremio addon")
         else base.removePrefix("https://").removePrefix("http://").substringBefore('/').substringBefore('.')
@@ -614,7 +571,6 @@ class CatalogRepositoryImpl @Inject constructor(
         val streams = torrentio.streamsAt("$base/stream/$type/$streamId.json").streams
         streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, label)) }
         return streams.mapNotNull { s ->
-            // Addon de torrents (sin url, con infoHash): como Torrentio, lo resuelve Real-Debrid.
             val link = s.url?.takeIf { it.startsWith("http") } ?: return@mapNotNull s.toStreamSource(item)
             val hash = s.infoHash ?: "aio%08x".format(link.hashCode())
             s.copy(infoHash = hash).toStreamSource(item)?.copy(
@@ -628,10 +584,8 @@ class CatalogRepositoryImpl @Inject constructor(
     private suspend fun torrentioStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String): List<StreamSource> {
         val debrid = settings.debridService.first()
         val base = checkNotNull(p.baseUrl)
-        // "Castellano primero": Torrentio también pone delante las releases en español (opción "language").
         val language = if (settings.spanishFirst.first()) "language=spanish" else null
         if (!debrid.viaTorrentio) {
-            // Real-Debrid: el buscador sin clave (solo infoHash); la resolución es local con la API de RD.
             val streams = when {
                 p != SourceProvider.TORRENTIO -> torrentio.streamsAt("$base/stream/$type/$streamId.json")
                 language != null -> torrentio.streamsWithConfig(language, type, streamId)
@@ -639,16 +593,12 @@ class CatalogRepositoryImpl @Inject constructor(
             }
             return streams.streams.mapNotNull { it.toStreamSource(item) }
         }
-        // Peerflix admite debrid en su propio addon: /alldebrid=CLAVE/stream/...
-        // No usar aquí language=spanish: ese parámetro es específico de Torrentio.
         if (p == SourceProvider.PEERFLIX) {
             val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
                 ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
             return aioStreams("$base/${torrentioConfig(debrid, key)}", item, type, streamId, label = debrid.title)
         }
-        // Otros debrids: solo los buscadores con la API de Torrentio saben pedir sus enlaces.
         if (!p.torrentioStyle) return emptyList()
-        // Otros debrids: Torrentio con la clave, que marca la caché y da enlaces /resolve/.
         val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
             ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
         val config = listOfNotNull(language, torrentioConfig(debrid, key)).joinToString("|")
@@ -661,7 +611,6 @@ class CatalogRepositoryImpl @Inject constructor(
         return sources
     }
 
-    /** Fuente de Torrentio con debrid: hash y fileIdx salen del enlace /resolve/; "[TB+]" = está en la caché. */
     private fun TorrentioStreamDto.toDebridSource(item: CatalogItem, debrid: DebridService): StreamSource? {
         val link = url?.takeIf { it.contains("/resolve/") } ?: return null
         val (hash, idx) = parseResolveUrl(link) ?: return null
@@ -683,13 +632,11 @@ class CatalogRepositoryImpl @Inject constructor(
         }.getOrNull()
     }
 
-    /** Título en inglés (TMDB translations): es por el que indexan las webs de subtítulos. */
     private fun englishTitle(t: TmdbTranslationsDto?): String? =
         t?.translations?.firstOrNull { it.iso_639_1 == "en" }?.data
             ?.let { it.title ?: it.name }
             ?.takeIf { it.isNotBlank() }
 
-    /** Logo del título (estilo Netflix): idioma de la app > inglés > sin idioma. Se descartan SVG (Coil sin decoder SVG). */
     private fun pickLogo(images: TmdbImagesDto?): String? {
         val logos = images?.logos.orEmpty().filter { it.file_path.isNotBlank() && !it.file_path.endsWith(".svg") }
         val best = logos.sortedWith(
@@ -706,7 +653,6 @@ class CatalogRepositoryImpl @Inject constructor(
     }
 
     // --- Mapeo TMDB -> CatalogItem ---
-    // Pósters a w342: suficiente para tarjetas de ~124 dp y mucho más ligero que w500 para el Tegra.
 
     private fun poster(path: String) = "$IMG/w342$path"
     private fun backdrop(path: String) = "$IMG/w1280$path"
@@ -758,12 +704,9 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private fun TorrentioStreamDto.toStreamSource(item: CatalogItem): StreamSource? {
         val hash = infoHash ?: return null
-        // Torrentio: `name` = "Torrentio\n4k DV | HDR", `title` = "Release\n👤 12 💾 4.5 GB ⚙️ Fuente".
         val text = title.ifBlank { description.orEmpty() }
-        // VVC/x266: no hay decoder en los dispositivos compatibles actuales → se descartan.
         if (UNSUPPORTED_CODEC.containsMatchIn("$name $text")) return null
         val isAv1 = AV1_CODEC.containsMatchIn("$name $text")
-        // AV1 4K se filtra después según el dispositivo: por CPU no es viable, por hardware sí.
         val releaseName = text.lineSequence().firstOrNull { it.isNotBlank() } ?: item.title
         val fileName = behaviorHints?.filename
         val magnet = "magnet:?xt=urn:btih:${hash.lowercase()}&dn=${Uri.encode(fileName ?: releaseName)}"
@@ -779,14 +722,12 @@ class CatalogRepositoryImpl @Inject constructor(
             seeders = availability ?: parseSeeders(text),
             isCached = false,
             fileName = fileName,
-            // Torrentio pone las banderas en el texto; Peerflix, en el nombre ("Peerflix 🇪🇸 720p").
             languages = parseLanguages("$name\n$text"),
             videoCodec = if (isAv1) VideoCodec.AV1 else null,
             softwareDecode = isAv1,
         )
     }
 
-    /** Torrentio indica los idiomas con banderas emoji (🇪🇸 🇲🇽 🇬🇧…). Se convierten a códigos cortos. */
     private fun parseLanguages(text: String): List<String> {
         val codePoints = ArrayList<Int>()
         var i = 0
@@ -828,7 +769,6 @@ class CatalogRepositoryImpl @Inject constructor(
         SEEDERS_REGEX.find(text)?.groupValues?.get(1)?.toIntOrNull()
 
     private companion object {
-        /** Géneros TMDB que cuentan como infantiles en la búsqueda: animación, familia, infantil (series). */
         val KIDS_GENRES = setOf(16, 10751, 10762)
         const val PROVIDER_TIMEOUT_MS = 25_000L
         const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -847,11 +787,8 @@ class CatalogRepositoryImpl @Inject constructor(
     }
 }
 
-/** Validez de la caché de Inicio / Series / Películas. */
 private const val HOME_CACHE_MS = 30 * 60 * 1000L
 
-/** TMDB solo cambia estos datos al emitirse o anunciarse un episodio; no hace falta pedirlos en cada sync. */
 private const val AIRING_CACHE_MS = 6 * 60 * 60 * 1000L
 
-/** Se muestra en el Inicio (con "Reintentar") si no hay clave de TMDB. */
 val MISSING_TMDB_KEY: String get() = tr("Falta la clave de TMDB. Añádela en Ajustes (rueda arriba a la derecha).", "TMDB key missing. Add it in Settings (gear, top right).")

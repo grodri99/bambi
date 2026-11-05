@@ -1,8 +1,4 @@
 /*
- * Copia de androidx.media3.extractor.mkv (Media3 1.6.0) para Bambi. Licencia Apache 2.0 (cabecera original abajo).
- * Solo se cambia el paquete (y se quitan las anotaciones de checkerframework, que solo sirven al compilar); los cambios de comportamiento están en LenientMatroskaExtractor (buscar "Bambi:").
- */
-/*
  * Copyright (C) 2016 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -778,7 +774,6 @@ public class LenientMatroskaExtractor implements Extractor {
         blockGroupDiscardPaddingNs = 0L;
         break;
       case ID_CONTENT_ENCODING:
-        // TODO: check and fail if more than one content encoding is present.
         break;
       case ID_CONTENT_ENCRYPTION:
         getCurrentTrack(id).hasContentEncryption = true;
@@ -881,7 +876,6 @@ public class LenientMatroskaExtractor implements Extractor {
         }
         break;
       case ID_CONTENT_COMPRESSION:
-        // Bambi: sin ContentCompAlgo = zlib (valor por defecto) → tampoco se puede leer.
         if (!getCurrentTrack(id).compressionAlgorithmSeen) {
           markUnsupportedEncoding(id, "ContentCompAlgo 0 (implícito)");
         }
@@ -900,7 +894,6 @@ public class LenientMatroskaExtractor implements Extractor {
               "CodecId is missing in TrackEntry element", /* cause= */ null);
         } else {
           if (currentTrack.unsupportedEncoding) {
-            // Bambi: se ignora solo esta pista; vídeo, audio y el resto de subtítulos siguen.
             Log.w(
                 TAG,
                 "Ignorando pista " + currentTrack.number + " (" + currentTrack.codecId
@@ -1011,14 +1004,12 @@ public class LenientMatroskaExtractor implements Extractor {
       case ID_CONTENT_ENCODING_ORDER:
         // This extractor only supports one ContentEncoding element and hence the order has to be 0.
         if (value != 0) {
-          // Bambi: antes lanzaba ParserException y no se reproducía nada.
           markUnsupportedEncoding(id, "ContentEncodingOrder " + value);
         }
         break;
       case ID_CONTENT_ENCODING_SCOPE:
         // This extractor only supports the scope of all frames.
         if (value != 1) {
-          // Bambi: antes lanzaba ParserException y no se reproducía nada.
           markUnsupportedEncoding(id, "ContentEncodingScope " + value);
         }
         break;
@@ -1026,7 +1017,6 @@ public class LenientMatroskaExtractor implements Extractor {
         getCurrentTrack(id).compressionAlgorithmSeen = true;
         // This extractor only supports header stripping.
         if (value != 3) {
-          // Bambi: antes lanzaba ParserException y no se reproducía nada.
           markUnsupportedEncoding(id, "ContentCompAlgo " + value);
         }
         break;
@@ -1687,7 +1677,6 @@ public class LenientMatroskaExtractor implements Extractor {
     size += sampleStrippedBytes.limit();
 
     if (CODEC_ID_H264.equals(track.codecId) || CODEC_ID_H265.equals(track.codecId)) {
-      // TODO: Deduplicate with Mp4Extractor.
 
       // Zero the top three bytes of the array that we'll use to decode nal unit lengths, in case
       // they're only 1 or 2 bytes long.
@@ -1970,7 +1959,6 @@ public class LenientMatroskaExtractor implements Extractor {
     return Util.scaleLargeTimestamp(unscaledTimecode, timecodeScale, 1000);
   }
 
-  /** Bambi: marca la pista actual para ignorarla en vez de fallar con todo el archivo. */
   private void markUnsupportedEncoding(int id, String reason) throws ParserException {
     Track track = getCurrentTrack(id);
     track.unsupportedEncoding = true;
@@ -2104,11 +2092,7 @@ public class LenientMatroskaExtractor implements Extractor {
     public int maxBlockAdditionId;
     private int blockAddIdType;
     public boolean hasContentEncryption;
-    // Bambi: la pista usa una codificación que este extractor no sabe deshacer (zlib, bzlib, lzo1x, varias
-    // codificaciones encadenadas…). En vez de rechazar el archivo entero, la pista se ignora (ver ID_TRACK_ENTRY).
     public boolean unsupportedEncoding;
-    // Bambi: ContentCompression traía ContentCompAlgo. Si no lo trae vale 0 (zlib) según la especificación;
-    // mkvmerge lo omite (p. ej. subtítulos VobSub) y Media3 entregaba los datos aún comprimidos.
     public boolean compressionAlgorithmSeen;
     public byte [] sampleStrippedBytes;
     public TrackOutput.CryptoData cryptoData;
@@ -2213,7 +2197,6 @@ public class LenientMatroskaExtractor implements Extractor {
           initializationData = pair.second;
           break;
         case CODEC_ID_THEORA:
-          // TODO: This can be set to the real mimeType if/when we work out what initializationData
           // should be set to for this case.
           mimeType = MimeTypes.VIDEO_UNKNOWN;
           break;
@@ -2385,7 +2368,6 @@ public class LenientMatroskaExtractor implements Extractor {
 
       int type;
       Format.Builder formatBuilder = new Format.Builder();
-      // TODO: Consider reading the name elements of the tracks and, if present, incorporating them
       // into the trackId passed when creating the formats.
       if (MimeTypes.isAudio(mimeType)) {
         type = C.TRACK_TYPE_AUDIO;

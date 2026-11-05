@@ -9,10 +9,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Detecta las capacidades HDR/DV del display activo antes de reproducir.
- * No asume que cualquier pantalla soporta HDR.
- */
 @Singleton
 class DisplayCapabilityDetector @Inject constructor(
     @ApplicationContext private val context: Context,

@@ -44,16 +44,6 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Trakt por perfil (ver [TraktRepository]). Reglas de sincronización:
- *
- *  - Manda lo más reciente: lo de Trakt solo pisa lo local si es más nuevo (y al revés no se baja).
- *  - "Seguir viendo" de Trakt (sync/playback) trae el % visto; los ms salen de la duración que ya se conoce aquí
- *    o de la duración del título en Trakt (aprox. al minuto: suficiente para reanudar).
- *  - Vistos (sync/watched) → tick en la ficha.
- *  - Lo que estaba a medias aquí, ya no está en Trakt y es anterior a la última sincronización → se quitó en la
- *    otra Shield (o se terminó): se quita aquí también.
- */
 @Singleton
 class TraktRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -68,9 +58,10 @@ class TraktRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
+    private val tokenLocks = ConcurrentHashMap<String, Mutex>()
+    private val scrobbleLocks = ConcurrentHashMap<String, Mutex>()
     private val syncPrefs = context.getSharedPreferences("trakt_sync", Context.MODE_PRIVATE)
 
-    /** Clave de progreso → id de Trakt en sync/playback (para borrarlo al "Quitar de Seguir viendo"). */
     private val playbackIds = ConcurrentHashMap<String, Long>()
     @Volatile private var lastSyncAttempt = 0L
 
@@ -78,25 +69,19 @@ class TraktRepositoryImpl @Inject constructor(
 
     init {
         scope.launch {
-            // Cambio de perfil → lo suyo de Trakt.
             profiles.active.distinctUntilChangedBy { it.id }.drop(1).collect {
                 playbackIds.clear()
                 syncActive(force = true)
             }
         }
         scope.launch {
-            // "Quitar de Seguir viendo" (o empezar de nuevo) → también fuera de Trakt, si no la otra Shield lo sigue viendo.
             progress.cleared.collect { key -> removePlayback(profiles.active.value.id, key) }
         }
         scope.launch {
-            // "Mi lista" añadida o quitada en esta tele → watchlist de Trakt.
             myList.changes.collect { pushWatchlist(it) }
         }
     }
 
-    // ------------------------------------------------------------------ enlazar cuenta
-
-    /** client_secret solo si la app de Trakt tiene (las creadas desde oct-2026 no: ver TraktCredentials). */
     private fun kotlinx.serialization.json.JsonObjectBuilder.putSecret() {
         if (credentials.clientSecret.isNotBlank()) put("client_secret", credentials.clientSecret)
     }
@@ -126,7 +111,7 @@ class TraktRepositoryImpl @Inject constructor(
                 },
                 null,
             )
-        }.getOrElse { return TraktAuthPoll.Pending } // sin red un momento: se sigue esperando
+        }.getOrElse { return TraktAuthPoll.Pending }
         return when (response.code) {
             200 -> {
                 val body = response.body?.jsonObject ?: return TraktAuthPoll.Failed("Trakt: respuesta vacía")
@@ -134,7 +119,6 @@ class TraktRepositoryImpl @Inject constructor(
                 val username = fetchUsername(access) ?: "Trakt"
                 saveSession(profileId, body, username)
                 profiles.profiles.value.firstOrNull { it.id == profileId }?.let { profiles.save(it.copy(traktUser = username)) }
-                // Primera vez: se sube lo que ya había en esta Shield y luego se baja lo de Trakt.
                 scope.launch {
                     uploadLocal(profileId)
                     if (profiles.active.value.id == profileId) syncActive(force = true)
@@ -168,8 +152,6 @@ class TraktRepositoryImpl @Inject constructor(
         forget(profileId)
     }
 
-    // ------------------------------------------------------------------ sincronización
-
     override fun syncActive(force: Boolean) {
         val now = System.currentTimeMillis()
         if (!force && now - lastSyncAttempt < MIN_SYNC_INTERVAL_MS) return
@@ -185,7 +167,6 @@ class TraktRepositoryImpl @Inject constructor(
 
     private suspend fun pull(profileId: String, force: Boolean) {
         val token = validToken(profileId) ?: return
-        // Si nada ha cambiado en Trakt desde la última vez, no hace falta bajar nada.
         val activities = client.get("/sync/last_activities", token)
         if (!activities.ok) throw TraktHttpException(activities.code)
         val marker = activities.body?.jsonObject?.string("all")
@@ -214,7 +195,6 @@ class TraktRepositoryImpl @Inject constructor(
             }
         }
 
-        // 2) Vistos (sync/watched): tick en la ficha.
         addWatched(client.get("/sync/watched/movies", token), local, incoming) { item ->
             listOf(keyOf(item) to item.string("last_watched_at"))
         }
@@ -229,16 +209,12 @@ class TraktRepositoryImpl @Inject constructor(
             }
         }
 
-        // 3) Quitado en la otra Shield: estaba en el "Seguir viendo" de Trakt la última vez, ya no está, y aquí no se ha
-        //    tocado desde entonces. Solo lo que Trakt tenía: lo que nunca llegó a subir (p. ej. < 1 %, que Trakt no
-        //    guarda) se queda aquí.
         val lastSync = syncPrefs.getLong("last_$profileId", 0L)
         val previousRemote = syncPrefs.getStringSet("remote_$profileId", null).orEmpty()
         val gone = local.filter { (key, p) ->
             p.isResumable && key in previousRemote && key !in remotePlayback && key !in incoming && p.updatedAt < lastSync
         }.keys
 
-        // 4) Mi lista = watchlist. Se añade lo nuevo de Trakt; se quita lo que estaba allí la última vez y ya no.
         val remoteList = ArrayList<MyListEntry>()
         for ((kind, type, field) in listOf(Triple("movies", MediaType.MOVIE, "movie"), Triple("shows", MediaType.TV, "show"))) {
             val response = client.get("/sync/watchlist/$kind", token)
@@ -255,7 +231,6 @@ class TraktRepositoryImpl @Inject constructor(
         val listAdded = remoteList.filter { it.key !in localList }
         val listGone = localList.filter { it in previousList && it !in remoteListKeys }
 
-        // El perfil pudo cambiar mientras se descargaba: solo se aplica si sigue siendo el activo.
         if (profiles.active.value.id != profileId) return
         progress.importRemote(incoming)
         progress.removeRemote(gone)
@@ -281,7 +256,6 @@ class TraktRepositoryImpl @Inject constructor(
                 if (key == null) continue
                 val at = TraktClient.parseDate(date) ?: continue
                 val mine = local[key]
-                // Se respeta lo local si ya está visto o si se ha tocado después (lo estás volviendo a ver).
                 if (mine != null && (mine.isWatched || mine.updatedAt >= at - CLOCK_SLACK_MS)) continue
                 if (into[key]?.let { it.updatedAt >= at } == true) continue
                 into[key] = WatchProgress(positionMs = 1, durationMs = 1, updatedAt = at) // 100 % = visto
@@ -289,14 +263,12 @@ class TraktRepositoryImpl @Inject constructor(
         }
     }
 
-    /** Al enlazar: lo que ya había en esta Shield sube a Trakt (a medias por scrobble/pause; vistos al historial). */
     private suspend fun uploadLocal(profileId: String) {
         val token = validToken(profileId) ?: return
         val all = WatchProgressRepositoryImpl.readAll(context, profileId)
         runCatching {
             val watched = all.filter { it.value.isWatched }
             if (watched.isNotEmpty()) client.post("/sync/history", historyBody(watched), token)
-            // Mi lista de esta tele → watchlist (solo si es el perfil que se está usando: es la que está cargada).
             if (profiles.active.value.id == profileId && myList.entries.value.isNotEmpty()) {
                 delay(POST_SPACING_MS)
                 client.post("/sync/watchlist", watchlistBody(myList.entries.value.map { it.type to it.id }), token)
@@ -305,14 +277,13 @@ class TraktRepositoryImpl @Inject constructor(
                 .entries.sortedByDescending { it.value.updatedAt }
                 .take(MAX_UPLOAD_RESUMABLE)
                 .forEach { (key, p) ->
-                    delay(POST_SPACING_MS) // Trakt: como mucho 1 escritura por segundo
+                    delay(POST_SPACING_MS)
                     val item = itemBody(key) ?: return@forEach
                     client.post("/scrobble/pause", item.with("progress", JsonPrimitive(p.fraction * 100f)), token)
                 }
         }.onFailure { Log.w(TAG, "Subida inicial fallida: ${it.message}") }
     }
 
-    /** "Mi lista" → watchlist de Trakt (o fuera de ella). */
     private fun pushWatchlist(change: MyListChange) {
         val profileId = profiles.active.value.id
         if (session(profileId) == null) return
@@ -347,7 +318,6 @@ class TraktRepositoryImpl @Inject constructor(
                 })
             }
         }
-        // tv:ID:T:E → por serie y temporada.
         val episodes = watched.mapNotNull { (key, p) ->
             val parts = key.split(':')
             if (parts.size != 4 || parts[0] != "tv") return@mapNotNull null
@@ -408,17 +378,18 @@ class TraktRepositoryImpl @Inject constructor(
         val item = itemBody(progressKey) ?: return
         val percent = (fraction * 100f).coerceIn(0f, 100f)
         scope.launch {
-            val token = validToken(profileId) ?: return@launch
-            val path = when (action) {
-                ScrobbleAction.START -> "/scrobble/start"
-                ScrobbleAction.PAUSE -> "/scrobble/pause"
-                ScrobbleAction.STOP -> "/scrobble/stop"
+            scrobbleLocks.getOrPut(profileId) { Mutex() }.withLock {
+                val token = validToken(profileId) ?: return@withLock
+                val path = when (action) {
+                    ScrobbleAction.START -> "/scrobble/start"
+                    ScrobbleAction.PAUSE -> "/scrobble/pause"
+                    ScrobbleAction.STOP -> "/scrobble/stop"
+                }
+                runCatching { client.post(path, item.with("progress", JsonPrimitive(percent)), token) }
+                    .onSuccess { if (!it.ok && it.code != 409) Log.w(TAG, "Scrobble $action: HTTP ${it.code}") }
+                    .onFailure { Log.w(TAG, "Scrobble $action fallido: ${it.message}") }
+                playbackIds.remove(progressKey)
             }
-            runCatching { client.post(path, item.with("progress", JsonPrimitive(percent)), token) }
-                .onSuccess { if (!it.ok && it.code != 409) Log.w(TAG, "Scrobble $action: HTTP ${it.code}") }
-                .onFailure { Log.w(TAG, "Scrobble $action fallido: ${it.message}") }
-            // Lo que queda a medias tiene ahora otro id en Trakt: se vuelve a leer en la próxima sincronización.
-            playbackIds.remove(progressKey)
         }
     }
 
@@ -426,7 +397,6 @@ class TraktRepositoryImpl @Inject constructor(
         val profileId = profiles.active.value.id
         if (session(profileId) == null || progressKeys.isEmpty()) return
         val now = System.currentTimeMillis()
-        // Lo que estaba a medias (antes del cambio local) también se quita de "a medias" en Trakt.
         val wasResumable = if (watched) progressKeys.filter { progress.progress.value[it]?.isResumable == true } else emptyList()
         val body = historyBody(progressKeys.associateWith { WatchProgress(positionMs = 1, durationMs = 1, updatedAt = now) })
         val path = if (watched) "/sync/history" else "/sync/history/remove"
@@ -436,13 +406,12 @@ class TraktRepositoryImpl @Inject constructor(
                 .onSuccess { if (!it.ok) Log.w(TAG, "Historial $path: HTTP ${it.code}") }
                 .onFailure { Log.w(TAG, "Historial $path fallido: ${it.message}") }
             wasResumable.forEach { key ->
-                delay(POST_SPACING_MS) // Trakt: como mucho 1 escritura por segundo
+                delay(POST_SPACING_MS)
                 removePlayback(profileId, key)
             }
         }
     }
 
-    /** "movie:ID" / "tv:ID:T:E" (ids de TMDB) → objeto que entiende Trakt. */
     private fun itemBody(key: String): JsonObject? {
         val parts = key.split(':')
         return when {
@@ -466,7 +435,6 @@ class TraktRepositoryImpl @Inject constructor(
         }
     }
 
-    /** Elemento de sync/playback → clave de WatchProgress. */
     private fun keyOf(item: JsonObject): String? {
         item.obj("movie")?.obj("ids")?.int("tmdb")?.let { return WatchProgress.movieKey(it.toString()) }
         val show = item.obj("show")?.obj("ids")?.int("tmdb") ?: return null
@@ -497,10 +465,10 @@ class TraktRepositoryImpl @Inject constructor(
         tokens.setSecret(TraktSession.storeKey(profileId), json.encodeToString(TraktSession.serializer(), session))
     }
 
-    /** Token en vigor; si caduca en menos de un día se renueva antes. null = el perfil no tiene Trakt. */
-    private suspend fun validToken(profileId: String): String? {
-        val s = session(profileId) ?: return null
-        if (s.expiresAt - System.currentTimeMillis() > REFRESH_MARGIN_MS) return s.accessToken
+    private suspend fun validToken(profileId: String): String? = tokenLocks.getOrPut(profileId) { Mutex() }.withLock {
+        // Otro pudo renovar mientras esperábamos: se vuelve a leer ya dentro del candado.
+        val s = session(profileId) ?: return@withLock null
+        if (s.expiresAt - System.currentTimeMillis() > REFRESH_MARGIN_MS) return@withLock s.accessToken
         val response = runCatching {
             client.post(
                 "/oauth/token",
@@ -513,17 +481,23 @@ class TraktRepositoryImpl @Inject constructor(
                 },
                 null,
             )
-        }.getOrElse { return s.accessToken.takeIf { s.expiresAt > System.currentTimeMillis() } }
-        return when {
+        }.getOrElse { return@withLock s.accessToken.takeIf { s.expiresAt > System.currentTimeMillis() } }
+        when {
             response.ok -> {
                 // El refresh token es de un solo uso: se guarda siempre el nuevo.
                 saveSession(profileId, response.body!!.jsonObject, s.username)
                 session(profileId)?.accessToken
             }
-            // Token revocado (p. ej. desde la web de Trakt): el perfil queda sin Trakt.
+            // Solo se olvida si la respuesta corresponde a la sesión que sigue guardada. Una respuesta
+            // antigua no puede borrar una sesión renovada o enlazada mientras estaba en vuelo.
             response.code == 400 || response.code == 401 -> {
-                forget(profileId)
-                null
+                val current = session(profileId)
+                if (current?.refreshToken == s.refreshToken) {
+                    forget(profileId)
+                    null
+                } else {
+                    current?.takeIf { it.expiresAt > System.currentTimeMillis() }?.accessToken
+                }
             }
             else -> s.accessToken.takeIf { s.expiresAt > System.currentTimeMillis() }
         }
@@ -542,7 +516,7 @@ class TraktRepositoryImpl @Inject constructor(
     private companion object {
         const val TAG = "Trakt"
         const val MIN_SYNC_INTERVAL_MS = 2 * 60_000L
-        const val REFRESH_MARGIN_MS = 24 * 3_600_000L
+        const val REFRESH_MARGIN_MS = 60 * 60_000L
         const val DEFAULT_EXPIRES_S = 24 * 3_600L
         const val CLOCK_SLACK_MS = 2_000L
         const val POST_SPACING_MS = 1_100L

@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -59,10 +61,6 @@ import com.shieldstream.tv.ui.component.ProfileAvatar
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.tvClickable
 
-/**
- * Añadir / editar perfil: avatar grande a la izquierda; nombre, color y Trakt a la derecha; Guardar, Eliminar y
- * Cancelar abajo. Atrás = Cancelar.
- */
 @Composable
 fun ProfileEditScreen(
     onDone: () -> Unit,
@@ -76,28 +74,28 @@ fun ProfileEditScreen(
         return
     }
     val nameRequester = remember { FocusRequester() }
-    // ▼ desde las opciones (infantil / PIN) → Guardar: por cercanía iba a Cancelar y se perdía lo editado.
     val saveRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
         runCatching { nameRequester.requestFocus() }
-        // Dar el foco a un campo de texto abre el teclado de la tele aunque se pida que no: se cierra y se abre
-        // solo con OK (si no, el OK siguiente pulsaba la "q" del teclado).
         repeat(3) {
             delay(120)
             keyboard?.hide()
         }
     }
     val profile = editing.profile
-    // Poner PIN: se escribe dos veces (como en Netflix); si no coinciden, se vuelve a empezar.
     var creatingPin by remember { mutableStateOf(false) }
     var firstPin by remember { mutableStateOf<String?>(null) }
     var pinError by remember { mutableStateOf<String?>(null) }
     var choosingCategories by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(ProfileBackground)) {
-        // La Shield mide 960 dp de ancho: todo con márgenes, nada de anchos fijos grandes.
-        Column(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 72.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 72.dp, vertical = 24.dp),
+        ) {
             Text(
                 if (editing.isNew) tr("Añadir perfil", "Add profile") else tr("Editar perfil", "Edit profile"),
                 color = Color.White,
@@ -214,7 +212,10 @@ fun ProfileEditScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(start = 186.dp),
+            ) {
                 TvButton(
                     text = tr("Guardar", "Save"),
                     onClick = {
@@ -280,7 +281,6 @@ fun ProfileEditScreen(
     }
 }
 
-/** Nombre: OK abre el teclado de la tele (no al recibir el foco); ▼ baja a los colores. */
 @Composable
 private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -370,7 +370,6 @@ private fun ColorChoice(initial: String, avatar: Int, selected: Boolean, onClick
     }
 }
 
-/** Tarjeta de Trakt: conectar / desconectar (con confirmación) o por qué no está disponible. */
 @Composable
 private fun TraktCard(
     state: ProfileEditUiState.Editing,
@@ -423,7 +422,6 @@ private fun TraktCard(
     }
 }
 
-/** Opción pequeña del perfil (infantil, PIN): píldora que se ilumina con el foco. */
 @Composable
 private fun OptionChip(
     text: String,

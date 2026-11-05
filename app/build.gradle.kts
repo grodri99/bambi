@@ -12,19 +12,13 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-// seedKeys=true en local.properties → incluye tus claves como valores iniciales (solo para tu APK privado).
-// Por defecto no se incluyen credenciales personales en el APK.
 val seedKeys: Boolean = localProps.getProperty("seedKeys")?.trim()?.lowercase() == "true"
 fun seed(name: String): String = if (seedKeys) localProps.getProperty(name) ?: "" else ""
 val rdToken: String = seed("rdToken")
-// API key gratuita de https://subdl.com (opcional): activa SubDL en "Subtítulos externos".
 val subdlApiKey: String = seed("subdlApiKey")
 val tmdbApiKey: String = seed("tmdbApiKey")
-// App "Bambi" registrada en Trakt (app.trakt.tv/settings/apps). No es una clave personal: identifica a la app, así
-// que va también en los APK sin claves (seedKeys=false). Desde oct-2026 Trakt solo da Client ID; el secreto es opcional.
 val traktClientId: String = localProps.getProperty("traktClientId")?.trim() ?: ""
 val traktClientSecret: String = localProps.getProperty("traktClientSecret")?.trim() ?: ""
-// La misma Redirect URI que se puso al crear la app en developer.trakt.tv (las apps "Production" exigen https).
 val traktRedirectUri: String = localProps.getProperty("traktRedirectUri")?.trim() ?: "urn:ietf:wg:oauth:2.0:oob"
 
 android {
@@ -35,14 +29,12 @@ android {
         applicationId = "com.shieldstream.tv"
         minSdk = 21
         targetSdk = 35
-        // Al publicar una versión nueva: subir versionCode (+1) y versionName (1.0.1, 1.1.0…).
         versionCode = 108
         versionName = "1.0.8"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         buildConfigField("String", "RD_TOKEN", "\"$rdToken\"")
         buildConfigField("String", "SUBDL_API_KEY", "\"$subdlApiKey\"")
-        // Solo valores iniciales: en la primera ejecución se guardan cifrados y desde ahí mandan los Ajustes.
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
         buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"$traktClientSecret\"")
@@ -62,9 +54,6 @@ android {
         jvmTarget = "17"
     }
 
-    // Firma de la release: keystore/butaca.keystore (fuera de git; el bucle la crea copiando la clave con la que
-    // ya estaba instalada la app, para actualizar sin desinstalar). ¡Haz copia de seguridad! Sin ella no se puede
-    // actualizar "Bambi" sin desinstalarla (y perder el progreso).
     signingConfigs {
         create("release") {
             storeFile = rootProject.file(localProps.getProperty("releaseStoreFile") ?: "keystore/butaca.keystore")
@@ -75,14 +64,11 @@ android {
     }
 
     buildTypes {
-        // "Bambi (pruebas)": se instala junto a la estable, con sus propios datos. Aquí se prueban los cambios.
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-pruebas"
             manifestPlaceholders["appLabel"] = "Bambi (pruebas)"
         }
-        // "Bambi": la de diario. Sin R8/minificar a propósito: en una app personal apenas aporta y es una
-        // fuente típica de cierres raros (reflexión de libgav1, JNI de dav1d, serialización).
         release {
             isMinifyEnabled = false
             isShrinkResources = false
@@ -123,11 +109,19 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
     implementation(libs.coil)
-    // Decoder AV1 por software (libgav1, compilado con _setup_av1.sh). Lo usa core:media por reflexión.
     implementation(files("libs/media3-decoder-av1-1.6.0.aar"))
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    ksp(libs.androidx.hilt.compiler)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }

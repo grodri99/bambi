@@ -17,15 +17,10 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Respuesta de Trakt: código HTTP y cuerpo ya leído como JSON (null si vacío o no es JSON). */
 data class TraktResponse(val code: Int, val body: JsonElement?) {
     val ok: Boolean get() = code in 200..299
 }
 
-/**
- * Cliente HTTP mínimo de la API de Trakt (v2). Sin Retrofit: son pocas llamadas y las respuestas se leen como
- * JSON genérico, así un campo nuevo o que falta no rompe nada.
- */
 @Singleton
 class TraktClient @Inject constructor(
     base: OkHttpClient,
@@ -39,7 +34,6 @@ class TraktClient @Inject constructor(
                     .header("Content-Type", "application/json")
                     .header("trakt-api-version", "2")
                     .header("trakt-api-key", credentials.clientId)
-                    // Trakt rechaza peticiones sin User-Agent propio.
                     .header("User-Agent", "Bambi/1.0 (Android TV)")
                     .build(),
             )
@@ -71,7 +65,6 @@ class TraktClient @Inject constructor(
         private const val BASE = "https://api.trakt.tv"
         private val JSON_TYPE = "application/json".toMediaType()
 
-        /** Fechas de Trakt: "2026-10-25T18:01:32.000Z" (UTC). */
         fun parseDate(raw: String?): Long? {
             if (raw.isNullOrBlank()) return null
             for (pattern in listOf("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'")) {
@@ -88,12 +81,10 @@ class TraktClient @Inject constructor(
     }
 }
 
-/** Tokens de Trakt de un perfil. Se guardan cifrados (TokenStore) bajo [storeKey]. */
 @Serializable
 data class TraktSession(
     val accessToken: String,
     val refreshToken: String,
-    /** Cuándo caduca el access token (ms). */
     val expiresAt: Long,
     val username: String,
 ) {

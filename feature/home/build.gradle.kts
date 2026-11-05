@@ -39,8 +39,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.androidx.activity.compose) // BackHandler del menú lateral
-    implementation(libs.coil.compose) // backdrop del hero
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.hilt.android)

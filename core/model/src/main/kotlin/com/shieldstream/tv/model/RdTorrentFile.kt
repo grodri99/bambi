@@ -1,8 +1,5 @@
 package com.shieldstream.tv.model
 
-/**
- * Archivo dentro de un torrent cacheado/agregado en Real-Debrid.
- */
 data class RdTorrentFile(
     val id: Int,
     val name: String,
@@ -20,9 +17,6 @@ data class RdTorrentFile(
     }
 }
 
-/**
- * Pista de subtítulos externa.
- */
 data class SubtitleTrack(
     val url: String,
     val language: String,

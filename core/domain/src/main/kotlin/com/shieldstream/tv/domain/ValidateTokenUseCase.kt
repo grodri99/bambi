@@ -1,8 +1,5 @@
 package com.shieldstream.tv.domain
 
-/**
- * Valida el token de Real-Debrid y lo persiste de forma segura.
- */
 class ValidateTokenUseCase(
     private val realDebrid: RealDebridRepository,
     private val settings: SettingsRepository,

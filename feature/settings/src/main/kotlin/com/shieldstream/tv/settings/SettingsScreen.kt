@@ -1,5 +1,11 @@
 package com.shieldstream.tv.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
@@ -81,11 +87,6 @@ private val Green = Color(0xFF46D369)
 private val Amber = Color(0xFFF5B83D)
 private val Red = Color(0xFFFF5A5F)
 
-/**
- * Ajustes: claves de los servicios (Real-Debrid, TMDB, SubDL), búfer del reproductor y versión.
- * Nota de foco: ningún elemento cambia de tamaño al enfocarse (sin escala) y las formas se dibujan en el
- * propio fondo, sin clip: en la Shield el clip se perdía y salían esquinas cuadradas.
- */
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -100,7 +101,6 @@ fun SettingsScreen(
         Modifier
             .fillMaxSize()
             .background(Background)
-            // Con la ventana de clave abierta, Atrás la cierra ella (va antes en la cadena de teclas).
             .onBackKey(enabled = ready?.editor == null) { onBack() },
     ) {
         when (val s = state) {
@@ -146,7 +146,6 @@ private fun SettingsList(
 ) {
     val requesters = remember { ApiService.entries.associateWith { FocusRequester() } }
     val debridRequester = remember { FocusRequester() }
-    // El foco vuelve a la tarjeta del servicio que se estaba editando (al entrar: el selector de debrid).
     var lastEdited by rememberSaveable { mutableStateOf<ApiService?>(null) }
     LaunchedEffect(state.editor == null) {
         if (state.editor == null) {
@@ -224,7 +223,6 @@ private fun SettingsList(
                 )
             }
             item { SectionTitle(tr("Buscadores de fuentes", "Source finders")) }
-            // Una tarjeta por sección. Comet va aparte: su activación comparte el token de Real-Debrid.
             items(SourceProvider.entries.distinctBy { it.section }) { p ->
                 ProviderCard(p, enabled = SourceProvider.entries.filter { it.section == p.section }.all { it in providers }, onClick = { onToggleProvider(p) })
             }
@@ -249,6 +247,7 @@ private fun SettingsList(
                 )
             }
             item { AutoNextCard() }
+            item { EpisodeNotificationsCard() }
             item {
                 BufferCard(
                     seconds = state.bufferSeconds,
@@ -275,7 +274,6 @@ private fun SectionTitle(text: String) {
     )
 }
 
-/** Tarjeta enfocable común: fondo y borde con forma (sin clip ni escala). */
 @Composable
 private fun FocusCard(
     modifier: Modifier = Modifier,
@@ -395,7 +393,6 @@ private fun StatusPill(status: ServiceStatus) {
     }
 }
 
-/** Vuelve a abrir la guía de configuración inicial (paso a paso, con QR). */
 @Composable
 private fun SetupGuideCard(onClick: () -> Unit) {
     FocusCard(onClick = onClick) { focused ->
@@ -525,7 +522,6 @@ private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) 
     }
 }
 
-/** Series: "Siguiente episodio" en los créditos y paso automático al terminar. ◀ = Sí, ▶ = No, OK cambia. */
 @Composable
 private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
     val enabled by viewModel.autoNextEpisode.collectAsStateWithLifecycle()
@@ -569,7 +565,56 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
-/** Detección por capacidades; no se guarda un perfil distinto para cada perfil de usuario. */
+@Composable
+private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.episodeNotifications.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) viewModel.setEpisodeNotifications(true)
+    }
+    fun enable() {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.setEpisodeNotifications(true)
+        }
+    }
+    FocusCard(
+        onClick = { if (enabled) viewModel.setEpisodeNotifications(false) else enable() },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { enable(); true }
+                Key.DirectionRight -> { viewModel.setEpisodeNotifications(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tr("Avisos de nuevos episodios", "New episode notifications"),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    tr(
+                        "Solo series seguidas. Comprueba estrenos cada 12 horas con conexión; no avisa de episodios vistos o descartados.",
+                        "Followed shows only. Checks for releases every 12 hours when online; watched and dismissed episodes are skipped.",
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(Modifier.background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50)).padding(4.dp)) {
+                SegmentOption(tr("Sí", "On"), selected = enabled)
+                SegmentOption(tr("No", "Off"), selected = !enabled)
+            }
+        }
+    }
+}
+
 @Composable
 private fun DeviceOptimizationCard(
     optimization: DeviceOptimization,
@@ -690,11 +735,6 @@ private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boole
     }
 }
 
-/**
- * Idioma de la app. ◀ ▶ eligen y OK aplica: se guarda y la app se reinicia, así todos los textos (y TMDB, el
- * audio preferido, las edades…) salen ya en el idioma nuevo. El título va en los dos idiomas para que se encuentre
- * aunque no se entienda el actual. Si el foco sale de la tarjeta sin pulsar OK, no cambia nada.
- */
 @Composable
 private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
     var pending by remember(current) { mutableStateOf(current) }
@@ -740,7 +780,6 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
     }
 }
 
-/** Buscador de fuentes: OK lo activa o lo desactiva. Con varios activados, "Fuentes" sale por secciones. */
 @Composable
 private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: () -> Unit) {
     FocusCard(onClick = onClick) { _ ->
@@ -777,7 +816,6 @@ private fun SegmentOption(text: String, selected: Boolean) {
     )
 }
 
-/** En modo manual, ◀ ▶ cambian el búfer de 10 en 10 (20–100 s) sin salir de la tarjeta. */
 @Composable
 private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) {
     FocusCard(
@@ -892,10 +930,6 @@ private fun AboutCard() {
     }
 }
 
-/**
- * Ventana para escribir una clave. Se comprueba contra el servicio antes de guardarla.
- * En la tele: OK sobre el campo abre el teclado del sistema.
- */
 @Composable
 private fun KeyEditorDialog(
     editor: KeyEditor,
@@ -963,8 +997,6 @@ private fun KeyEditorDialog(
                     .fillMaxWidth()
                     .focusRequester(fieldRequester)
                     .onFocusChanged { fieldFocused = it.isFocused }
-                    // OK del mando sobre el campo → teclado en pantalla.
-                    // ▼ → botones: el campo de texto se queda con las flechas y no dejaba salir hacia abajo.
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.DirectionCenter, Key.Enter -> {

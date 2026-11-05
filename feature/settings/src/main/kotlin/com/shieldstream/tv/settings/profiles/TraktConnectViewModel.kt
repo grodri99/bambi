@@ -18,7 +18,6 @@ import javax.inject.Inject
 sealed interface TraktConnectUiState {
     data object Loading : TraktConnectUiState
 
-    /** Código en pantalla: se escribe en [url] desde el móvil. [secondsLeft] hasta que caduca. */
     data class ShowCode(val userCode: String, val url: String, val secondsLeft: Int) : TraktConnectUiState
 
     data class Connected(val username: String) : TraktConnectUiState
@@ -28,10 +27,6 @@ sealed interface TraktConnectUiState {
     data class Error(val message: String) : TraktConnectUiState
 }
 
-/**
- * Enlazar Trakt con un código, como se enlaza Netflix en una tele: se pide un código, se muestra, y se pregunta a
- * Trakt cada pocos segundos si ya lo has escrito en el móvil. Ruta "trakt_connect/{id}" (id del perfil).
- */
 @HiltViewModel
 class TraktConnectViewModel @Inject constructor(
     savedState: SavedStateHandle,
@@ -49,7 +44,6 @@ class TraktConnectViewModel @Inject constructor(
         start()
     }
 
-    /** Pide un código (también "Pedir otro código" tras caducar o fallar). */
     fun start() {
         job?.cancel()
         _uiState.value = TraktConnectUiState.Loading
@@ -95,7 +89,7 @@ class TraktConnectViewModel @Inject constructor(
                     }
                     nextPoll = System.currentTimeMillis() + interval
                 }
-                delay(1000) // el contador baja cada segundo
+                delay(1000)
             }
         }
     }

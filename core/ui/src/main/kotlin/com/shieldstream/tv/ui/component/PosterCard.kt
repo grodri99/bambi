@@ -45,10 +45,6 @@ import com.shieldstream.tv.model.tr
 val PosterWidth: Dp = 124.dp
 private val CardShape = RoundedCornerShape(6.dp)
 
-/**
- * Póster 2:3 con foco estilo Netflix TV: escala + borde blanco. Sin ripple.
- * [onFocused] se usa para actualizar el fondo/hero de la pantalla.
- */
 @Composable
 fun PosterCard(
     item: CatalogItem,
@@ -57,19 +53,17 @@ fun PosterCard(
     onFocused: () -> Unit = {},
     width: Dp = PosterWidth,
     onLongClick: (() -> Unit)? = null,
+    newEpisodeCount: Int = 0,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale = if (focused) 1.1f else 1f
+    val scale = if (focused) 1.04f else 1f
 
     Box(
         modifier = modifier
             .zIndex(if (focused) 1f else 0f)
             .width(width)
             .aspectRatio(2f / 3f)
-            // Bambi 1.0.6: el foco (clickable) va ANTES que la escala. Si la escala va delante, el rectángulo que
-            // la tarjeta pide "traer a la vista" crece con la animación (1.0 → 1.1) y la lista de filas lo sigue
-            // en vertical: el "saltito" de las carátulas en todas las filas menos la primera.
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
@@ -81,7 +75,7 @@ fun PosterCard(
             }
             .clip(CardShape)
             .background(Color(0xFF232327))
-            .then(if (focused) Modifier.border(2.dp, Color.White, CardShape) else Modifier),
+            .then(if (focused) Modifier.border(1.dp, Color.White.copy(alpha = 0.9f), CardShape) else Modifier),
     ) {
         if (item.posterUrl != null) {
             AsyncImage(
@@ -99,13 +93,22 @@ fun PosterCard(
             )
         }
         overlay()
+        if (newEpisodeCount > 0) {
+            Text(
+                text = if (newEpisodeCount == 1) tr("NUEVO", "NEW") else tr("$newEpisodeCount NUEVOS", "$newEpisodeCount NEW"),
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .background(Color(0xFFE50914), RoundedCornerShape(3.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+            )
+        }
     }
 }
 
-/**
- * Tarjeta de "Seguir viendo": póster con la etiqueta (T1:E6 · 14 min) y la barra roja de progreso.
- * Mantener OK → [onLongClick] (quitar de la fila).
- */
 @Composable
 fun ContinueCard(
     item: CatalogItem,
@@ -115,6 +118,7 @@ fun ContinueCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
+    newEpisodeCount: Int = 0,
 ) {
     PosterCard(
         item = item,
@@ -122,6 +126,7 @@ fun ContinueCard(
         modifier = modifier,
         onFocused = onFocused,
         onLongClick = onLongClick,
+        newEpisodeCount = newEpisodeCount,
     ) {
         Box(
             Modifier
@@ -169,7 +174,6 @@ fun ContinueCard(
     }
 }
 
-/** Póster de una serie con distintivo de episodio nuevo, código y fecha de emisión. */
 @Composable
 fun NewEpisodeCard(
     item: CatalogItem,
@@ -177,8 +181,10 @@ fun NewEpisodeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
+    count: Int = 1,
+    onLongClick: (() -> Unit)? = null,
 ) {
-    PosterCard(item = item, onClick = onClick, modifier = modifier, onFocused = onFocused) {
+    PosterCard(item = item, onClick = onClick, modifier = modifier, onFocused = onFocused, onLongClick = onLongClick) {
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -198,7 +204,11 @@ fun NewEpisodeCard(
                 .padding(8.dp),
         ) {
             Text(
-                text = tr("NUEVO EPISODIO", "NEW EPISODE"),
+                text = when (count) {
+                    0 -> tr("PRÓXIMAMENTE", "COMING SOON")
+                    1 -> tr("NUEVO EPISODIO", "NEW EPISODE")
+                    else -> tr("$count EPISODIOS NUEVOS", "$count NEW EPISODES")
+                },
                 color = Color.White,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
@@ -219,9 +229,6 @@ fun NewEpisodeCard(
     }
 }
 
-/**
- * Tarjeta "Top 10": número gigante con contorno gris + póster, como en Netflix.
- */
 @Composable
 fun Top10Card(
     rank: Int,
@@ -229,6 +236,7 @@ fun Top10Card(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
+    newEpisodeCount: Int = 0,
 ) {
     val numberWidth = if (rank >= 10) 104.dp else 70.dp
     val posterHeight = PosterWidth * 1.5f
@@ -253,6 +261,7 @@ fun Top10Card(
             item = item,
             onClick = onClick,
             onFocused = onFocused,
+            newEpisodeCount = newEpisodeCount,
             modifier = modifier.align(Alignment.BottomEnd),
         )
     }

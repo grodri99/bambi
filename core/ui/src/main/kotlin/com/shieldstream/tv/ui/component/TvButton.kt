@@ -1,5 +1,7 @@
 package com.shieldstream.tv.ui.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,10 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
 
-/**
- * Botón de TV estilo Netflix: translúcido sin foco, blanco con texto negro con foco.
- */
 @Composable
 fun TvButton(
     text: String,
@@ -36,21 +36,26 @@ fun TvButton(
     enabled: Boolean = true,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val background = if (focused) Color.White else Color.White.copy(alpha = 0.16f)
-    val content = if (focused) Color.Black else Color.White
+    val duration = if (LocalLightweightUi.current) 0 else 150
+    val background by animateColorAsState(
+        if (focused) Color.White else Color.White.copy(alpha = 0.12f),
+        tween(duration),
+        label = "buttonBackground",
+    )
+    val content by animateColorAsState(if (focused) Color.Black else Color.White, tween(duration), label = "buttonContent")
 
     Row(
         modifier = modifier
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(background)
             .tvClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(10.dp))
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
         }
         Text(
             text = text,

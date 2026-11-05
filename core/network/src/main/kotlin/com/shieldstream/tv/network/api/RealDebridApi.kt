@@ -15,18 +15,11 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/**
- * API privada de Real-Debrid (https://api.real-debrid.com).
- * El token se pasa por header en cada llamada porque es dinámico (Settings).
- *
- * /torrents/instantAvailability ya no existe (retirado en nov-2024): no lo vuelvas a añadir.
- */
 interface RealDebridApi {
 
     @GET("rest/1.0/user")
     suspend fun user(@Header("Authorization") token: String): RdUserDto
 
-    /** Librería del usuario, más recientes primero. Responde 204 sin body si está vacía. */
     @GET("rest/1.0/torrents")
     suspend fun torrents(
         @Header("Authorization") token: String,
@@ -46,7 +39,6 @@ interface RealDebridApi {
         @Path("id") id: String,
     ): RdTorrentInfoDto
 
-    /** 204 = ok, 202 = ya estaba hecho. Response<Unit> evita fallos al no haber body. */
     @FormUrlEncoded
     @POST("rest/1.0/torrents/selectFiles/{id}")
     suspend fun selectFiles(

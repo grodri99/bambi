@@ -46,7 +46,6 @@ private val PanelFocused = Color(0xFF2A2D3D)
 private val Dim = Color.White.copy(alpha = 0.6f)
 private val Red = Color(0xFFE50914)
 
-/** Editor de las categorías visibles en el Inicio de un perfil. */
 @Composable
 internal fun HomeCategoriesDialog(
     hidden: Set<String>,
@@ -85,7 +84,7 @@ internal fun HomeCategoriesDialog(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(4.dp),
-                modifier = Modifier.height(300.dp), // la Shield mide 540 dp de alto: la lista se desplaza
+                modifier = Modifier.height(300.dp),
             ) {
                 itemsIndexed(Category.entries, key = { _, c -> c.name }) { index, category ->
                     CategoryToggle(
@@ -122,7 +121,6 @@ private fun CategoryToggle(category: Category, shown: Boolean, onClick: () -> Un
             .tvClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        // Casilla: roja con ✓ si se ve; vacía si está oculta.
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

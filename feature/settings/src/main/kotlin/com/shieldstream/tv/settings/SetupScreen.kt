@@ -4,6 +4,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.AppLanguage
+import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.model.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,6 +80,7 @@ import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.onBackKey
+import com.shieldstream.tv.ui.component.tvClickable
 import com.shieldstream.tv.ui.theme.DisplayFont
 
 private val Background = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
@@ -87,13 +90,6 @@ private val Green = Color(0xFF46D369)
 private val Red = Color(0xFFFF5A5F)
 private val Accent = Color(0xFFE50914)
 
-/**
- * Guía de configuración (primer arranque sin claves, o desde Ajustes → "Guía de configuración").
- * Bienvenida → 1 Catálogo (TMDB) → 2 Servicio debrid → 3 Subtítulos (SubDL, opcional) → Todo listo.
- * Cada paso explica cómo sacar la clave y enseña un QR que abre esa página en el móvil.
- *
- * [onExit]: Atrás en la bienvenida o "Más tarde". [onFinish]: "Empezar a ver".
- */
 @Composable
 fun SetupScreen(
     onFinish: () -> Unit,
@@ -116,10 +112,15 @@ fun SetupScreen(
                 SetupStep.WELCOME -> WelcomeStep(
                     onStart = viewModel::next,
                     onLater = onExit,
-                    onLanguage = {
-                        val other = if (Lang.isEnglish) AppLanguage.ES else AppLanguage.EN
-                        viewModel.setLanguage(other) { restartApp(context) }
-                    },
+                )
+                SetupStep.PLAYBACK -> PlaybackPreferencesStep(
+                    audio = s.audio,
+                    subtitles = s.subtitles,
+                    language = s.language,
+                    onLanguage = viewModel::setLanguage,
+                    onAudio = viewModel::setAudio,
+                    onSubtitles = viewModel::setSubtitles,
+                    onNext = viewModel::next,
                 )
                 SetupStep.TMDB -> KeyStep(
                     state = s,
@@ -165,7 +166,10 @@ fun SetupScreen(
                     onNext = viewModel::next,
                     onTyping = viewModel::clearError,
                 )
-                SetupStep.DONE -> DoneStep(state = s, onFinish = onFinish)
+                SetupStep.DONE -> DoneStep(
+                    state = s,
+                    onFinish = { if (s.languageChanged) restartApp(context) else onFinish() },
+                )
             }
         }
     }
@@ -214,10 +218,10 @@ private fun SetupHeader(step: SetupStep) {
         Image(painterResource(R.drawable.bambi_wordmark), contentDescription = "Bambi", modifier = Modifier.height(13.dp))
         Spacer(Modifier.weight(1f))
         step.number?.let { n ->
-            Text(tr("PASO $n DE 3", "STEP $n OF 3"), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)
+            Text(tr("PASO $n DE 4", "STEP $n OF 4"), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)
             Spacer(Modifier.width(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                (1..3).forEach { i ->
+                (1..4).forEach { i ->
                     Box(
                         Modifier
                             .width(36.dp)
@@ -233,7 +237,7 @@ private fun SetupHeader(step: SetupStep) {
 // ------------------------------------------------------------------ bienvenida
 
 @Composable
-private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit, onLanguage: () -> Unit) {
+private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit) {
     val startRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -248,7 +252,7 @@ private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit, on
         Spacer(Modifier.height(16.dp))
         Text(tr("Vamos a dejar Bambi listo", "Let's get Bambi ready"), fontFamily = DisplayFont, fontSize = 44.sp, color = Color.White)
         Text(
-            tr("Son 3 pasos y solo se hace una vez. Ten a mano el móvil o el ordenador para sacar las claves.", "It takes 3 steps and you only do it once. Keep your phone or computer handy to get the keys."),
+            tr("Son 4 pasos y solo se hace una vez. Ten a mano el móvil o el ordenador para sacar las claves.", "It takes 4 steps and you only do it once. Keep your phone or computer handy to get the keys."),
             style = MaterialTheme.typography.bodyLarge,
             color = Muted,
             textAlign = TextAlign.Center,
@@ -257,24 +261,24 @@ private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit, on
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             WelcomeTile("1", tr("Catálogo", "Catalog"), tr("Portadas y sinopsis (TMDB)", "Artwork and synopses (TMDB)"))
             WelcomeTile("2", "Debrid", "Real-Debrid, TorBox…")
-            WelcomeTile("3", tr("Subtítulos", "Subtitles"), tr("Opcional (SubDL)", "Optional (SubDL)"))
+            WelcomeTile("3", tr("Subtítulos extra", "Extra subtitles"), tr("Opcional (SubDL)", "Optional (SubDL)"))
+            WelcomeTile("4", tr("Preferencias", "Preferences"), tr("Idioma, audio y subtítulos", "Language, audio & subtitles"))
         }
         Spacer(Modifier.height(28.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TvButton(text = tr("Empezar", "Start"), onClick = onStart, modifier = Modifier.focusRequester(startRequester))
             TvButton(text = tr("Más tarde", "Later"), onClick = onLater)
-            // Siempre en el otro idioma, para que lo entienda quien no lee el actual.
-            TvButton(text = if (Lang.isEnglish) "Español" else "English", onClick = onLanguage)
         }
     }
 }
 
 @Composable
-private fun WelcomeTile(number: String, title: String, subtitle: String) {
+private fun RowScope.WelcomeTile(number: String, title: String, subtitle: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .width(240.dp)
+            .weight(1f)
+            .height(84.dp)
             .background(Panel, RoundedCornerShape(14.dp))
             .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -295,12 +299,142 @@ private fun StepNumber(text: String, color: Color = Accent, size: Dp = 30.dp) {
     }
 }
 
-// ------------------------------------------------------------------ paso con clave
+@Composable
+private fun ColumnScope.PlaybackPreferencesStep(
+    audio: SetupAudioPreference,
+    subtitles: SubtitlePreference,
+    language: AppLanguage,
+    onLanguage: (AppLanguage) -> Unit,
+    onAudio: (SetupAudioPreference) -> Unit,
+    onSubtitles: (SubtitlePreference) -> Unit,
+    onNext: () -> Unit,
+) {
+    val firstRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { firstRequester.requestFocus() }
+    }
+    Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+        Text(tr("AUDIO Y SUBTÍTULOS", "AUDIO & SUBTITLES"), fontFamily = DisplayFont, fontSize = 38.sp, color = Color.White)
+        Text(
+            tr("Se guardan en el perfil activo y puedes cambiarlas después.", "Saved to the active profile; you can change them later."),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Muted,
+        )
+        Spacer(Modifier.height(18.dp))
+        Text(tr("Idioma de la interfaz", "Interface language"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SetupChoice(
+                title = "Español",
+                description = "Español",
+                selected = language == AppLanguage.ES,
+                onClick = { onLanguage(AppLanguage.ES) },
+                modifier = Modifier.weight(1f).focusRequester(firstRequester),
+            )
+            SetupChoice(
+                title = "English",
+                description = "English",
+                selected = language == AppLanguage.EN,
+                onClick = { onLanguage(AppLanguage.EN) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(tr("Audio preferido", "Preferred audio"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SetupChoice(
+                title = tr("Original", "Original"),
+                description = tr("Sin forzar el idioma", "No forced language"),
+                selected = audio == SetupAudioPreference.ORIGINAL,
+                onClick = { onAudio(SetupAudioPreference.ORIGINAL) },
+                modifier = Modifier.weight(1f),
+            )
+            SetupChoice(
+                title = tr("Español", "Spanish"),
+                description = tr("Priorizar si está disponible", "Prefer when available"),
+                selected = audio == SetupAudioPreference.SPANISH,
+                onClick = { onAudio(SetupAudioPreference.SPANISH) },
+                modifier = Modifier.weight(1f),
+            )
+            SetupChoice(
+                title = tr("Solo español", "Spanish only"),
+                description = tr("Descarta otros audios", "Reject other audio"),
+                selected = audio == SetupAudioPreference.SPANISH_ONLY,
+                onClick = { onAudio(SetupAudioPreference.SPANISH_ONLY) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(tr("Subtítulos automáticos", "Automatic subtitles"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SetupChoice(
+                title = tr("Desactivados", "Off"),
+                description = tr("Elección manual", "Manual selection"),
+                selected = subtitles == SubtitlePreference.OFF,
+                onClick = { onSubtitles(SubtitlePreference.OFF) },
+                modifier = Modifier.weight(1f),
+            )
+            SetupChoice(
+                title = tr("Español", "Spanish"),
+                description = tr("Integrados o externos", "Embedded or external"),
+                selected = subtitles == SubtitlePreference.SPANISH,
+                onClick = { onSubtitles(SubtitlePreference.SPANISH) },
+                modifier = Modifier.weight(1f),
+            )
+            SetupChoice(
+                title = tr("Inglés", "English"),
+                description = tr("Integrados o externos", "Embedded or external"),
+                selected = subtitles == SubtitlePreference.ENGLISH,
+                onClick = { onSubtitles(SubtitlePreference.ENGLISH) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            tr("Si el archivo no trae subtítulos en ese idioma, Bambi buscará subtítulos externos.", "If the file has no subtitles in that language, Bambi will search for external subtitles."),
+            style = MaterialTheme.typography.bodySmall,
+            color = Muted,
+        )
+        Spacer(Modifier.height(20.dp))
+        TvButton(text = tr("Siguiente", "Next"), onClick = onNext)
+    }
+}
 
-/**
- * Explicación + pasos + recuadro de la clave a la izquierda; QR a la derecha.
- * Foco: recuadro → ▼ botón principal; ▲ desde el recuadro → selector (paso del debrid).
- */
+@Composable
+private fun SetupChoice(
+    title: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .height(76.dp)
+            .background(if (selected) Color.White.copy(alpha = 0.14f) else Panel, RoundedCornerShape(12.dp))
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) Color.White else if (selected) Green else Color.White.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(12.dp),
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = (if (selected) "✓ " else "") + title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White,
+        )
+        Text(description, style = MaterialTheme.typography.bodySmall, color = Muted)
+    }
+}
+
 @Composable
 private fun ColumnScope.KeyStep(
     state: SetupUiState.Ready,
@@ -315,7 +449,6 @@ private fun ColumnScope.KeyStep(
     selector: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val has = state.has(service)
-    // Con clave ya puesta se enseña "Conectada" y Siguiente; "Cambiar clave" vuelve a abrir el recuadro.
     var editing by rememberSaveable(service) { mutableStateOf(!has) }
     val detail = state.details[service]
 
@@ -324,15 +457,11 @@ private fun ColumnScope.KeyStep(
     val primaryRequester = remember(service) { FocusRequester() }
     val skipRequester = remember(service) { FocusRequester() }
     val selectorRequester = remember { FocusRequester() }
-    // El foco se coloca al entrar en el paso y tras cada acción (guardar, "Cambiar clave"…), pero NO al cambiar de
-    // servicio con ◀▶ en el selector: si no, cada pulsación sacaría el foco del selector.
     var focusRequest by remember { mutableIntStateOf(0) }
     LaunchedEffect(state.step, focusRequest) {
         withFrameNanos { }
         runCatching {
             when {
-                // Paso opcional sin clave: foco en "Saltar". En la tele, el teclado se abre solo con que el recuadro
-                // reciba el foco, y quien quiere saltarse el paso tendría que cerrarlo primero.
                 editing && !required && !has -> skipRequester.requestFocus()
                 editing -> fieldRequester.requestFocus()
                 else -> primaryRequester.requestFocus()
@@ -347,7 +476,6 @@ private fun ColumnScope.KeyStep(
     }
 
     Row(Modifier.fillMaxWidth().weight(1f)) {
-        // Desplazable por si no cabe (paso del debrid con selector): el foco lleva la vista hasta los botones.
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Text(title.uppercase(), fontFamily = DisplayFont, fontSize = 38.sp, color = Color.White)
             Text(intro, style = MaterialTheme.typography.bodyMedium, color = Muted)
@@ -461,7 +589,6 @@ private fun ConfiguredRow(service: ApiService, maskedKey: String?, detail: Strin
     }
 }
 
-/** Recuadro de clave: OK abre el teclado de la tele; ▼ baja a los botones (el campo se queda las flechas). */
 @Composable
 private fun KeyField(
     value: String,
@@ -474,8 +601,6 @@ private fun KeyField(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     var focused by remember { mutableStateOf(false) }
-    // El teclado solo se abre si el OK se pulsó (y soltó) aquí: el OK de "Siguiente" del paso anterior suelta
-    // la tecla ya con el foco en este recuadro y, si no, abría el teclado sin querer.
     var pressedHere by remember { mutableStateOf(false) }
     BasicTextField(
         value = value,
@@ -488,7 +613,6 @@ private fun KeyField(
             autoCorrectEnabled = false,
             keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Done,
-            // Compose abre el teclado solo con recibir el foco: aquí solo se abre con OK (ver onPreviewKeyEvent).
             showKeyboardOnFocus = false,
         ),
         keyboardActions = KeyboardActions(onDone = {
@@ -540,7 +664,6 @@ private fun KeyField(
     )
 }
 
-/** QR que abre en el móvil la página donde se saca la clave (más cómodo que teclear la dirección). */
 @Composable
 private fun QrPanel(url: String) {
     Column(
@@ -617,7 +740,7 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
         Spacer(Modifier.height(16.dp))
         Text(tr("¡Todo listo!", "All set!"), fontFamily = DisplayFont, fontSize = 48.sp, color = Color.White)
         Text(
-            tr("Puedes cambiar cualquier clave cuando quieras en Ajustes (la rueda de arriba a la derecha).", "You can change any key whenever you like in Settings (the gear at the top right)."),
+            tr("Puedes cambiar claves y preferencias cuando quieras en Ajustes.", "You can change keys and preferences whenever you like in Settings."),
             style = MaterialTheme.typography.bodyLarge,
             color = Muted,
         )
@@ -626,12 +749,41 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.width(560.dp),
         ) {
+            PreferenceSummaryRow(tr("Idioma", "Language"), state.language.label)
+            PreferenceSummaryRow(tr("Audio", "Audio"), audioLabel(state.audio))
+            PreferenceSummaryRow(tr("Subtítulos", "Subtitles"), subtitleLabel(state.subtitles))
             SummaryRow(tr("Catálogo · TMDB", "Catalog · TMDB"), state.has(ApiService.TMDB), required = true)
             SummaryRow("Debrid · ${state.debrid.title}", state.has(state.debrid.apiService), required = true)
             SummaryRow(tr("Subtítulos extra · SubDL", "Extra subtitles · SubDL"), state.has(ApiService.SUBDL), required = false)
         }
         Spacer(Modifier.height(26.dp))
         TvButton(text = tr("Empezar a ver", "Start watching"), onClick = onFinish, modifier = Modifier.focusRequester(requester))
+    }
+}
+
+private fun audioLabel(audio: SetupAudioPreference): String = when (audio) {
+    SetupAudioPreference.ORIGINAL -> tr("Original", "Original")
+    SetupAudioPreference.SPANISH -> tr("Español primero", "Spanish first")
+    SetupAudioPreference.SPANISH_ONLY -> tr("Solo español", "Spanish only")
+}
+
+private fun subtitleLabel(preference: SubtitlePreference): String = when (preference) {
+    SubtitlePreference.OFF -> tr("Desactivados", "Off")
+    SubtitlePreference.SPANISH -> tr("Español", "Spanish")
+    SubtitlePreference.ENGLISH -> tr("Inglés", "English")
+}
+
+@Composable
+private fun PreferenceSummaryRow(label: String, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = Green)
     }
 }
 

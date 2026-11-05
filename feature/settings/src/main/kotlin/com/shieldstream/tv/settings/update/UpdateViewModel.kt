@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-/** Lo que pinta el aviso de versión nueva (al abrir la app). */
 sealed interface UpdatePromptUiState {
     data object Hidden : UpdatePromptUiState
     data class Visible(val state: UpdateState) : UpdatePromptUiState
@@ -27,10 +26,8 @@ class UpdateViewModel @Inject constructor(
     private val updates: UpdateRepository,
 ) : ViewModel() {
 
-    /** Estado completo (tarjeta de Ajustes). */
     val state: StateFlow<UpdateState> = updates.state
 
-    /** El aviso sale con versión nueva (o descargando / instalando) mientras no se diga "Ahora no". */
     val prompt: StateFlow<UpdatePromptUiState> = combine(updates.state, updates.promptDismissed) { s, dismissed ->
         val relevant = when (s) {
             is UpdateState.Available, is UpdateState.Downloading,
@@ -47,12 +44,10 @@ class UpdateViewModel @Inject constructor(
 
     fun later() = updates.dismissPrompt()
 
-    /** De vuelta en la app: si faltaba el permiso de instalar y ya se ha dado, se continúa (si no, sigue igual). */
     fun onResumed() {
         if (updates.state.value is UpdateState.NeedsPermission) updates.downloadAndInstall()
     }
 
-    /** Android 8+: pantalla del sistema "Instalar apps desconocidas" de Bambi. En algunas teles no existe. */
     fun openInstallPermission(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 26) return false
         return runCatching {

@@ -22,15 +22,6 @@ import java.io.RandomAccessFile;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * Solo en la build de pruebas (src/debug). Prueba de MKV fuera de la app, en la propia Shield:
- *
- * <pre>CLASSPATH=$(pm path com.shieldstream.tv.debug | cut -d: -f2) app_process /system/bin \
- *     com.shieldstream.tv.media.mkv.MkvProbe archivo.mkv …</pre>
- *
- * Lee cada archivo con el extractor de Media3 y con {@link LenientMatroskaExtractor} y dice qué pistas salen y cuántas
- * muestras da cada una (o el error).
- */
 @UnstableApi
 public final class MkvProbe {
 
@@ -74,7 +65,6 @@ public final class MkvProbe {
     };
   }
 
-  /** Cuenta pistas y muestras. */
   private static final class Output implements ExtractorOutput {
     private final Map<Integer, Track> tracks = new TreeMap<>();
 

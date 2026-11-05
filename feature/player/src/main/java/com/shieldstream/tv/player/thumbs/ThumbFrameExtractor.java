@@ -14,14 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * Copia de androidx.media3.transformer.ExperimentalFrameExtractor (Media3 1.6.0, licencia Apache 2.0),
- * modificada para Bambi:
- *  - La entrada HDR se declara SDR (ver FrameExtractorRenderer#onInputFormatChanged): el driver del Tegra X1
- *    de la Shield no tiene GL_EXT_YUV_target y el camino HDR de Media3 no llega a compilar su shader.
- *    El paso de PQ a SDR lo hace después una tabla de color (SeekThumbnails.kt).
- *  - Sin anotaciones de compilación de checker-framework / errorprone (no están en el classpath de la app).
- */
 package com.shieldstream.tv.player.thumbs;
 
 import static android.graphics.Bitmap.Config.ARGB_8888;
@@ -148,7 +140,6 @@ public final class ThumbFrameExtractor {
       /** Creates a new instance with default values. */
       public Builder() {
         seekParameters = SeekParameters.DEFAULT;
-        // TODO: b/350498258 - Consider a switch to MediaCodecSelector.DEFAULT. Some hardware
         // MediaCodec decoders crash when flushing (seeking) and setVideoEffects is used. See also
         // b/362904942.
         mediaCodecSelector = MediaCodecSelector.PREFER_SOFTWARE;
@@ -282,7 +273,6 @@ public final class ThumbFrameExtractor {
    */
   public ThumbFrameExtractor(Context context, Configuration configuration) {
     MediaSource.Factory mediaSourceFactory =
-        // Bambi: mismo extractor tolerante que el reproductor (MKV con pista zlib).
         new DefaultMediaSourceFactory(context, new LenientExtractorsFactory())
             .experimentalSetCodecsToParseWithinGopSampleDependencies(
                 C.VIDEO_CODEC_FLAG_H264 | C.VIDEO_CODEC_FLAG_H265);
@@ -303,8 +293,6 @@ public final class ThumbFrameExtractor {
                     },
                 mediaSourceFactory)
             .setSeekParameters(configuration.seekParameters)
-            // Bambi: solo hace falta un fotograma. Con el LoadControl por defecto cargaba hasta ~130 MB a la vez
-            // que el reproductor principal y la app se quedaba sin memoria.
             .setLoadControl(
                 new DefaultLoadControl.Builder()
                     .setBufferDurationsMs(500, 1000, 250, 250)
@@ -330,7 +318,6 @@ public final class ThumbFrameExtractor {
    */
   public void setMediaItem(MediaItem mediaItem, List<Effect> effects) {
     ListenableFuture<Frame> previousRequestedFrame = lastRequestedFrameFuture;
-    // TODO: b/350498258 - Extracting the first frame is a workaround for ExoPlayer.setVideoEffects
     // returning incorrect timestamps if we seek the player before rendering starts from zero.
     lastRequestedFrameFuture =
         CallbackToFutureAdapter.getFuture(
@@ -407,8 +394,6 @@ public final class ThumbFrameExtractor {
               null,
               ERROR_CODE_SETUP_REQUIRED));
     } else {
-      // Bambi: el original hace checkState() y cierra la app si aún hay un fotograma en curso (pasa al
-      // cancelar una petición a medias). Aquí esa petición simplemente falla.
       if (!frameBeingExtractedCompleterAtomicReference.compareAndSet(null, completer)) {
         completer.setException(new IllegalStateException("Extractor ocupado con otro fotograma"));
         return;
@@ -482,7 +467,6 @@ public final class ThumbFrameExtractor {
         // If the seek resolves to the current position, the renderer position will not be reset
         // and extractedFrameNeedsRendering remains false. No frames are rendered. Repeat the
         // previously returned frame.
-        // Bambi: sin checkNotNull (cerraba la app si no había petición o fotograma anterior).
         CallbackToFutureAdapter.Completer<Frame> frameBeingExtractedCompleter =
             frameBeingExtractedCompleterAtomicReference.getAndSet(null);
         if (frameBeingExtractedCompleter != null) {
@@ -619,7 +603,6 @@ public final class ThumbFrameExtractor {
       }
       bitmap.copyPixelsFromBuffer(byteBuffer);
 
-      // Bambi: sin checkNotNull (en el hilo de la GPU un null cerraba la app). Sin petición, se descarta.
       CallbackToFutureAdapter.Completer<Frame> frameBeingExtractedCompleter =
           frameBeingExtractedCompleterAtomicReference.getAndSet(null);
       if (frameBeingExtractedCompleter != null) {
@@ -725,8 +708,6 @@ public final class ThumbFrameExtractor {
           formatHolder.format = format.buildUpon().setRotationDegrees(0).build();
         }
       }
-      // Bambi: HDR (PQ/HLG) → se declara SDR para usar el camino de shaders normal (samplerExternalOES), que
-      // el Tegra X1 sí soporta. Los valores siguen codificados en PQ; la LUT de la app los convierte a SDR.
       if (formatHolder.format != null && isTransferHdr(formatHolder.format.colorInfo)) {
         formatHolder.format = formatHolder.format.buildUpon().setColorInfo(SDR_BT709_LIMITED).build();
       }

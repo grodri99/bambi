@@ -7,10 +7,6 @@ import android.content.pm.PackageInstaller
 import android.util.Log
 import com.shieldstream.tv.model.tr
 
-/**
- * Respuesta del instalador del sistema. Lo normal es STATUS_PENDING_USER_ACTION: se abre su ventana de "Instalar".
- * Si se instala, Android cierra Bambi y la siguiente vez arranca la versión nueva (con todos sus datos).
- */
 class UpdateInstallReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -26,7 +22,6 @@ class UpdateInstallReceiver : BroadcastReceiver() {
             else -> {
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 Log.w("Update", "Instalación fallida ($status): $message")
-                // Cancelar en la ventana del sistema también llega aquí (STATUS_FAILURE_ABORTED).
                 onFailure?.invoke(
                     status,
                     if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
@@ -40,7 +35,6 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        /** Lo pone UpdateRepositoryImpl para enterarse de los fallos (la app sigue abierta): (estado, mensaje). */
         @Volatile
         var onFailure: ((Int, String) -> Unit)? = null
     }

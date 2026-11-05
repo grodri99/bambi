@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
+import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.media.PlaybackPolicyProvider
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Estado de la clave de un servicio. */
 sealed interface ServiceStatus {
     data object Missing : ServiceStatus
     data object Checking : ServiceStatus
@@ -36,12 +36,10 @@ sealed interface ServiceStatus {
 
 data class ServiceUi(
     val service: ApiService,
-    /** Últimos 4 caracteres a la vista, el resto con puntos. null = sin clave. */
     val maskedKey: String?,
     val status: ServiceStatus,
 )
 
-/** Ventana para escribir una clave nueva. */
 data class KeyEditor(
     val service: ApiService,
     val hasKey: Boolean,
@@ -61,7 +59,6 @@ sealed interface SettingsUiState {
     data class Ready(
         val services: List<ServiceUi>,
         val bufferSeconds: Int,
-        /** ◀▶ en el reproductor: miniaturas (true) o saltos de 10 s (false). */
         val seekThumbnails: Boolean,
         /** Servicio debrid en uso. */
         val debrid: DebridService,
@@ -69,7 +66,6 @@ sealed interface SettingsUiState {
         val capabilities: DeviceCapabilities,
         val memoryProfile: MemoryProfile,
         val editor: KeyEditor?,
-        /** Idioma con el que arrancó la app (cambiarlo la reinicia). */
         val language: AppLanguage = Lang.current,
     ) : SettingsUiState
 }
@@ -79,6 +75,7 @@ class SettingsViewModel @Inject constructor(
     private val apiKeys: ApiKeysRepository,
     private val settings: SettingsRepository,
     private val playbackPolicies: PlaybackPolicyProvider,
+    private val episodeTracking: EpisodeTrackingRepository,
 ) : ViewModel() {
 
     private val statuses = MutableStateFlow<Map<ApiService, ServiceStatus>>(emptyMap())
@@ -124,7 +121,6 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Loading)
 
     init {
-        // Al entrar se prueban todas las claves guardadas (en paralelo) para enseñar su estado real.
         apiKeys.keys.value.forEach { (service, key) ->
             if (!key.isNullOrBlank()) {
                 viewModelScope.launch {
@@ -135,7 +131,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Guarda el idioma y avisa para reiniciar la app (lo hace la pantalla, que tiene el Context). */
     fun setLanguage(language: AppLanguage, onSaved: () -> Unit) {
         if (language == settings.language) return
         viewModelScope.launch {
@@ -144,7 +139,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Interfaz ligera para TV boxes de baja potencia. */
     val lightweightUi: StateFlow<Boolean> =
         settings.lightweightUi.stateIn(viewModelScope, SharingStarted.Eagerly, settings.lightweightUiEnabled)
 
@@ -152,15 +146,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setLightweightUi(enabled) }
     }
 
-    /** Buscadores de fuentes activados (se pinta aparte del resto del estado). */
     val providers: StateFlow<Set<SourceProvider>> =
         settings.sourceProviders.stateIn(viewModelScope, SharingStarted.Eagerly, SourceProvider.entries.toSet())
 
-    /** Activa o desactiva un buscador; siempre queda al menos uno. */
     fun toggleProvider(p: SourceProvider) {
         viewModelScope.launch {
             val current = settings.sourceProviders.first()
-            // Toda la sección a la vez (los buscadores propios van juntos bajo "The Pirate Bay").
             val group = SourceProvider.entries.filter { it.section == p.section }.toSet()
             val next = if (group.all { it in current }) current - group else current + group
             if (next.isNotEmpty()) settings.setSourceProviders(next)
@@ -175,7 +166,6 @@ class SettingsViewModel @Inject constructor(
         if (editor.value?.busy != true) editor.value = null
     }
 
-    /** Solo se guarda si el servicio la acepta: así nunca se queda una clave rota guardada. */
     fun saveKey(input: String) {
         val current = editor.value ?: return
         val key = input.trim()
@@ -196,7 +186,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Solo para servicios opcionales (SubDL). */
     fun removeKey() {
         val current = editor.value ?: return
         if (current.service.required) return
@@ -215,7 +204,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setDeviceOptimization(optimization) }
     }
 
-    /** Series: siguiente episodio automático. */
+    val episodeNotifications: StateFlow<Boolean> = episodeTracking.notificationsEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setEpisodeNotifications(enabled: Boolean) = episodeTracking.setNotificationsEnabled(enabled)
+
     val autoNextEpisode: StateFlow<Boolean> = settings.autoNextEpisode
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

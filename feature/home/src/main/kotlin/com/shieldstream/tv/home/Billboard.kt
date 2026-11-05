@@ -2,7 +2,6 @@ package com.shieldstream.tv.home
 
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.tr
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -38,7 +37,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -75,12 +73,7 @@ import java.util.Locale
 
 private val UiLocale: Locale get() = Lang.locale
 private val NetflixRed = Color(0xFFE50914)
-private val CardShape = RoundedCornerShape(18.dp)
 
-/**
- * Portada grande del Inicio: los destacados de la semana. ◀ ▶ cambia de destacado (en bucle) y además
- * avanza solo cada 10 s. OK abre la ficha.
- */
 @Composable
 internal fun FeaturedCarousel(
     items: List<FeaturedItem>,
@@ -90,10 +83,9 @@ internal fun FeaturedCarousel(
     var index by rememberSaveable { mutableIntStateOf(0) }
     if (index >= items.size) index = 0
     var focused by remember { mutableStateOf(false) }
-    // Cambiar de destacado a mano reinicia la cuenta (el efecto depende de index).
     val lightweightUi = LocalLightweightUi.current
-    LaunchedEffect(index, items.size, lightweightUi) {
-        if (!lightweightUi && items.size > 1) {
+    LaunchedEffect(index, items.size, lightweightUi, focused) {
+        if (!lightweightUi && focused && items.size > 1) {
             delay(10_000)
             index = (index + 1) % items.size
         }
@@ -102,9 +94,6 @@ internal fun FeaturedCarousel(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp)
-            .clip(CardShape)
-            .border(if (focused) 3.dp else 0.dp, if (focused) Color.White else Color.Transparent, CardShape)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown || items.size < 2) return@onPreviewKeyEvent false
@@ -122,25 +111,28 @@ internal fun FeaturedCarousel(
             }
             .tvClickable { onOpen(current.item) },
     ) {
-        if (lightweightUi) {
-            FeaturedSlide(current)
-        } else {
-            Crossfade(targetState = current, animationSpec = tween(500), label = "featured") { featured ->
-                FeaturedSlide(featured)
-            }
+        FeaturedSlide(current, focused)
+        if (focused && items.size > 1) {
+            CarouselArrow("‹", Modifier.align(Alignment.CenterStart).padding(start = 16.dp))
+            CarouselArrow("›", Modifier.align(Alignment.CenterEnd).padding(end = 16.dp))
         }
         if (items.size > 1) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp),
             ) {
                 items.indices.forEach { i ->
                     Box(
                         Modifier
-                            .size(width = if (i == index) 18.dp else 6.dp, height = 6.dp)
-                            // Forma en el propio fondo (sin clip): el punto activo cambia de ancho y en la Shield
-                            // el recorte no se actualizaba al cambiar de tamaño → salían cuadrados.
-                            .background(if (i == index) Color.White else Color.White.copy(alpha = 0.4f), CircleShape),
+                            .size(width = if (i == index) 22.dp else 5.dp, height = 4.dp)
+                            .background(
+                                when {
+                                    i == index && focused -> NetflixRed
+                                    i == index -> Color.White
+                                    else -> Color.White.copy(alpha = 0.35f)
+                                },
+                                CircleShape,
+                            ),
                     )
                 }
             }
@@ -149,9 +141,20 @@ internal fun FeaturedCarousel(
 }
 
 @Composable
-private fun FeaturedSlide(featured: FeaturedItem) {
+private fun CarouselArrow(text: String, modifier: Modifier) {
+    Box(
+        modifier.size(36.dp).background(Color.Black.copy(alpha = 0.35f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = Color.White, fontSize = 32.sp)
+    }
+}
+
+@Composable
+private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean) {
     val item = featured.item
-    val backdropUrl = if (LocalLightweightUi.current) {
+    val lightweightUi = LocalLightweightUi.current
+    val backdropUrl = if (lightweightUi) {
         item.backdropUrl?.replace("/w1280/", "/w780/")
     } else {
         item.backdropUrl
@@ -177,8 +180,8 @@ private fun FeaturedSlide(featured: FeaturedItem) {
         Column(
             Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth(0.6f)
-                .padding(start = 32.dp, bottom = 28.dp),
+                .fillMaxWidth(0.65f)
+                .padding(start = 48.dp, bottom = 112.dp),
         ) {
             if (featured.logoUrl != null) {
                 AsyncImage(
@@ -186,30 +189,60 @@ private fun FeaturedSlide(featured: FeaturedItem) {
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.BottomStart,
-                    modifier = Modifier.widthIn(max = 320.dp).heightIn(max = 120.dp),
+                    modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 100.dp),
                 )
             } else {
                 Text(
                     text = item.title.uppercase(UiLocale),
                     fontFamily = DisplayFont,
-                    fontSize = 54.sp,
-                    lineHeight = 52.sp,
+                    fontSize = 46.sp,
+                    lineHeight = 46.sp,
                     color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             MetaLine(featured)
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MoreInfoAction(focused)
+                if (focused) {
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        text = tr("◀  ▶   Explorar", "◀  ▶   Browse"),
+                        color = Color.White.copy(alpha = 0.65f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
         BadgeChip(
             badge = featured.badge,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 28.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 112.dp),
         )
     }
 }
 
-/** "Película • Drama • 2026 • 1 h 37 min  [16+]  ★ 8,6" */
+@Composable
+private fun MoreInfoAction(focused: Boolean) {
+    val content = if (focused) Color.Black else Color.White
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(if (focused) Color.White else Color.Black.copy(alpha = 0.4f), RoundedCornerShape(50))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Icon(AppIcons.List, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = tr("Más información", "More info"),
+            color = content,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+        )
+    }
+}
+
 @Composable
 private fun MetaLine(featured: FeaturedItem) {
     val item = featured.item
@@ -222,8 +255,8 @@ private fun MetaLine(featured: FeaturedItem) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = text,
-            color = Color.White,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
         )
         featured.certification?.let { cert ->
             Spacer(Modifier.width(10.dp))
@@ -243,13 +276,12 @@ private fun MetaLine(featured: FeaturedItem) {
             Text(
                 text = String.format(UiLocale, "%.1f", rating),
                 color = Color.White,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
             )
         }
     }
 }
 
-/** Colores de la calificación por edades española: verde TP, amarillo 7/12/13, naranja 16, rojo 18. */
 private fun certificationColor(cert: String): Color = when (cert.removeSuffix("+").toIntOrNull()) {
     null -> Color(0xFF2E9E4F)
     in 0..6 -> Color(0xFF2E9E4F)
@@ -264,16 +296,15 @@ private fun BadgeChip(badge: FeaturedBadge, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(10.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(
             text = badge.label,
             color = Color.White,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         )
     }
 }
@@ -287,10 +318,6 @@ private fun badgeIcon(badge: FeaturedBadge): Pair<ImageVector, Color> = when (ba
     FeaturedBadge.ACCLAIMED -> AppIcons.Star to Color(0xFFFFC94A)
 }
 
-/**
- * Botones de categoría bajo la portada, en bucle. ▼ baja a las filas ([onDown]).
- * [requester] va en el botón que tenía el foco, para volver a él al subir desde las filas.
- */
 @Composable
 internal fun CategoryChips(
     categories: List<Category>,
@@ -302,7 +329,6 @@ internal fun CategoryChips(
     modifier: Modifier = Modifier,
 ) {
     if (categories.isEmpty()) return
-    // Si cambian las categorías (Ajustes → Categorías del Inicio), la fila empieza de cero con la lista nueva.
     key(categories) { CategoryChipsRow(categories, onOpen, requester, upRequester, onFocused, onDown, modifier) }
 }
 
@@ -318,11 +344,11 @@ private fun CategoryChipsRow(
 ) {
     val state = rememberLoopingRowState(categories.size)
     var focusedVirtual by rememberSaveable { mutableIntStateOf(state.firstVisibleItemIndex) }
-    ProvidePivotScroll(leading = 28.dp) {
+    ProvidePivotScroll(leading = 48.dp) {
         LazyRow(
             state = state,
-            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = modifier
                 .fillMaxWidth()
                 .onPreviewKeyEvent { event ->
@@ -359,11 +385,11 @@ private fun CategoryChip(
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale = if (LocalLightweightUi.current) {
-        if (focused) 1.07f else 1f
+        if (focused) 1.02f else 1f
     } else {
-        animateFloatAsState(if (focused) 1.07f else 1f, label = "chipScale").value
+        animateFloatAsState(if (focused) 1.02f else 1f, tween(150), label = "chipScale").value
     }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(50)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -371,31 +397,21 @@ private fun CategoryChip(
                 scaleX = scale
                 scaleY = scale
             }
-            .height(48.dp)
-            .widthIn(min = 132.dp)
-            // Sin clip: el fondo se dibuja ya con la forma (ver TopBarItem).
-            .background(
-                shape = shape,
-                brush = if (focused) {
-                    Brush.verticalGradient(listOf(Color.White, Color.White))
-                } else {
-                    Brush.verticalGradient(listOf(Color(0xFF2A2C3C), Color(0xFF17181F)))
-                },
-            )
-            .border(1.dp, Color.White.copy(alpha = if (focused) 0f else 0.12f), shape)
+            .height(40.dp)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.09f), shape)
+            .border(1.dp, Color.White.copy(alpha = if (focused) 0f else 0.1f), shape)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
             .tvClickable(onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = 16.dp),
     ) {
         Text(
-            text = category.title.uppercase(UiLocale),
-            fontFamily = DisplayFont,
-            fontSize = 25.sp,
-            letterSpacing = 0.6.sp,
-            color = if (focused) Color.Black else Color.White,
+            text = category.title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (focused) Color.Black else Color.White.copy(alpha = 0.9f),
             maxLines = 1,
         )
     }

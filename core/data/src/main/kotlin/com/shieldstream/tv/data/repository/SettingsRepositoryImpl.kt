@@ -13,6 +13,7 @@ import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.enabledSourceProviders
 import com.shieldstream.tv.model.DeviceProfile
+import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +67,13 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setSpanishOnlySources(enabled: Boolean) {
         profiles.save(profiles.active.value.copy(spanishOnlySources = enabled))
     }
+    override val subtitlePreference: Flow<SubtitlePreference> = profiles.active
+        .map { it.subtitlePreference }.distinctUntilChanged()
+
+    override suspend fun setSubtitlePreference(preference: SubtitlePreference) {
+        profiles.save(profiles.active.value.copy(subtitlePreference = preference))
+    }
+
     private val autoNextFlow = MutableStateFlow(prefs.getBoolean(KEY_AUTO_NEXT, true))
     override val autoNextEpisode: Flow<Boolean> = autoNextFlow
 
@@ -92,9 +100,6 @@ class SettingsRepositoryImpl @Inject constructor(
     )
     override val debridService: Flow<DebridService> = debridFlow
 
-    // Se guardan los DESACTIVADOS: así un buscador nuevo (actualización) sale activado sin tocar nada.
-    // Comet es la excepción: requiere enviar el token de Real-Debrid a un tercero y debe ser opt-in.
-    // Si el usuario ya lo activó expresamente, su elección guardada se respeta.
     private val providersFlow = MutableStateFlow(
         enabledSourceProviders(
             prefs.getStringSet(KEY_PROVIDERS_OFF, null)
@@ -115,7 +120,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val language: AppLanguage get() = Lang.current
 
-    /** commit() (no apply): la app se reinicia justo después y el valor tiene que estar ya en disco. */
     override suspend fun setLanguage(language: AppLanguage) {
         prefs.edit().putString(AppLanguage.PREF_KEY, language.name).commit()
     }

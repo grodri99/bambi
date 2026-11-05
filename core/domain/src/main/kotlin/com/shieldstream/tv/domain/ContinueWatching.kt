@@ -4,7 +4,6 @@ import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.WatchProgress
 
-/** Una entrada de "Seguir viendo": una película, o el episodio a medias de una serie. */
 data class ContinueEntry(
     val type: MediaType,
     val id: String,
@@ -13,18 +12,12 @@ data class ContinueEntry(
     val progress: WatchProgress,
 )
 
-/**
- * Reglas de la fila "Seguir viendo" a partir del progreso guardado (claves `movie:{id}` / `tv:{id}:{t}:{e}`).
- * Funciones puras: no tocan red ni disco.
- */
 object ContinueWatching {
     const val MAX_ITEMS = 15
 
     fun entries(all: Map<String, WatchProgress>, filter: HomeFilter): List<ContinueEntry> {
         val parsed = all.mapNotNull { (key, progress) -> parse(key, progress) }
         val movies = parsed.filter { it.type == MediaType.MOVIE }
-        // Serie: cuenta el episodio tocado más recientemente. Si ese ya está terminado, la serie no sale
-        // (aunque quede a medias algún episodio anterior que se dejó abandonado).
         val shows = parsed
             .filter { it.type == MediaType.TV }
             .groupBy { it.id }
@@ -43,7 +36,6 @@ object ContinueWatching {
             .take(MAX_ITEMS)
     }
 
-    /** Claves que hay que borrar para quitar un título de la fila. Los episodios ya vistos (ticks) se conservan. */
     fun keysToRemove(all: Map<String, WatchProgress>, type: MediaType, id: String): List<String> =
         if (type == MediaType.MOVIE) {
             listOf(WatchProgress.movieKey(id))

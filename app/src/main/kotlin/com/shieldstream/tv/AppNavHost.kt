@@ -28,11 +28,8 @@ import com.shieldstream.tv.settings.update.UpdatePrompt
 @Composable
 fun AppNavHost(holder: SelectedContentHolder) {
     val navController = rememberNavController()
-    // Instalación nueva (sin clave de TMDB o sin ningún debrid): la guía de configuración va antes del Inicio.
-    // Después, como Netflix, cada vez que se abre la app: "¿Quién está viendo?".
     val gate: SetupGateViewModel = hiltViewModel()
     val start = remember { if (gate.needsSetup) "setup" else "profiles" }
-    // Al elegir perfil: Inicio desde cero (su "Seguir viendo"), sin nada detrás → Atrás en Inicio sale de la app.
     val toMainFresh = {
         navController.navigate("main") { popUpTo(navController.graph.id) { inclusive = true } }
     }
@@ -61,15 +58,12 @@ fun AppNavHost(holder: SelectedContentHolder) {
         composable("trakt_connect/{id}") { entry ->
             TraktConnectScreen(onDone = { if (entry.isVisible()) navController.popBackStack() })
         }
-        // Desde Ajustes → "Guía de configuración": al acabar (o con Atrás) se vuelve a Ajustes.
         composable("setup_again") {
             SetupScreen(
                 onFinish = { navController.popBackStack() },
                 onExit = { navController.popBackStack() },
             )
         }
-        // Navegar solo desde la pantalla visible: evita dobles pulsaciones y saltos tardíos
-        // que apilaban fichas/reproductores de otro título.
         composable("main") { entry ->
             val profiles: ProfilesViewModel = hiltViewModel()
             val active by profiles.active.collectAsState()
@@ -83,6 +77,15 @@ fun AppNavHost(holder: SelectedContentHolder) {
                         navController.navigate("details")
                     }
                 },
+                onContinue = { item, info ->
+                    if (entry.isVisible()) {
+                        val target = info.season?.let { season ->
+                            info.episode?.let { episode -> EpisodeTarget(season, episode) }
+                        }
+                        holder.selectItem(item, target, playImmediately = true)
+                        navController.navigate("details")
+                    }
+                },
                 onOpenNewEpisode = { item, episode ->
                     if (entry.isVisible()) {
                         holder.selectItem(item, EpisodeTarget(episode.season, episode.number))
@@ -91,7 +94,6 @@ fun AppNavHost(holder: SelectedContentHolder) {
                 },
                 onOpenSettings = { navController.navigate("settings") },
             )
-            // Versión nueva en GitHub: el aviso sale aquí y en "¿Quién está viendo?", nunca durante la reproducción.
             UpdatePrompt()
         }
         composable("details") { entry ->
@@ -112,5 +114,4 @@ fun AppNavHost(holder: SelectedContentHolder) {
     }
 }
 
-/** Visible en pantalla (STARTED o más). Una pantalla tapada por otra baja a CREATED. */
 private fun NavBackStackEntry.isVisible() = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)

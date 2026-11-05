@@ -32,11 +32,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 
-/**
- * Héroe "full-bleed" con backdrop. El `LaunchedEffect(focused)` es el punto de
- * enganche para la preview auto-reproducible: se arranca al ganar foco y se
- * detiene al perderlo (o al salir de la pantalla).
- */
 @Composable
 fun Hero(
     item: CatalogItem,
@@ -47,8 +42,6 @@ fun Hero(
     var focused by remember { mutableStateOf(false) }
 
     LaunchedEffect(focused) {
-        // Preview de héroe: arrancar/detener reproducción según foco.
-        // Se conecta al PlayerController cuando el item disponga de tráiler/backdrop de video.
     }
 
     Box(

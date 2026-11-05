@@ -24,7 +24,6 @@ import com.shieldstream.tv.model.PlaybackVideoInfo
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.StreamSource
 
-/** Distintivos anunciados por una fuente; se confirman de verdad al reproducir. */
 @Composable
 fun SourceMediaBadges(source: StreamSource, modifier: Modifier = Modifier) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -39,7 +38,6 @@ fun SourceMediaBadges(source: StreamSource, modifier: Modifier = Modifier) {
     }
 }
 
-/** Distintivos del Format y decoder activos, disponibles una vez preparado el vídeo. */
 @Composable
 fun PlaybackMediaBadges(info: PlaybackVideoInfo, modifier: Modifier = Modifier) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

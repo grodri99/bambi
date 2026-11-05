@@ -7,18 +7,12 @@ import java.net.URL;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/**
- * Solo pruebas (app_process en la Shield): pide URLs de addons de Stremio y cuenta las fuentes.
- * Uso: CLASSPATH=$APK app_process /system/bin com.shieldstream.tv.media.mkv.HttpProbe N url1 url2…
- * (N = cuántos títulos enseñar por URL).
- */
 public final class HttpProbe {
     public static void main(String[] args) throws Exception {
         int show = Integer.parseInt(args[0]);
         for (int a = 1; a < args.length; a++) {
             String url = args[a];
             try {
-                // "POST:url|json" = POST con ese cuerpo JSON (Knaben…).
                 String post = null;
                 if (url.startsWith("POST:")) { int bar = url.indexOf('|'); post = url.substring(bar + 1); url = url.substring(5, bar); }
                 HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -41,7 +35,6 @@ public final class HttpProbe {
                 System.out.println("== " + url.replaceAll("realdebrid=[^|/]+", "realdebrid=***") + " -> HTTP " + code);
                 if (!body.trim().startsWith("{")) {
                     System.out.println("   (no es JSON) " + body.substring(0, Math.min(200, body.length())).replace("\n", " "));
-                    // Páginas de buscadores (Nyaa…): cuántos magnet trae y los primeros nombres.
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile("magnet:\\?xt=urn:btih:[a-fA-F0-9]{40}[^\"'<>\\s]*?dn=([^&\"]+)").matcher(body);
                     int magnets = 0;
                     while (m.find()) { if (magnets++ < Math.max(show, 3)) System.out.println("   magnet: " + java.net.URLDecoder.decode(m.group(1).replace("&amp;", "&"), "UTF-8")); }

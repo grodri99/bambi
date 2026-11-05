@@ -1,8 +1,5 @@
 package com.shieldstream.tv.model
 
-/**
- * Tipo de alto rango dinámico de una fuente. [rank] mayor = mejor.
- */
 enum class HdrType(val rank: Int, val label: String) {
     SDR(0, "SDR"),
     HLG(1, "HLG"),

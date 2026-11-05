@@ -18,8 +18,6 @@ object AppModule {
     @Singleton
     fun provideSelectedContentHolder(): SelectedContentHolder = SelectedContentHolder()
 
-    /** App "Bambi" en Trakt (local.properties → BuildConfig). Vacío = Trakt desactivado en esta compilación. */
-    /** Versión instalada y repositorio de GitHub del que salen las actualizaciones. */
     @Provides
     @Singleton
     fun provideAppVersion(): AppVersion =

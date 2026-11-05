@@ -6,7 +6,6 @@ import com.shieldstream.tv.model.PlaybackPolicy
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Combina las capacidades detectadas con los ajustes manuales, sin sobrescribir estos últimos. */
 @Singleton
 class PlaybackPolicyProvider @Inject constructor(
     private val deviceCapabilities: DeviceCapabilityDetector,

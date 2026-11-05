@@ -1,6 +1,5 @@
 package com.shieldstream.tv.model
 
-/** Por qué sale un título en la portada grande. */
 enum class FeaturedBadge(val label: String) {
     NEW(tr("Recién llegada", "New arrival")),
     POPULAR(tr("La más popular", "Most popular")),
@@ -10,10 +9,6 @@ enum class FeaturedBadge(val label: String) {
     ACCLAIMED(tr("Aclamada por la crítica", "Critically acclaimed")),
 }
 
-/**
- * Destacado de la portada grande del Inicio. Se eligen una vez por semana (ver CatalogRepository.getFeatured).
- * [durationText]: "1 h 37 min" (película) o "3 temporadas" (serie). [certification]: "16+", "TP"…
- */
 data class FeaturedItem(
     val item: CatalogItem,
     val badge: FeaturedBadge,
@@ -23,11 +18,6 @@ data class FeaturedItem(
     val certification: String?,
 )
 
-/**
- * Botones de categoría bajo la portada (en bucle). Cada uno abre su pantalla con filas.
- * El orden de aquí es el de los botones. Cada perfil puede ocultarlas al editarlo (se guarda el nombre de las
- * ocultas: las que se añadan en versiones nuevas salen visibles).
- */
 enum class Category(val title: String, val forMovies: Boolean = true, val forTv: Boolean = true) {
     ACCLAIMED(tr("Aclamadas", "Critically acclaimed")),
     DRAMAS("Dramas"),
@@ -61,11 +51,9 @@ enum class Category(val title: String, val forMovies: Boolean = true, val forTv:
     ;
 
     companion object {
-        /** Selección inicial manejable; el resto se puede activar al editar el perfil. */
         val DEFAULT_VISIBLE = setOf(ACCLAIMED, DRAMAS, SPANISH, ACTION, COMEDY, SCIFI, KIDS, FAMILY, DOCUMENTARY)
         val DEFAULT_HIDDEN: Set<String> = entries.filterNot { it in DEFAULT_VISIBLE }.map { it.name }.toSet()
 
-        /** Las únicas que se enseñan en un perfil infantil. */
         val KIDS_SAFE = setOf(KIDS, FAMILY)
 
         fun forFilter(filter: HomeFilter): List<Category> = entries.filter {

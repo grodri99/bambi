@@ -15,10 +15,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.shieldstream.tv.model.ProfileAvatars
 
-/**
- * Avatar de perfil: cuadrado redondeado con degradado de su color y la inicial del nombre.
- * Mismo dibujo en "¿Quién está viendo?", en la edición del perfil y (pequeño) en el menú superior.
- */
 @Composable
 fun ProfileAvatar(
     initial: String,

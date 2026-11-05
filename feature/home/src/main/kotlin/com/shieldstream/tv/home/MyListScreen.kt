@@ -41,10 +41,6 @@ import com.shieldstream.tv.ui.component.PosterCard
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
-/**
- * Pestaña "Mi lista": rejilla con todo lo guardado (Todo / Series / Películas). OK abre la ficha; mantener OK lo
- * quita. Al volver de una ficha, el foco vuelve a la tarjeta de la que se salió.
- */
 @Composable
 fun MyListScreen(
     onItemClick: (CatalogItem) -> Unit,
@@ -53,7 +49,6 @@ fun MyListScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cardRequester = remember { FocusRequester() }
     var lastCardKey by rememberSaveable { mutableStateOf<String?>(null) }
-    // Volver de la ficha: foco a la última tarjeta (si sigue en la lista).
     LaunchedEffect(state is MyListUiState.Content) {
         if (state !is MyListUiState.Content || lastCardKey == null) return@LaunchedEffect
         withFrameNanos { }
@@ -64,6 +59,16 @@ fun MyListScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 36.dp, top = 24.dp)) {
+        val currentSort = when (val s = state) {
+            is MyListUiState.Content -> s.sort
+            is MyListUiState.Empty -> s.sort
+            MyListUiState.Loading -> MyListSort.RECENT
+        }
+        val hidingCompleted = when (val s = state) {
+            is MyListUiState.Content -> s.hideCompleted
+            is MyListUiState.Empty -> s.hideCompleted
+            MyListUiState.Loading -> false
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 tr("Mi lista", "My list"),
@@ -89,12 +94,31 @@ fun MyListScreen(
                 Text(tr("Mantén OK para quitar", "Hold OK to remove"), color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
             }
         }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            listOf(
+                MyListSort.NEW_FIRST to tr("Nuevos primero", "New first"),
+                MyListSort.RECENT to tr("Recientes", "Recent"),
+                MyListSort.TITLE to tr("A–Z", "A–Z"),
+            ).forEach { (value, label) ->
+                FilterChip(label = label, selected = value == currentSort, onClick = { viewModel.setSort(value) })
+                Spacer(Modifier.width(8.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            FilterChip(
+                label = tr("Ocultar completadas", "Hide completed"),
+                selected = hidingCompleted,
+                onClick = viewModel::toggleHideCompleted,
+            )
+        }
         Spacer(Modifier.height(12.dp))
         when (val s = state) {
             MyListUiState.Loading -> Text(tr("Cargando…", "Loading…"), color = Color.White.copy(alpha = 0.6f))
             is MyListUiState.Empty -> Text(
                 if (s.filter == MyListFilter.ALL) {
                     tr("Tu lista está vacía. Añade películas y series con el botón «Mi lista» de su ficha.", "Your list is empty. Add movies and shows with the “My list” button on their page.")
+                } else if (s.hideCompleted) {
+                    tr("No quedan series sin completar con estos filtros.", "No unfinished shows match these filters.")
                 } else {
                     tr("No hay nada de este tipo en tu lista.", "Nothing of this kind in your list.")
                 },
@@ -114,6 +138,7 @@ fun MyListScreen(
                         onClick = { onItemClick(item) },
                         onFocused = { lastCardKey = item.key },
                         onLongClick = { viewModel.remove(item) },
+                        newEpisodeCount = s.newEpisodeCounts[item.key] ?: 0,
                         width = 140.dp,
                         modifier = if (item.key == lastCardKey) Modifier.focusRequester(cardRequester) else Modifier,
                     )

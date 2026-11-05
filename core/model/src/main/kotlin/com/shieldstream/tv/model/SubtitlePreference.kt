@@ -1,6 +1,5 @@
 package com.shieldstream.tv.model
 
-/** Idioma de subtítulos elegido por un perfil. OFF conserva el comportamiento anterior de Media3. */
 enum class SubtitlePreference(val code: String?) {
     OFF(null),
     SPANISH("es"),

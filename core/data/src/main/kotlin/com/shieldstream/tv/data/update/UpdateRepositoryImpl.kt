@@ -38,13 +38,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-/**
- * Busca la última release de GitHub, descarga su APK y se lo pasa al instalador del sistema (PackageInstaller).
- *
- *  - El APK de cada release debería llamarse "Bambi.apk" (enlace fijo a la última); si no, vale el primer .apk.
- *  - Misma firma siempre (keystore/): si cambiara, Android no deja actualizar encima.
- *  - Los datos de la app se conservan: es una actualización normal, como desde la tienda.
- */
 @Singleton
 class UpdateRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -65,17 +58,14 @@ class UpdateRepositoryImpl @Inject constructor(
 
     private var job: Job? = null
 
-    /** Última instalación lanzada: para reintentar sin el perfil (.dm) si Android lo rechazara. */
     @Volatile private var lastApk: File? = null
     @Volatile private var lastWithDm = false
 
     init {
-        // El resultado del instalador del sistema (ver UpdateInstallReceiver) vuelve aquí.
         UpdateInstallReceiver.onFailure = { status, message ->
             val update = (_state.value as? UpdateState.Installing)?.update
             val apk = lastApk
             if (lastWithDm && status != PackageInstaller.STATUS_FAILURE_ABORTED && apk != null && apk.exists()) {
-                // Red de seguridad: si la tele no acepta el .dm, se instala como antes (sin precompilar).
                 Log.w(TAG, "Instalación con perfil fallida ($status): se reintenta sin él")
                 scope.launch {
                     runCatching { install(apk, withProfile = false) }
@@ -106,7 +96,6 @@ class UpdateRepositoryImpl @Inject constructor(
                 }
                 .onFailure {
                     Log.w(TAG, "No se pudo comprobar: ${it.message}")
-                    // En la comprobación automática, un fallo de red no molesta al usuario.
                     _state.value = if (manual) {
                         UpdateState.Failed(tr("No se pudo comprobar si hay versión nueva.", "Couldn't check for a new version."), null)
                     } else {
@@ -124,7 +113,6 @@ class UpdateRepositoryImpl @Inject constructor(
             else -> return
         }
         if (job?.isActive == true) return
-        // Android 8+: Bambi necesita permiso para instalar apps (se concede una vez en Ajustes del sistema).
         if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
             _state.value = UpdateState.NeedsPermission(update)
             return
@@ -157,7 +145,7 @@ class UpdateRepositoryImpl @Inject constructor(
             .header("User-Agent", "Bambi/${version.name}")
             .build()
         val body = client.newCall(request).execute().use { response ->
-            if (response.code == 404) return null // aún sin releases
+            if (response.code == 404) return null
             check(response.isSuccessful) { "GitHub HTTP ${response.code}" }
             response.body?.string().orEmpty()
         }
@@ -210,13 +198,6 @@ class UpdateRepositoryImpl @Inject constructor(
         return file
     }
 
-    /**
-     * Se lo pasa al instalador del sistema. El resultado llega a [UpdateInstallReceiver].
-     *
-     * Fluidez: instalada así, Android deja la app SIN precompilar (días hasta que lo hace él solo) y el Inicio va a
-     * tirones (medido en la Shield: 13,7 % de frames con tirón frente a 4,9 %). Por eso va también "bambi.dm" con el
-     * perfil de arranque que trae el propio APK: Android precompila con él al instalar, como hace la Play Store.
-     */
     private fun install(apk: File, withProfile: Boolean = true) {
         val dm = if (withProfile) runCatching { dexMetadata(apk) }.getOrNull() else null
         lastApk = apk
@@ -233,7 +214,6 @@ class UpdateRepositoryImpl @Inject constructor(
                 }
             }
             if (dm != null) {
-                // Mismo nombre que el APK de la sesión (bambi.apk → bambi.dm), si no Android no lo empareja.
                 session.openWrite("bambi.dm", 0, dm.size.toLong()).use { output ->
                     output.write(dm)
                     session.fsync(output)
@@ -247,11 +227,6 @@ class UpdateRepositoryImpl @Inject constructor(
         }
     }
 
-    /**
-     * "Dex metadata" (.dm): un zip con primary.prof = el perfil de arranque del APK (assets/dexopt/baseline.prof).
-     * Ese perfil viene en formato "010", el que usan Android 9, 10 y 11 (las Shield): en otras versiones se devuelve
-     * null y se instala sin él (Android 12+ usa otro formato; ahí lo precompila el sistema más tarde).
-     */
     private fun dexMetadata(apk: File): ByteArray? {
         if (Build.VERSION.SDK_INT !in 28..30) return null
         val profile = ZipFile(apk).use { zip ->
@@ -263,7 +238,7 @@ class UpdateRepositoryImpl @Inject constructor(
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
             val entry = ZipEntry("primary.prof").apply {
-                method = ZipEntry.STORED // sin comprimir, igual que el .dm probado en la Shield
+                method = ZipEntry.STORED
                 size = profile.size.toLong()
                 compressedSize = profile.size.toLong()
                 crc = CRC32().apply { update(profile) }.value

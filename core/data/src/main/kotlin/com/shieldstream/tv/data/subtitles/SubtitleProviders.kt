@@ -16,11 +16,9 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
-/** Un proveedor de subtítulos externos. */
 interface SubtitleProvider {
     val name: String
 
-    /** false = no configurado (p. ej. falta la API key): se salta sin error. */
     val enabled: Boolean get() = true
 
     suspend fun search(query: SubtitleQuery): List<ExternalSubtitle>
@@ -42,7 +40,6 @@ internal suspend fun OkHttpClient.getString(request: Request): String = withCont
 }
 
 // ---------------------------------------------------------------------------
-// OpenSubtitles (addon "OpenSubtitles v3" de Stremio: mismo protocolo que Torrentio, sin API key)
 // ---------------------------------------------------------------------------
 
 @Serializable
@@ -72,7 +69,6 @@ class OpenSubtitlesProvider @Inject constructor(
         } else {
             "movie" to imdb
         }
-        // Con filename= el addon ordena primero los que encajan con la release que se reproduce.
         val extra = query.fileName?.let { "/filename=" + URLEncoder.encode(it, "UTF-8") }.orEmpty()
         val request = Request.Builder()
             .url("$BASE/subtitles/$type/$id$extra.json")
@@ -83,7 +79,6 @@ class OpenSubtitlesProvider @Inject constructor(
         return response.subtitles
             .filter { it.url.isNotBlank() && toIso1(it.lang) == query.language }
             .mapIndexed { index, s ->
-                // Español latino (spl/spn/ea) se muestra marcado para distinguirlo del de España.
                 val latino = s.lang.lowercase() in LATIN_SPANISH
                 val release = (s.subtitleFileName ?: s.movieReleaseName).orEmpty()
                 ExternalSubtitle(
@@ -93,7 +88,6 @@ class OpenSubtitlesProvider @Inject constructor(
                     language = query.language,
                     hearingImpaired = false,
                     downloadUrl = s.url,
-                    // El addon ya los devuelve ordenados por coincidencia con el archivo.
                     matchScore = if (query.fileName != null) (0.6f - index * 0.05f).coerceAtLeast(0f) else 0f,
                 )
             }
@@ -102,10 +96,8 @@ class OpenSubtitlesProvider @Inject constructor(
     private companion object {
         const val BASE = "https://opensubtitles-v3.strem.io"
 
-        /** Códigos de OpenSubtitles para el español latino (el addon de Stremio usa "spl"). */
         val LATIN_SPANISH = setOf("spl", "spn", "ea")
 
-        /** OpenSubtitles usa códigos ISO 639-2 propios (spa, spl/spn = latino, pob = pt-BR…). */
         fun toIso1(code: String): String? = when (code.lowercase()) {
             "spa", "spl", "spn", "es", "ea" -> "es"
             "eng", "en" -> "en"
@@ -120,7 +112,6 @@ class OpenSubtitlesProvider @Inject constructor(
 }
 
 // ---------------------------------------------------------------------------
-// Podnapisi.NET (proveedor de a4kSubtitles, sin API key)
 // ---------------------------------------------------------------------------
 
 @Serializable
@@ -208,7 +199,6 @@ class SubDlProvider @Inject constructor(
 ) : SubtitleProvider {
     override val name = "SubDL"
 
-    /** Clave de Ajustes (opcional): sin clave, SubDL no se consulta. */
     private val apiKey: String get() = store.subdlKey.orEmpty()
     private val client get() = http.client
     override val enabled: Boolean get() = apiKey.isNotBlank()
@@ -251,7 +241,6 @@ class SubDlProvider @Inject constructor(
             }
     }
 
-    /** SubDL devuelve "ES"/"EN" o el nombre ("Spanish"); se aceptan ambos. */
     private fun languageMatches(value: String, iso1: String): Boolean {
         val v = value.lowercase()
         return v == iso1 || v.startsWith(ENGLISH_NAMES[iso1] ?: "\u0000")
@@ -267,14 +256,12 @@ class SubDlProvider @Inject constructor(
     }
 }
 
-/** De las releases que anuncia un subtítulo, la que más se parece al archivo que se reproduce. */
 internal fun bestRelease(releases: List<String>, fileName: String?): String {
     if (releases.isEmpty()) return ""
     if (fileName == null) return releases.first()
     return releases.maxByOrNull { similarity(it, fileName) } ?: releases.first()
 }
 
-/** Parecido 0..1 entre dos nombres de release (tokens en común), para estimar la sincronía. */
 internal fun similarity(a: String, b: String): Float {
     fun tokens(s: String) = s.lowercase()
         .substringBeforeLast('.')

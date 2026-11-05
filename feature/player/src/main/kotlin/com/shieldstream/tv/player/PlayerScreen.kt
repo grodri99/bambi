@@ -101,7 +101,6 @@ fun PlayerScreen(
     val thumbnailsEnabled by viewModel.seekThumbnails.collectAsStateWithLifecycle()
     val nextUp by viewModel.nextUp.collectAsStateWithLifecycle()
     val skipPrompt by viewModel.skipPrompt.collectAsStateWithLifecycle()
-    // "Siguiente episodio": se sale a la ficha, que busca las fuentes del siguiente y lo pone.
     LaunchedEffect(Unit) { viewModel.goNext.collect { onBack() } }
     LaunchedEffect(notice) {
         if (notice != null) {
@@ -113,15 +112,12 @@ fun PlayerScreen(
     LaunchedEffect(Unit) { viewModel.start() }
     BackHandler(onBack = onBack)
 
-    // Panel Audio/Subtítulos. Registrado después: Atrás lo cierra antes de salir del reproductor.
     var tracksOpen by remember { mutableStateOf(false) }
     BackHandler(enabled = tracksOpen) { tracksOpen = false }
-    // Barra "Sincronizar subtítulos" (solo con subtítulo externo).
     var syncOpen by remember { mutableStateOf(false) }
     BackHandler(enabled = syncOpen) { syncOpen = false }
     LaunchedEffect(activeExternal) { if (activeExternal == null) syncOpen = false }
 
-    // Subtítulo externo cargado en el vídeo → se cierra el panel y se vuelve a la película.
     LaunchedEffect(externalSubs) {
         if (externalSubs is ExternalSubsState.Attached) {
             tracksOpen = false
@@ -129,7 +125,6 @@ fun PlayerScreen(
         }
     }
 
-    // Ciclo de vida del player: liberar en ON_STOP (Home / salvapantallas) y recrear en ON_START.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -146,7 +141,6 @@ fun PlayerScreen(
     val playback = rememberPlaybackState(player)
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableIntStateOf(0) }
-    // Modo "saltos de 10 s" (ajuste sin miniaturas): aviso "« 10 s" en el centro.
     var seekFeedback by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(seekFeedback) {
         if (seekFeedback != null) {
@@ -155,24 +149,19 @@ fun PlayerScreen(
         }
     }
 
-    // Modo búsqueda (◀▶): el vídeo se pausa y se elige el punto con miniaturas; OK salta ahí, Atrás vuelve.
-    // null = no se está buscando.
     var scrubMs by remember { mutableStateOf<Long?>(null) }
     var resumeAfterScrub by remember { mutableStateOf(false) }
     val scrubbing = scrubMs != null
-    // Dolby Vision perfil 5 (sin capa HDR10/SDR): la capa base sale con colores falsos → sin miniaturas, solo tiempos.
     val mediaUri = remember(player, scrubbing) {
         player?.currentMediaItem?.localConfiguration?.uri
             ?.takeUnless { player?.videoFormat?.codecs?.let { c -> c.startsWith("dvhe.05") || c.startsWith("dvh1.05") } == true }
     }
-    // HDR10 / Dolby Vision (PQ): las miniaturas se pasan a SDR con una LUT (ver SeekThumbnails).
     val pqHdr = remember(player, scrubbing) {
         player?.videoFormat?.let {
             it.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084 || it.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION
         } ?: false
     }
     val thumbs = rememberSeekThumbnails(mediaUri, pqHdr, active = scrubbing)
-    // Si el reproductor se recrea (vuelta de Home / salvapantallas) se sale del modo búsqueda.
     LaunchedEffect(player) { scrubMs = null }
 
     fun showControls() {
@@ -180,7 +169,6 @@ fun PlayerScreen(
         interactions++
     }
 
-    // Auto-ocultar a los 4 s si se está reproduciendo (en pausa se quedan visibles).
     LaunchedEffect(controlsVisible, interactions, playback.isPlaying) {
         if (controlsVisible && playback.isPlaying) {
             delay(4_000)
@@ -188,13 +176,9 @@ fun PlayerScreen(
         }
     }
 
-    // El foco del D-pad vive en Compose (no en el PlayerView): aquí se traducen las teclas del mando.
     val focusRequester = remember { FocusRequester() }
-    // Al cerrar el panel de pistas el foco vuelve al reproductor (si no, el D-pad no haría nada).
     LaunchedEffect(tracksOpen) { if (!tracksOpen) runCatching { focusRequester.requestFocus() } }
 
-    // "Omitir intro/resumen": 10 s a la vista (como en Nuvio) y luego solo con los controles abiertos. Mientras no se
-    // ve, OK vuelve a ser pausa.
     val skipTarget = (skipPrompt as? SkipPromptUiState.Showing)?.targetMs
     var skipExpired by remember { mutableStateOf(false) }
     LaunchedEffect(skipTarget) {
@@ -209,16 +193,13 @@ fun PlayerScreen(
 
     fun handleKey(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
-        // Con el panel abierto, el D-pad mueve el foco entre pistas: no se intercepta.
         if (tracksOpen) return false
         val p = player ?: return false
-        // Tarjeta "Siguiente episodio": OK = ya (Atrás la quita: ver onBackKey abajo).
         val okKey = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
         if (okKey && nextUp is NextUpUiState.Showing && scrubMs == null && !syncOpen) {
             viewModel.playNextNow()
             return true
         }
-        // "Saltar intro / resumen" a la vista: OK salta (como en Netflix); para pausar, Play/Pausa del mando.
         if (okKey && skipVisible && scrubMs == null && !syncOpen) {
             viewModel.skipSegment()
             return true
@@ -234,7 +215,6 @@ fun PlayerScreen(
                 else -> false
             }
         }
-        // ◀▶ mueven el punto elegido (no el vídeo): al primer toque se pausa y se entra en modo búsqueda.
         fun scrub(deltaMs: Long) {
             val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
             val from = scrubMs ?: run {
@@ -242,7 +222,6 @@ fun PlayerScreen(
                 p.pause()
                 p.currentPosition
             }
-            // Redondeado a la rejilla de miniaturas (10 s): la hora del centro coincide con su fotograma.
             val snapped = Math.round((from + deltaMs).toDouble() / THUMB_SLOT_MS) * THUMB_SLOT_MS
             scrubMs = snapped.coerceIn(0L, duration)
             showControls()
@@ -293,7 +272,6 @@ fun PlayerScreen(
                 }
                 true
             }
-            // ▼ con los controles visibles (o Menú / tecla de subtítulos) abre Audio y subtítulos.
             Key.DirectionDown, Key.Menu, Key.Captions -> {
                 if (controlsVisible || event.key != Key.DirectionDown) {
                     controlsVisible = false
@@ -304,7 +282,6 @@ fun PlayerScreen(
                 true
             }
             Key.DirectionUp, Key.Info -> { showControls(); true }
-            // Volumen, Atrás, Home… se dejan pasar al sistema / BackHandler.
             else -> false
         }
     }
@@ -331,15 +308,13 @@ fun PlayerScreen(
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
-                        // SurfaceView por defecto: obligatorio para Dolby Vision (TextureView no lo soporta).
-                        useController = false // controles propios en Compose (abajo)
-                        keepScreenOn = true // evita que salte el salvapantallas de Android TV
+                        useController = false
+                        keepScreenOn = true
                         isFocusable = false
                     }
                 },
                 update = { view ->
                     view.player = exoPlayer
-                    // La referencia queda oculta tanto con un externo como durante la selección automática.
                     val evaluating = (externalSubs as? ExternalSubsState.Results)?.evaluating == true
                     view.subtitleView?.visibility = if (activeExternal != null || evaluating) View.GONE else View.VISIBLE
                 },
@@ -415,12 +390,10 @@ fun PlayerScreen(
             }
         }
 
-        // Abajo a la derecha, compactos (estilo Netflix): suben un poco si están los controles para no tapar la barra.
         val pillBottom by animateDpAsState(if (controlsVisible) 116.dp else 48.dp, label = "pillBottom")
         val pillModifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = pillBottom)
         if (state == PlayerUiState.Playing && !tracksOpen) {
             (nextUp as? NextUpUiState.Showing)?.let { next ->
-                // Relleno = cuenta atrás de los últimos 10 s (al llenarse, pasa solo).
                 val target = if (next.secondsLeft <= NEXT_FILL_SECONDS) 1f - next.secondsLeft / NEXT_FILL_SECONDS.toFloat() else 0f
                 val fill by animateFloatAsState(target, animationSpec = tween(500, easing = LinearEasing), label = "nextFill")
                 PlayerPill(tr("Siguiente episodio", "Next episode"), AppIcons.SkipNext, fill, pillModifier)
@@ -440,15 +413,9 @@ fun PlayerScreen(
     }
 }
 
-/** Cuántos segundos del final se ven como relleno en "Siguiente episodio". */
 private const val NEXT_FILL_SECONDS = 10
-/** Tiempo que "Omitir intro" se ve sin abrir los controles. */
 private const val SKIP_VISIBLE_MS = 10_000L
 
-/**
- * Botón compacto del reproductor ("Omitir intro", "Siguiente episodio"): píldora oscura con borde blanco.
- * [fill] (0..1) pinta por detrás el avance de la cuenta atrás. Se activa con OK (ver handleKey).
- */
 @Composable
 private fun PlayerPill(text: String, icon: ImageVector, fill: Float?, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(50)
@@ -469,7 +436,6 @@ private fun PlayerPill(text: String, icon: ImageVector, fill: Float?, modifier: 
     }
 }
 
-/** Mantener pulsado acelera el salto: 10 s → 30 s → 60 s. */
 private fun seekStepMs(repeatCount: Int): Long = when {
     repeatCount > 20 -> 60_000L
     repeatCount > 5 -> 30_000L
@@ -613,7 +579,6 @@ private fun SeekBar(playback: PlaybackState, positionMs: Long) {
         )
     }
 }
-
 
 @Composable
 private fun StatusOverlay(title: String, message: String, loading: Boolean) {

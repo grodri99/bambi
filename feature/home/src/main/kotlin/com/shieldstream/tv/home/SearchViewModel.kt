@@ -31,7 +31,6 @@ class SearchViewModel @Inject constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
-    /** Distribución del teclado en pantalla (se recuerda): QWERTY o alfabético. */
     val qwerty: StateFlow<Boolean> = settings.searchQwerty.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun toggleKeyboardLayout() {
@@ -60,7 +59,6 @@ class SearchViewModel @Inject constructor(
 
     fun clear() = setQuery("")
 
-    /** Texto completo (teclado del sistema / dictado por voz). */
     fun setQuery(value: String) {
         _query.value = value
         searchJob?.cancel()
@@ -69,7 +67,6 @@ class SearchViewModel @Inject constructor(
             _uiState.value = SearchUiState.Suggestions(suggestions)
             return
         }
-        // Debounce: no se lanza una búsqueda por cada tecla del teclado en pantalla.
         searchJob = viewModelScope.launch {
             delay(450)
             _uiState.value = SearchUiState.Loading

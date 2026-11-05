@@ -7,7 +7,6 @@ import com.shieldstream.tv.model.VideoCodec
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Detecta capacidades reales; no mantiene una lista de modelos de Android TV. */
 @Singleton
 class DeviceCapabilityDetector @Inject constructor(
     private val displayCapabilities: DisplayCapabilityDetector,
@@ -21,7 +20,6 @@ class DeviceCapabilityDetector @Inject constructor(
         )
     }
 
-    /** El HDR se vuelve a consultar por si cambia el display o se reconecta HDMI. */
     val capabilities: DeviceCapabilities
         get() = staticCapabilities.copy(supportedHdr = displayCapabilities.supportedHdrTypes())
 

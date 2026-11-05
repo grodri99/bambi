@@ -23,12 +23,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Progreso en SharedPreferences: clave → "posiciónMs|duraciónMs|actualizadoMs".
- * Son pocas entradas pequeñas; no compensa meter Room solo para esto.
- *
- * Un archivo por perfil ([prefsNameFor]); al cambiar de perfil se carga el suyo.
- */
 @Singleton
 class WatchProgressRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -45,7 +39,6 @@ class WatchProgressRepositoryImpl @Inject constructor(
     override val cleared: SharedFlow<String> = _cleared.asSharedFlow()
 
     init {
-        // Cambio de perfil → su progreso ("Seguir viendo", ticks y barras se repintan solos).
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
             profiles.active.distinctUntilChangedBy { it.id }.drop(1).collect { profile ->
                 prefs = prefsFor(profile.id)
@@ -94,11 +87,9 @@ class WatchProgressRepositoryImpl @Inject constructor(
     private fun load(): Map<String, WatchProgress> = read(prefs)
 
     companion object {
-        /** El perfil que se crea al actualizar sigue usando el archivo de antes: no se pierde nada. */
         fun prefsNameFor(profileId: String) =
             if (profileId == Profile.DEFAULT_ID) "watch_progress" else "watch_progress_$profileId"
 
-        /** Progreso de cualquier perfil (aunque no sea el activo): lo usa Trakt al enlazar una cuenta. */
         internal fun readAll(context: Context, profileId: String): Map<String, WatchProgress> =
             read(context.getSharedPreferences(prefsNameFor(profileId), Context.MODE_PRIVATE))
 

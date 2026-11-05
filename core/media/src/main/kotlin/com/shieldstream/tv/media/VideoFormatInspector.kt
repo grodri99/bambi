@@ -7,7 +7,6 @@ import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.PlaybackVideoInfo
 import com.shieldstream.tv.model.VideoCodec
 
-/** Convierte el Format real de Media3 y el decoder activo en datos para los distintivos del reproductor. */
 object VideoFormatInspector {
     fun inspect(format: Format, decoderName: String? = null): PlaybackVideoInfo {
         val codecs = format.codecs.orEmpty().lowercase()
@@ -20,14 +19,10 @@ object VideoFormatInspector {
         return PlaybackVideoInfo(
             resolutionLabel = resolutionLabel(format.width, format.height),
             hdrType = when {
-                // El renderer dav1d pinta YV12 de 8 bits: no conserva HDR aunque el archivo lo anuncie.
                 softwareWithoutHdr -> HdrType.SDR
-                // Bambi descarta la capa DV y decodifica la base HEVC Main10.
                 dolbyVisionProfile7 -> HdrType.HDR10
-                // Perfil 10: dav1d/AV1 descarta los metadatos DV.
                 dolbyVisionAv1 -> if (pq) HdrType.HDR10 else HdrType.SDR
                 dolbyVision -> HdrType.DOLBY_VISION
-                // PQ solo confirma HDR10; HDR10+ necesita metadatos dinámicos que Media3 no expone aquí.
                 pq -> HdrType.HDR10
                 format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_HLG -> HdrType.HLG
                 else -> HdrType.SDR

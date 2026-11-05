@@ -3,19 +3,13 @@ package com.shieldstream.tv.domain
 import com.shieldstream.tv.model.tr
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Servicios que necesitan clave propia. Las claves se guardan cifradas en el dispositivo y se cambian
- * desde Ajustes (ya no van escritas en el código).
- */
 enum class ApiService(
     val title: String,
     val keyName: String,
     val whereToGet: String,
-    /** Página donde se saca la clave (QR de la guía de configuración). */
     val url: String,
     val usedFor: String,
     val required: Boolean,
-    /** Servicio debrid (solo uno está en uso: ver DebridService y Ajustes). */
     val isDebrid: Boolean = false,
 ) {
     REAL_DEBRID(
@@ -43,10 +37,6 @@ enum class ApiService(
         usedFor = tr("Más subtítulos externos", "More external subtitles"),
         required = false,
     ),
-    /**
-     * Cualquier addon de Stremio (AIOStreams, Comet, MediaFusion…). La "clave" es la URL del manifiesto.
-     * Antes se llamaba "AIOStreams" y en el foro se entendía que solo valía ese addon.
-     */
     AIOSTREAMS(
         title = tr("Addon de Stremio", "Stremio addon"),
         keyName = tr("URL del manifiesto del addon", "Addon manifest URL"),
@@ -58,7 +48,6 @@ enum class ApiService(
         ),
         required = false,
     ),
-    // Debrids a través de Torrentio (ver DebridService).
     TORBOX(
         title = "TorBox",
         keyName = tr("Clave de API", "API key"),
@@ -106,20 +95,15 @@ enum class ApiService(
     ),
 }
 
-/** Resultado de probar una clave contra su servicio. */
 sealed interface KeyCheck {
-    /** [detail]: información extra para mostrar (p. ej. usuario y días de Premium en Real-Debrid). */
     data class Valid(val detail: String? = null) : KeyCheck
     data class Invalid(val message: String) : KeyCheck
 }
 
 interface ApiKeysRepository {
-    /** Clave actual de cada servicio (null = sin configurar). */
     val keys: StateFlow<Map<ApiService, String?>>
 
-    /** Guarda (o borra con null) la clave. No la comprueba: para eso está [check]. */
     suspend fun set(service: ApiService, value: String?)
 
-    /** Prueba la clave contra el servicio, sin guardarla. */
     suspend fun check(service: ApiService, value: String): KeyCheck
 }

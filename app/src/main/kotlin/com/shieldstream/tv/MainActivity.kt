@@ -42,11 +42,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Al volver a la app (p. ej. tras ver algo en la otra Shield): se trae lo nuevo de Trakt (como mucho cada 2 min). */
     override fun onStart() {
         super.onStart()
         trakt.syncActive()
-        // Versión nueva en GitHub: como mucho una consulta cada 6 h; el aviso sale en el Inicio / perfiles.
         updates.check(manual = false)
     }
 }

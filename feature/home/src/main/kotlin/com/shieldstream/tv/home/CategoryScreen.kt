@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Pantalla de una categoría (Dramas, Anime, Estados de ánimo…): filas en bucle. Atrás vuelve al Inicio. */
 @Composable
 fun CategoryScreen(
     category: Category,

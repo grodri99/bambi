@@ -53,10 +53,6 @@ import kotlinx.coroutines.delay
 internal val ProfileBackground = Brush.verticalGradient(listOf(Color(0xFF14151F), Color.Black))
 internal val ProfileMuted = Color.White.copy(alpha = 0.55f)
 
-/**
- * "¿Quién está viendo?" (al abrir la app y desde el avatar del menú). Como en Netflix: los perfiles en fila, el
- * enfocado crece con borde blanco, "Añadir perfil" al final y "Administrar perfiles" debajo (lápiz sobre cada uno).
- */
 @Composable
 fun ProfilePickerScreen(
     onSelected: () -> Unit,
@@ -87,12 +83,10 @@ fun ProfilePickerScreen(
             managementAction = action
         }
     }
-    // Perfil con PIN: antes de entrar se pide su PIN. La edición además exige el PIN de administración.
     var pinFor by remember { mutableStateOf<Pair<Profile, Boolean>?>(null) }
     var pinError by remember { mutableStateOf<String?>(null) }
     val activeRequester = remember { FocusRequester() }
     LaunchedEffect(manage) {
-        // Al arrancar justo tras el salvapantallas la ventana tarda en tener el foco: se insiste unas veces.
         repeat(4) {
             runCatching { activeRequester.requestFocus() }
             delay(150)
@@ -103,7 +97,6 @@ fun ProfilePickerScreen(
         Modifier
             .fillMaxSize()
             .background(ProfileBackground)
-            // En "Administrar", Atrás vuelve a elegir perfil; si no, Atrás hace lo de siempre (salir / volver).
             .onBackKey(enabled = manage) { manage = false },
     ) {
         Row(
@@ -218,7 +211,6 @@ fun ProfilePickerScreen(
 
 private enum class ManagementAction { MANAGE, ADD }
 
-// 5 perfiles (o 4 + "Añadir") tienen que caber en los 960 dp de ancho de la Shield.
 private val TileSize = 128.dp
 
 @Composable
@@ -243,7 +235,6 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
         ) {
             ProfileAvatar(initial = profile.initial, avatar = profile.avatar, size = TileSize)
             if (manage) {
-                // Lápiz sobre el avatar oscurecido, como en "Administrar perfiles" de Netflix.
                 Box(
                     Modifier
                         .size(TileSize)
@@ -264,7 +255,6 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-        // Debajo del nombre: Trakt, infantil y candado (con PIN), en una línea pequeña.
         if (profile.traktUser != null || profile.kids || profile.locked) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (profile.traktUser != null) {
@@ -320,5 +310,4 @@ private fun AddTile(onClick: () -> Unit) {
     }
 }
 
-/** Rojo de la marca Trakt (solo para la etiqueta, sin su logo). */
 internal val TraktRed = Color(0xFFED1C24)

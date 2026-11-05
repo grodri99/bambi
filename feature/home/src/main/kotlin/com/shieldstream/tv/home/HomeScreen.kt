@@ -2,7 +2,11 @@ package com.shieldstream.tv.home
 
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.tr
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,6 +66,7 @@ import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
 import com.shieldstream.tv.model.Category
+import com.shieldstream.tv.model.ContinueInfo
 import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HomeFilter
@@ -90,16 +95,11 @@ import java.util.Locale
 
 private val ContentStart = 48.dp
 
-/**
- * Inicio / Series / Películas. Dos modos:
- *  - Portada (arriba): menú superior, destacados de la semana y botones de categoría.
- *  - Filas (al bajar): fondo e información del título enfocado + filas (en bucle).
- * ▼ desde las categorías → filas. ▲ desde la primera fila o Atrás → portada.
- */
 @Composable
 fun HomeScreen(
     filter: HomeFilter,
     onItemClick: (CatalogItem) -> Unit,
+    onContinueClick: (CatalogItem, ContinueInfo) -> Unit,
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     topBar: @Composable (Modifier) -> Unit,
@@ -114,9 +114,7 @@ fun HomeScreen(
     val hidden by viewModel.hiddenCategories.collectAsStateWithLifecycle()
 
     when (val s = state) {
-        // Mismo fondo que la portada para que al terminar de cargar no haya "salto" de color.
         HomeUiState.Loading -> Column(Modifier.fillMaxSize().background(BillboardBackground)) {
-            // Con el menú visible mientras carga (al cambiar de pestaña el foco se queda en él).
             topBar(Modifier)
             LaunchedEffect(Unit) {
                 if (preferTopBarFocus) {
@@ -126,7 +124,6 @@ fun HomeScreen(
             }
             BillboardSkeleton()
         }
-        // Con el menú arriba: si falta una clave (instalación nueva), la rueda de Ajustes queda a mano.
         is HomeUiState.Error -> Column(Modifier.fillMaxSize().background(BillboardBackground)) {
             topBar(Modifier)
             HomeError(
@@ -140,13 +137,12 @@ fun HomeScreen(
             featured = s.featured,
             categories = remember(filter, hidden) {
                 when {
-                    // Perfil infantil: solo Infantiles y Para toda la familia (no se pueden ocultar).
                     viewModel.kidsProfile -> Category.forFilter(filter).filter { it in Category.KIDS_SAFE }
-                    // Si se ocultaran todas las de esta pestaña, se enseñan todas (la fila de botones no puede quedar vacía).
                     else -> Category.forFilter(filter).filter { it.name !in hidden }.ifEmpty { Category.forFilter(filter) }
                 }
             },
             onItemClick = onItemClick,
+            onContinueClick = onContinueClick,
             onNewEpisodeClick = onNewEpisodeClick,
             onOpenCategory = onOpenCategory,
             onRemoveContinue = viewModel::removeFromContinue,
@@ -160,6 +156,7 @@ fun HomeScreen(
 }
 
 private enum class TopFocus { HERO, CHIPS }
+private data class ContinueMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem)
 
 @Composable
 private fun HomeContent(
@@ -167,6 +164,7 @@ private fun HomeContent(
     featured: List<FeaturedItem>,
     categories: List<Category>,
     onItemClick: (CatalogItem) -> Unit,
+    onContinueClick: (CatalogItem, ContinueInfo) -> Unit,
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
@@ -176,14 +174,14 @@ private fun HomeContent(
     preferTopBarFocus: Boolean,
     onTopBarFocusConsumed: () -> Unit,
 ) {
-    var inRows by rememberSaveable { mutableStateOf(false) }
+    var inRows by rememberSaveable { mutableStateOf(rows.any { it.style == RowStyle.CONTINUE }) }
     var topFocus by rememberSaveable { mutableStateOf(TopFocus.HERO) }
-    // Portada y filas conservan su estado al pasar de una a otra (botón de categoría, tarjeta enfocada…).
     val saveable = rememberSaveableStateHolder()
     if (inRows && rows.isNotEmpty()) saveable.SaveableStateProvider("rows") {
         RowsBrowser(
             rows = rows,
             onItemClick = onItemClick,
+            onContinueClick = onContinueClick,
             onNewEpisodeClick = onNewEpisodeClick,
             onRemoveContinue = onRemoveContinue,
             onExitTop = {
@@ -213,7 +211,6 @@ private fun HomeContent(
     }
 }
 
-/** Portada: menú + destacados + categorías. Atrás (fuera del menú) lleva el foco al menú. */
 @Composable
 private fun Billboard(
     featured: List<FeaturedItem>,
@@ -243,32 +240,38 @@ private fun Billboard(
             else -> runCatching { chipsRequester.requestFocus() }
         }
     }
-    Column(
+    Box(
         Modifier
             .fillMaxSize()
-            .background(BillboardBackground)
+            .background(Color.Black)
             .onBackKey(enabled = !topBarFocused) { focusTopBar() },
     ) {
-        topBar(Modifier.onFocusChanged { topBarFocused = it.hasFocus })
         if (featured.isNotEmpty()) {
             FeaturedCarousel(
                 items = featured,
                 onOpen = onItemClick,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .focusRequester(heroRequester)
-                    // ▲ desde la portada → la pestaña activa del menú (no la más cercana).
-                    // ▼ → el botón de categoría que se ve a la izquierda (el recordado), no el "más cercano"
-                    // geométricamente: con una portada tan ancha Android elegía uno más a la derecha.
                     .focusProperties {
                         up = topBarRequester
                         down = chipsRequester
                     }
                     .onFocusChanged { if (it.isFocused) onFocusChange(TopFocus.HERO) },
             )
-        } else {
-            Spacer(Modifier.weight(1f))
         }
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(112.dp)
+                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.75f), 1f to Color.Transparent)),
+        )
+        topBar(
+            Modifier
+                .align(Alignment.TopCenter)
+                .onFocusChanged { topBarFocused = it.hasFocus },
+        )
         CategoryChips(
             categories = categories,
             onOpen = onOpenCategory,
@@ -276,15 +279,14 @@ private fun Billboard(
             upRequester = if (featured.isNotEmpty()) heroRequester else topBarRequester,
             onFocused = { onFocusChange(TopFocus.CHIPS) },
             onDown = onEnterRows,
-            modifier = Modifier.padding(bottom = 6.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f)))
+                .padding(bottom = 6.dp),
         )
     }
 }
 
-/**
- * Fondo + información del título enfocado + filas en bucle. Lo usan el Inicio (al bajar) y las categorías.
- * [header]: título grande arriba (categorías). [onExitTop]: ▲ en la primera fila.
- */
 @Composable
 internal fun RowsBrowser(
     rows: List<CatalogRow>,
@@ -292,23 +294,17 @@ internal fun RowsBrowser(
     onRemoveContinue: (CatalogItem) -> Unit,
     onExitTop: (() -> Unit)?,
     onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)? = null,
+    onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)? = null,
     onBack: () -> Unit,
     header: String? = null,
 ) {
-    // Última tarjeta enfocada: "fila/posición virtual". rememberSaveable: sobrevive a ir al detalle y volver.
-    // IMPORTANTE (fluidez): este estado NO se lee al componer. Si se leyera, cada paso del mando recomponía toda la
-    // pantalla y todas las filas visibles (frames de 50-150 ms medidos en la Shield). Lo leen solo los listeners.
     val savedFocus = rememberSaveable { mutableStateOf(firstKey(rows.first())) }
-    // Si esa tarjeta ya no existe (p. ej. se terminó la peli de "Seguir viendo"), la primera de las filas.
     fun validKey(key: String) = if (findByKey(rows, key) != null) key else firstKey(rows.first())
-    // Clave de "volver aquí" para las filas: cambia al entrar en la pantalla o al quitar un título de Seguir viendo.
     var restoreKey by remember { mutableStateOf(Snapshot.withoutReadObservation { validKey(savedFocus.value) }) }
     var lastVerticalRepeat by remember { mutableStateOf(0L) }
-    // Tras quitar una tarjeta de "Seguir viendo", el foco salta a la vecina cuando llegan las filas nuevas.
     var pendingRefocus by remember { mutableStateOf(false) }
+    var continueMenu by remember { mutableStateOf<ContinueMenu?>(null) }
 
-    // Fondo e información de arriba: cambian 300 ms después de pararse en un título (al recorrer rápido una fila no
-    // se piden 20 fondos seguidos al Tegra). Se escucha el estado sin leerlo al componer.
     var hero by remember { mutableStateOf(Snapshot.withoutReadObservation { findByKey(rows, restoreKey) ?: rows.first().items.first() }) }
     LaunchedEffect(rows) {
         snapshotFlow { savedFocus.value }.collectLatest { key ->
@@ -317,7 +313,6 @@ internal fun RowsBrowser(
         }
     }
 
-    // Al entrar (o volver del detalle) el foco va a la tarjeta que tenía.
     val restoreRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -336,8 +331,6 @@ internal fun RowsBrowser(
             .fillMaxSize()
             .background(Color.Black)
             .onBackKey(enabled = true) { onBack() }
-            // Botón ▲▼ mantenido: el mando repite unas 20 veces por segundo y cada paso monta una fila nueva. Se deja
-            // pasar una repetición cada 130 ms: la lista baja a ritmo constante en vez de atascarse y dar saltos.
             .onPreviewKeyEvent { e ->
                 val vertical = e.key == Key.DirectionDown || e.key == Key.DirectionUp
                 if (e.type != KeyEventType.KeyDown || !vertical || e.nativeKeyEvent.repeatCount == 0) return@onPreviewKeyEvent false
@@ -345,7 +338,7 @@ internal fun RowsBrowser(
                 if (now - lastVerticalRepeat < 130) true else { lastVerticalRepeat = now; false }
             },
     ) {
-        HeroBackdrop(hero)
+        if (!LocalLightweightUi.current) HeroBackdrop(hero)
         Column(Modifier.fillMaxSize()) {
             Column(
                 Modifier
@@ -364,9 +357,7 @@ internal fun RowsBrowser(
                 }
                 HeroInfo(item = hero)
             }
-            // Deja visible el título de la fila enfocada. 51 dp = los 42 de antes + lo que crece hacia arriba el póster
-            // enfocado (×1.1): ahora se alinea la tarjeta sin escalar (ver PosterCard), así la pantalla queda igual.
-            ProvidePivotScroll(leading = 51.dp) {
+            ProvidePivotScroll(leading = 46.dp) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(bottom = 260.dp),
@@ -379,12 +370,8 @@ internal fun RowsBrowser(
                             onFocused = { virtual -> savedFocus.value = keyOf(row, virtual) },
                             onItemClick = onItemClick,
                             onNewEpisodeClick = onNewEpisodeClick,
-                            onRemove = { virtual, item ->
-                                savedFocus.value = neighbourKey(rows, row, virtual)
-                                restoreKey = savedFocus.value
-                                pendingRefocus = true
-                                onRemoveContinue(item)
-                            },
+                            onContinueClick = onContinueClick,
+                            onContinueMenu = { virtual, item -> continueMenu = ContinueMenu(row, virtual, item) },
                             modifier = if (rowIndex == 0 && onExitTop != null) {
                                 Modifier.onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
@@ -402,6 +389,57 @@ internal fun RowsBrowser(
                 }
             }
         }
+        continueMenu?.let { menu ->
+            ContinueActions(
+                item = menu.item,
+                onDetails = {
+                    continueMenu = null
+                    onItemClick(menu.item)
+                },
+                onRemove = {
+                    savedFocus.value = neighbourKey(rows, menu.row, menu.virtual)
+                    restoreKey = savedFocus.value
+                    pendingRefocus = true
+                    onRemoveContinue(menu.item)
+                    continueMenu = null
+                },
+                onCancel = { continueMenu = null },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContinueActions(
+    item: CatalogItem,
+    onDetails: () -> Unit,
+    onRemove: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { requester.requestFocus() }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .onBackKey(enabled = true, onBack = onCancel),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .width(360.dp)
+                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            TvButton(text = tr("Ver detalles", "View details"), onClick = onDetails, modifier = Modifier.focusRequester(requester))
+            TvButton(text = tr("Quitar de Seguir viendo", "Remove from Continue Watching"), onClick = onRemove)
+            TvButton(text = tr("Cancelar", "Cancel"), onClick = onCancel)
+        }
     }
 }
 
@@ -413,7 +451,8 @@ private fun CatalogRowView(
     onFocused: (Int) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
     onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)?,
-    onRemove: (Int, CatalogItem) -> Unit,
+    onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)?,
+    onContinueMenu: (Int, CatalogItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -428,16 +467,14 @@ private fun CatalogRowView(
             )
             if (row.style == RowStyle.CONTINUE) {
                 Text(
-                    text = tr("   Mantén OK para quitar", "   Hold OK to remove"),
+                    text = tr("   Mantén OK para opciones", "   Hold OK for options"),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.45f),
                 )
             }
         }
-        // Con menos de 8 títulos no hay bucle: si cambia (p. ej. al quitar uno), la fila empieza de cero.
         key(shouldLoop(row.items.size)) {
-            // + 6 dp: lo que crece por cada lado el póster enfocado; así su borde sigue alineado con el título de la fila.
-            ProvidePivotScroll(leading = ContentStart + 6.dp) {
+            ProvidePivotScroll(leading = ContentStart + 3.dp) {
                 LazyRow(
                     state = rememberLoopingRowState(row.items.size),
                     contentPadding = PaddingValues(horizontal = ContentStart, vertical = 14.dp),
@@ -450,6 +487,7 @@ private fun CatalogRowView(
                                 item = item,
                                 onClick = { onItemClick(item) },
                                 onFocused = { onFocused(virtual) },
+                                newEpisodeCount = row.newEpisodeCounts[item.key] ?: 0,
                                 modifier = itemModifier,
                             )
                             RowStyle.CONTINUE -> {
@@ -458,19 +496,27 @@ private fun CatalogRowView(
                                     item = item,
                                     fraction = info?.fraction ?: 0f,
                                     label = info?.label.orEmpty(),
-                                    onClick = { onItemClick(item) },
-                                    onLongClick = { onRemove(virtual, item) },
+                                    onClick = {
+                                        if (info == null || onContinueClick == null) onItemClick(item)
+                                        else onContinueClick(item, info)
+                                    },
+                                    onLongClick = { onContinueMenu(virtual, item) },
                                     onFocused = { onFocused(virtual) },
+                                    newEpisodeCount = row.newEpisodeCounts[item.key] ?: 0,
                                     modifier = itemModifier,
                                 )
                             }
                             RowStyle.NEW_EPISODES -> {
                                 val episode = row.newEpisodes[item.key]
+                                val episodeLabel = remember(row.newEpisodes, item.key) {
+                                    episode?.let {
+                                        listOf(it.code, formatEpisodeDate(it.airDate)).filter { part -> part.isNotEmpty() }.joinToString(" · ")
+                                    }.orEmpty()
+                                }
                                 NewEpisodeCard(
                                     item = item,
-                                    label = episode?.let {
-                                        listOf(it.code, formatEpisodeDate(it.airDate)).filter { part -> part.isNotEmpty() }.joinToString(" · ")
-                                    }.orEmpty(),
+                                    label = episodeLabel,
+                                    count = row.newEpisodeCounts[item.key] ?: 1,
                                     onClick = {
                                         if (episode == null || onNewEpisodeClick == null) onItemClick(item)
                                         else onNewEpisodeClick(item, episode)
@@ -484,6 +530,7 @@ private fun CatalogRowView(
                                 item = item,
                                 onClick = { onItemClick(item) },
                                 onFocused = { onFocused(virtual) },
+                                newEpisodeCount = row.newEpisodeCounts[item.key] ?: 0,
                                 modifier = itemModifier,
                             )
                         }
@@ -494,7 +541,6 @@ private fun CatalogRowView(
     }
 }
 
-/** Backdrop del título enfocado, arriba a la derecha, fundido a negro por la izquierda y por abajo. */
 @Composable
 private fun HeroBackdrop(item: CatalogItem) {
     Box(Modifier.fillMaxSize()) {
@@ -566,13 +612,9 @@ private fun metaLine(item: CatalogItem): String = buildList {
     item.rating?.takeIf { it > 0f }?.let { add("★ " + String.format(Lang.locale, "%.1f", it)) }
 }.joinToString("  ·  ")
 
-private val BillboardBackground = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
-private val SkeletonColor = Color(0xFF1C1E2A)
+private val BillboardBackground = Brush.verticalGradient(listOf(Color(0xFF0B0B0D), Color.Black))
+private val SkeletonColor = Color(0xFF202023)
 
-/**
- * Opacidad del esqueleto de carga: no aparece hasta pasados 250 ms y entra con fundido. Si los datos llegan
- * antes (caché / precarga) solo se ve el fondo oscuro y no hay "parpadeo" de cajas.
- */
 @Composable
 private fun delayedSkeletonAlpha(): Float {
     var visible by remember { mutableStateOf(false) }
@@ -584,41 +626,58 @@ private fun delayedSkeletonAlpha(): Float {
     return alpha
 }
 
-/** Esqueleto con la forma de la portada (tarjeta grande + botones de categoría) mientras carga. */
+@Composable
+private fun skeletonPulse(): Float {
+    if (LocalLightweightUi.current) return 0.8f
+    val transition = rememberInfiniteTransition(label = "skeletonPulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1_100), RepeatMode.Reverse),
+        label = "skeletonPulseAlpha",
+    )
+    return pulse
+}
+
 @Composable
 private fun ColumnScope.BillboardSkeleton() {
-    val alpha = delayedSkeletonAlpha()
+    val alpha = delayedSkeletonAlpha() * skeletonPulse()
     Box(
         Modifier
             .weight(1f)
             .fillMaxWidth()
-            .padding(horizontal = 28.dp)
             .graphicsLayer { this.alpha = alpha }
-            .background(Brush.verticalGradient(listOf(Color(0xFF191B27), Color(0xFF111219))), RoundedCornerShape(18.dp)),
+            .background(Brush.verticalGradient(listOf(Color(0xFF17171B), Color(0xFF0D0D0F)))),
     ) {
-        Column(Modifier.align(Alignment.BottomStart).padding(start = 40.dp, bottom = 40.dp)) {
-            Box(Modifier.width(300.dp).height(46.dp).background(SkeletonColor, RoundedCornerShape(6.dp)))
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 40.dp)) {
+            Box(Modifier.width(320.dp).height(42.dp).background(SkeletonColor, RoundedCornerShape(6.dp)))
             Spacer(Modifier.height(14.dp))
-            Box(Modifier.width(380.dp).height(18.dp).background(SkeletonColor, RoundedCornerShape(4.dp)))
+            Box(Modifier.width(340.dp).height(16.dp).background(SkeletonColor, RoundedCornerShape(4.dp)))
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.width(126.dp).height(36.dp).background(SkeletonColor, RoundedCornerShape(50)))
         }
     }
     Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, top = 14.dp, bottom = 20.dp)
+            .padding(start = 48.dp, top = 10.dp, bottom = 16.dp)
             .graphicsLayer { this.alpha = alpha },
     ) {
-        repeat(8) {
-            Box(Modifier.width(150.dp).height(48.dp).background(SkeletonColor, RoundedCornerShape(10.dp)))
+        repeat(8) { index ->
+            Box(
+                Modifier
+                    .width((104 + (index % 3) * 18).dp)
+                    .height(40.dp)
+                    .background(SkeletonColor, RoundedCornerShape(50)),
+            )
         }
     }
 }
 
-/** Esqueleto de filas (pantallas de categoría). */
 @Composable
 internal fun HomeSkeleton() {
-    val alpha = delayedSkeletonAlpha()
+    val alpha = delayedSkeletonAlpha() * skeletonPulse()
     Column(
         Modifier
             .fillMaxSize()
@@ -667,8 +726,6 @@ internal fun HomeError(message: String, onRetry: () -> Unit, modifier: Modifier 
     }
 }
 
-// --- Claves de foco: "fila/posición virtual" (en filas en bucle el mismo título aparece en varias posiciones) ---
-
 private fun keyOf(row: CatalogRow, virtual: Int) = "${row.id}/$virtual"
 
 private fun firstKey(row: CatalogRow) = keyOf(row, firstVirtualIndex(row.items.size))
@@ -682,7 +739,6 @@ private fun findByKey(rows: List<CatalogRow>, key: String?): CatalogItem? {
     return row.items[virtual % row.items.size]
 }
 
-/** Tarjeta que recibe el foco al quitar la de [virtual]: la que pasa a ocupar su sitio, la anterior o la fila de abajo. */
 private fun neighbourKey(rows: List<CatalogRow>, row: CatalogRow, virtual: Int): String {
     val newSize = row.items.size - 1
     if (newSize <= 0) {

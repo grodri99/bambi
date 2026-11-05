@@ -23,9 +23,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * "Mi lista" en SharedPreferences, un archivo por perfil (como el progreso): clave "MOVIE_123" → fecha en que se añadió.
- */
 @Singleton
 class MyListRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,

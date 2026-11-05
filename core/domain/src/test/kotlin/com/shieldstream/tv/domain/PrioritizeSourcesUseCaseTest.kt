@@ -18,7 +18,6 @@ class PrioritizeSourcesUseCaseTest {
         val hevc = source(id = "hevc", videoCodec = VideoCodec.HEVC)
 
         val result = prioritize(
-            // A igualdad de calidad, el orden estable demuestra que AV1 ya no baja al final.
             listOf(av1, hevc),
             supportedHdr = setOf(HdrType.SDR),
             hardwareVideoCodecs = setOf(VideoCodec.AV1, VideoCodec.HEVC),

@@ -23,11 +23,8 @@ sealed interface ProfileEditUiState {
     data class Editing(
         val profile: Profile,
         val isNew: Boolean,
-        /** No se puede borrar el último perfil. */
         val canDelete: Boolean,
-        /** Esta compilación de Bambi tiene app de Trakt (traktClientId en local.properties). */
         val traktAvailable: Boolean,
-        /** Primer OK en "Eliminar" / "Desconectar Trakt": el segundo confirma (como un aviso de Netflix). */
         val confirmDelete: Boolean = false,
         val confirmDisconnect: Boolean = false,
         val confirmRemovePin: Boolean = false,
@@ -35,7 +32,6 @@ sealed interface ProfileEditUiState {
     ) : ProfileEditUiState
 }
 
-/** Añadir o editar un perfil: nombre, color del avatar y cuenta de Trakt. Ruta "profile_edit/{id}" ("new" = nuevo). */
 @HiltViewModel
 class ProfileEditViewModel @Inject constructor(
     savedState: SavedStateHandle,
@@ -45,14 +41,12 @@ class ProfileEditViewModel @Inject constructor(
 
     private val requestedId: String = savedState.get<String>("id") ?: NEW
 
-    /** Id real del perfil: el del borrador hasta que se guarda por primera vez (p. ej. al ir a enlazar Trakt). */
     @Volatile private var profileId: String? = requestedId.takeIf { it != NEW }
 
     private val _uiState = MutableStateFlow(initialState())
     val uiState: StateFlow<ProfileEditUiState> = _uiState.asStateFlow()
 
     init {
-        // La cuenta de Trakt se enlaza en otra pantalla: al volver, se refleja aquí sin perder lo que se está editando.
         viewModelScope.launch {
             profiles.profiles.collect { list ->
                 val id = profileId ?: return@collect
@@ -78,7 +72,6 @@ class ProfileEditViewModel @Inject constructor(
 
     fun setAvatar(index: Int) = edit { it.copy(profile = it.profile.copy(avatar = index), confirmDelete = false) }
 
-    /** Perfil infantil: solo contenido para niños en Inicio, categorías y Buscar. Se aplica al guardar. */
     fun setKids(kids: Boolean) = edit {
         it.copy(
             profile = it.profile.copy(
@@ -98,7 +91,6 @@ class ProfileEditViewModel @Inject constructor(
         it.copy(profile = it.profile.copy(subtitlePreference = preference))
     }
 
-    /** Categorías del Inicio de este perfil. La última visible no se puede ocultar. */
     fun toggleCategory(category: Category) {
         val state = _uiState.value as? ProfileEditUiState.Editing ?: return
         val hidden = state.profile.hiddenCategories
@@ -111,10 +103,8 @@ class ProfileEditViewModel @Inject constructor(
         it.copy(profile = it.profile.copy(hiddenCategories = emptySet()), confirmDelete = false)
     }
 
-    /** PIN ya escrito dos veces (ver PinDialog en la pantalla). Se guarda solo su hash, al guardar el perfil. */
     fun setPin(pin: String) = edit { it.copy(profile = it.profile.copy(pinHash = ProfilePin.hash(it.profile.id, pin)), confirmRemovePin = false) }
 
-    /** Primer OK pide confirmación; el segundo quita el PIN (al guardar). */
     fun removePin() {
         val state = _uiState.value as? ProfileEditUiState.Editing ?: return
         if (!state.confirmRemovePin) {
@@ -124,17 +114,14 @@ class ProfileEditViewModel @Inject constructor(
         edit { it.copy(profile = it.profile.copy(pinHash = null), confirmRemovePin = false) }
     }
 
-    /** Guarda y devuelve el id (para enlazar Trakt justo después en un perfil nuevo). */
     fun save(): String? {
         val state = _uiState.value as? ProfileEditUiState.Editing ?: return null
-        // traktUser lo lleva TraktRepository: se guarda el que tenga ahora el perfil, no el de este borrador.
         val stored = profiles.profiles.value.firstOrNull { it.id == state.profile.id }
         val saved = profiles.save(state.profile.copy(traktUser = stored?.traktUser))
         profileId = saved.id
         return saved.id
     }
 
-    /** Primer OK pide confirmación; el segundo borra. Devuelve true si se ha borrado. */
     fun delete(): Boolean {
         val state = _uiState.value as? ProfileEditUiState.Editing ?: return false
         if (!state.canDelete) return false
@@ -159,7 +146,6 @@ class ProfileEditViewModel @Inject constructor(
         }
     }
 
-    /** Al mover el foco a otra cosa, los "¿seguro?" se olvidan. */
     fun cancelConfirmations() = edit { it.copy(confirmDelete = false, confirmDisconnect = false, confirmRemovePin = false) }
 
     private fun edit(transform: (ProfileEditUiState.Editing) -> ProfileEditUiState.Editing) {

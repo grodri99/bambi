@@ -20,14 +20,8 @@ class RealDebridRepositoryImpl @Inject constructor(
     private val settings: SettingsRepository,
 ) : RealDebridRepository {
 
-    // Caché en memoria de la librería: Details y Resolve la consultan con segundos de diferencia,
-    // así es una sola llamada. Se invalida al añadir o borrar torrents.
     private val libraryMutex = Mutex()
 
-    /**
-     * Hashes que RD ya rechazó (451) en esta sesión: no se vuelven a pedir. Pedir muchos seguidos acababa en 429
-     * (demasiadas peticiones) y cortaba la cola antes de llegar a fuentes buenas.
-     */
     private val blockedHashes = java.util.Collections.synchronizedSet(mutableSetOf<String>())
     private var libraryCache: List<RdTorrentDto> = emptyList()
 
@@ -53,10 +47,6 @@ class RealDebridRepositoryImpl @Inject constructor(
 
     override suspend fun addMagnet(magnet: String): String = addMagnet(magnet, attempt = 0)
 
-    /**
-     * Ritmo de añadir torrents: RD corta con 429 si se le piden muchos seguidos (pasa con estrenos, donde casi todos
-     * están bloqueados y la cola los recorre muy rápido). Como mínimo [ADD_SPACING_MS] entre uno y otro.
-     */
     private val addPacing = Mutex()
     @Volatile private var lastAddAt = 0L
 
@@ -78,11 +68,9 @@ class RealDebridRepositoryImpl @Inject constructor(
         val resp = try {
             api.addMagnet("Bearer $t", magnet)
         } catch (e: retrofit2.HttpException) {
-            // Real-Debrid explica el motivo en el cuerpo: {"error": "...", "error_code": N}.
             val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull().orEmpty()
             android.util.Log.w("RealDebrid", "addMagnet HTTP ${e.code()}: $body")
             val code = Regex("\"error_code\"\\s*:\\s*(\\d+)").find(body)?.groupValues?.get(1)?.toIntOrNull()
-            // 429: RD pide frenar. Se espera cada vez más (2, 4 y 8 s) y se reintenta el mismo torrent.
             if ((e.code() == 429 || code == 34) && attempt < LIMIT_RETRIES) {
                 kotlinx.coroutines.delay(2_000L shl attempt)
                 return addMagnet(magnet, attempt + 1)
@@ -153,7 +141,6 @@ class RealDebridRepositoryImpl @Inject constructor(
                 libraryCache
             } else {
                 val resp = api.torrents("Bearer ${token()}", limit = LIBRARY_LIMIT)
-                // 204 = librería vacía (sin body). Si falla (401, 503…) no se cachea el error.
                 if (resp.isSuccessful) {
                     libraryCache = resp.body().orEmpty()
                     libraryFetchedAt = now
@@ -172,7 +159,6 @@ class RealDebridRepositoryImpl @Inject constructor(
     private companion object {
         const val LIBRARY_TTL_MS = 60_000L
 
-        /** Los más recientes primero; 1000 cubre de sobra el uso normal. */
         const val LIBRARY_LIMIT = 1000
 
         val BTIH = Regex("btih:([a-fA-F0-9]{40})")

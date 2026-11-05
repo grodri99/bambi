@@ -1,10 +1,14 @@
 package com.shieldstream.tv.data.di
 
 import com.shieldstream.tv.data.repository.ApiKeysRepositoryImpl
+import com.shieldstream.tv.data.repository.EpisodeReleaseRepositoryImpl
+import com.shieldstream.tv.data.repository.EpisodeTrackingRepositoryImpl
 import com.shieldstream.tv.data.repository.TorrentioLinkResolverImpl
 import com.shieldstream.tv.domain.TorrentioLinkResolver
 import com.shieldstream.tv.data.repository.CatalogRepositoryImpl
 import com.shieldstream.tv.domain.ApiKeysRepository
+import com.shieldstream.tv.domain.EpisodeReleaseRepository
+import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.data.repository.RealDebridRepositoryImpl
 import com.shieldstream.tv.data.repository.SettingsRepositoryImpl
 import com.shieldstream.tv.data.repository.WatchProgressRepositoryImpl
@@ -53,6 +57,14 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindCatalogRepository(impl: CatalogRepositoryImpl): CatalogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindEpisodeTrackingRepository(impl: EpisodeTrackingRepositoryImpl): EpisodeTrackingRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindEpisodeReleaseRepository(impl: EpisodeReleaseRepositoryImpl): EpisodeReleaseRepository
 
     @Binds
     @Singleton

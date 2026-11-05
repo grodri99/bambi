@@ -54,7 +54,6 @@ import java.util.Locale
 private val UiLocale: Locale get() = Lang.locale
 private val NetflixRed = Color(0xFFE50914)
 
-/** Una opción del panel: texto principal, detalle técnico, si está activa y qué hace al pulsarla. */
 private data class TrackOption(
     val key: String,
     val title: String,
@@ -63,11 +62,6 @@ private data class TrackOption(
     val onSelect: () -> Unit,
 )
 
-/**
- * Panel "Audio y subtítulos" estilo Netflix: dos columnas, se elige con el D-pad y OK.
- * Lee las pistas reales del archivo (MKV multi-audio / multi-subtítulo) vía player.currentTracks.
- * "Subtítulos externos ›" abre la búsqueda en OpenSubtitles / Podnapisi / SubDL.
- */
 @OptIn(UnstableApi::class)
 @Composable
 fun TracksPanel(
@@ -99,7 +93,6 @@ fun TracksPanel(
         Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.85f))
-            // Atrás en "Subtítulos externos" vuelve a las pistas (el panel entero lo cierra la pantalla).
             .onBackKey(enabled = showExternal) {
                 showExternal = false
                 onCloseExternal()
@@ -145,7 +138,6 @@ fun TracksPanel(
 
 @Composable
 private fun TracksView(audio: List<TrackOption>, text: List<TrackOption>) {
-    // El foco entra en el audio seleccionado (o en el primero).
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -180,10 +172,6 @@ private fun TracksView(audio: List<TrackOption>, text: List<TrackOption>) {
     }
 }
 
-/**
- * "Subtítulos externos": idioma a la izquierda, resultados a la derecha.
- * Al entrar busca en español directamente.
- */
 @Composable
 private fun ExternalSubtitlesView(
     state: ExternalSubsState,
@@ -378,7 +366,6 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
 }
 
 // ---------------------------------------------------------------------------
-// Construcción de opciones a partir de las pistas del archivo
 // ---------------------------------------------------------------------------
 
 private fun externalOption(hasSpanish: Boolean, open: () -> Unit) = TrackOption(
@@ -437,7 +424,6 @@ private fun textOptions(
     onManualSelection: () -> Unit,
 ): List<TrackOption> {
     val textGroups = tracks.groups.withIndex().filter { it.value.type == C.TRACK_TYPE_TEXT }
-    // Con subtítulo externo, la pista seleccionada del archivo es solo la referencia (oculta): no cuenta.
     val anySelected = externalActive || textGroups.any { (_, g) -> (0 until g.length).any { g.isTrackSelected(it) } }
 
     return buildList {

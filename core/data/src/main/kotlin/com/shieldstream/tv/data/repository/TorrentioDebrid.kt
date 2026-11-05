@@ -15,24 +15,11 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/*
- * Debrids a través de Torrentio (TorBox, Premiumize, AllDebrid, Debrid-Link, Offcloud).
- * Formato comprobado en el código de Torrentio (torrentio-scraper, addon/moch):
- *  - Configuración en la ruta:  https://torrentio.strem.fun/torbox=CLAVE/stream/movie/tt0137523.json
- *  - Fuente en caché:   name = "[TB+] Torrentio\n4k", url = …/resolve/torbox/CLAVE/HASH/…/fileIdx/archivo
- *  - Fuente sin caché:  name = "[TB download] Torrentio\n…" (pedirla la pone a descargar en la cuenta)
- *  - Error de cuenta:   name = "Torrentio\nTB error", title = "Invalid TorBox ApiKey/Token!", url = …/videos/…
- *  - /resolve/ responde 302 al enlace directo del debrid, o a un vídeo de aviso de Torrentio (carpeta videos/ de Torrentio).
- */
-
-/** Trozo de configuración de Torrentio para el servicio: "torbox=CLAVE". */
 internal fun torrentioConfig(debrid: DebridService, key: String): String = "${debrid.torrentioKey}=${Uri.encode(key)}"
 
-/** Fuente de error que Torrentio añade cuando la clave o la cuenta fallan. */
 internal fun TorrentioStreamDto.isDebridError(): Boolean =
     url?.contains("/videos/") == true && name.contains("error", ignoreCase = true)
 
-/** Traduce el aviso de Torrentio ("Invalid TorBox ApiKey/Token!", "Expired/invalid … subscription!"…). */
 internal fun debridErrorMessage(title: String, service: String): String = when {
     title.contains("expired", ignoreCase = true) -> tr("La suscripción de $service ha caducado o no es válida.", "Your $service subscription has expired or isn't valid.")
     title.contains("invalid", ignoreCase = true) -> tr("Clave de $service no válida. Revísala en Ajustes.", "Invalid $service key. Check it in Settings.")
@@ -42,11 +29,9 @@ internal fun debridErrorMessage(title: String, service: String): String = when {
 
 private val HASH = Regex("^[0-9a-fA-F]{40}$")
 
-/** infoHash y fileIdx dentro de …/resolve/{servicio}/{clave}/{hash}/{info}/{fileIdx}/{archivo}. */
 internal fun parseResolveUrl(url: String): Pair<String, Int?>? {
     val segments = Uri.parse(url).pathSegments
     val start = segments.indexOf("resolve").takeIf { it >= 0 } ?: return null
-    // Lo normal: el hash va justo después de la clave. Si no, el primer segmento con forma de hash tras ella.
     val hash = segments.getOrNull(start + 3)?.takeIf { HASH.matches(it) }
         ?: segments.drop(start + 3).firstOrNull { HASH.matches(it) }
         ?: return null
@@ -54,15 +39,9 @@ internal fun parseResolveUrl(url: String): Pair<String, Int?>? {
     return hash.lowercase() to fileIdx
 }
 
-/**
- * Pide el enlace a Torrentio SIN seguir la redirección: la respuesta de /resolve/ ES la redirección (302) al
- * enlace directo del debrid, o a uno de sus vídeos de aviso. Se devuelve el enlace final a ExoPlayer, que así
- * no vuelve a pasar por Torrentio en cada salto de la película.
- */
 @Singleton
 class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : TorrentioLinkResolver {
 
-    // Torrentio espera a que el debrid prepare el enlace antes de responder: más margen que el resto de peticiones.
     private val client = base.newBuilder()
         .followRedirects(false)
         .followSslRedirects(false)
@@ -73,7 +52,6 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
     override suspend fun resolve(url: String, service: String): DebridLink = withContext(Dispatchers.IO) {
         var current = url
         repeat(MAX_HOPS) {
-            // Range 0-0: si la cadena llega al vídeo, solo se pide 1 byte.
             val request = Request.Builder().url(current).get().header("User-Agent", "Bambi").header("Range", "bytes=0-0").build()
             val next: String? = client.newCall(request).execute().use { response ->
                 val location = response.header("Location")
@@ -81,9 +59,6 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
                     response.isRedirect && location != null ->
                         response.request.url.resolve(location)?.toString() ?: location
                     response.isSuccessful -> {
-                        // Un 2xx no basta: Comet, sin la fuente disponible, redirige a su página /configure (HTML)
-                        // y ExoPlayer fallaba con PARSING_CONTAINER_UNSUPPORTED. Si no es vídeo, la fuente no vale
-                        // y la cola pasa a la siguiente.
                         val type = response.header("Content-Type").orEmpty().lowercase()
                         if (type.startsWith("text/") || "json" in type) {
                             val host = Uri.parse(current).host
@@ -104,9 +79,6 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
             }
             checkNotNull(next)
             staticVideoProblem(next, service)?.let { return@withContext it }
-            // Torrentio: la primera redirección fuera de Torrentio ya es el enlace del debrid.
-            // Otros addons (AIOStreams → MediaFusion/Comet → debrid…): se sigue la cadena entera hasta una respuesta
-            // 2xx y se le da al reproductor esa URL final (pasando por los addons intermedios daba 404).
             if (isTorrentio(url) && !isTorrentio(next)) return@withContext DebridLink.Ready(next)
             current = next
         }
@@ -115,7 +87,6 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
 
     private fun isTorrentio(url: String) = Uri.parse(url).host?.contains("torrentio") == true
 
-    /** Vídeos de aviso de Torrentio (addon/moch/static.js) → mensaje en español. */
     private fun staticVideoProblem(url: String, service: String): DebridLink.Problem? {
         if (!isTorrentio(url) || !url.contains("/videos/")) return null
         val file = url.substringAfterLast('/')
@@ -145,11 +116,6 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
     }
 }
 
-/** URL del manifiesto de AIOStreams (también stremio://…) → base para pedir /stream/{type}/{id}.json. */
-/**
- * Varios addons en el mismo campo: URLs separadas por espacios, comas o saltos de línea (en la tele, con el teclado
- * del sistema, se pegan una detrás de otra). Devuelve las bases válidas, sin repetir.
- */
 internal fun aioStreamBases(raw: String): List<String> =
     raw.split(Regex("[\\s,;]+")).mapNotNull { aioStreamBase(it) }.distinct()
 

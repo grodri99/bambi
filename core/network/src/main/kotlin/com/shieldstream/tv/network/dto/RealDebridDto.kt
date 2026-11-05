@@ -26,7 +26,6 @@ data class RdTorrentInfoDto(
     val links: List<String> = emptyList(),
 )
 
-/** Archivo dentro de un torrent. [id] en base 1; [selected] es 0/1. */
 @Serializable
 data class RdTorrentFileDto(
     val id: Int = 0,
@@ -35,7 +34,6 @@ data class RdTorrentFileDto(
     val selected: Int = 0,
 )
 
-/** Entrada de la librería (GET /torrents). */
 @Serializable
 data class RdTorrentDto(
     val id: String = "",
