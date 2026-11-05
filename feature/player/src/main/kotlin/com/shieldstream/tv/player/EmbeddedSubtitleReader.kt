@@ -85,6 +85,9 @@ internal fun referenceTrackScore(format: Format): Int? {
     return score
 }
 
+internal fun referenceTrackSelectionScore(baseScore: Int, cueCount: Int): Int =
+    baseScore + minOf(cueCount, 20) * 20
+
 private const val LAST_CUE_MS = 4_000L
 private const val MAX_INFERRED_CUE_MS = 2_500L
 
@@ -190,7 +193,7 @@ internal class Media3EmbeddedReferenceReader(
         val positionHolder = PositionHolder()
         var lastSeekPosition = -1L
         var initialSeekHandled = positionMs == 0L
-        while (output.starts.size < REFERENCE_CUES) {
+        while (!output.hasEnoughCues) {
             if (Thread.interrupted()) throw InterruptedException("Subtitle demux interrupted")
             val seekMap = output.seekMap
             if (!initialSeekHandled && seekMap != null) {
@@ -204,7 +207,7 @@ internal class Media3EmbeddedReferenceReader(
                 }
             }
             val readResult = extractor.read(input, positionHolder)
-            if (output.tracksEnded && metrics.track == null) {
+            if (output.tracksEnded && !output.hasReferenceTracks) {
                 return failure(ReferenceFailureReason.NO_TEXT_TRACK, retryable = false)
             }
             when (readResult) {
@@ -221,6 +224,7 @@ internal class Media3EmbeddedReferenceReader(
                 else -> Unit
             }
         }
+        output.selectBestTrack()
         val decodedIntervals = SubtitleSync.intervalsOf(output.cues)
         val intervals = if (decodedIntervals.size >= SubtitleSync.MIN_REFERENCE_CUES) {
             decodedIntervals
@@ -274,29 +278,43 @@ internal class Media3EmbeddedReferenceReader(
         private val positionMs: Long,
         private val metrics: DemuxMetrics,
     ) : ExtractorOutput {
-        val starts = mutableListOf<Long>()
-        val cues = mutableListOf<CuesWithTiming>()
+        private val tracks = mutableListOf<TimestampTrackOutput>()
+        private var selected: TimestampTrackOutput? = null
+        val starts: List<Long> get() = selected?.starts.orEmpty()
+        val cues: List<CuesWithTiming> get() = selected?.cues.orEmpty()
+        val hasEnoughCues: Boolean get() = tracks.any { it.starts.size >= REFERENCE_CUES }
+        val hasReferenceTracks: Boolean get() = tracks.any { it.score != null }
         var seekMap: SeekMap? = null
         var tracksEnded = false
-        private val tracks = mutableListOf<TimestampTrackOutput>()
 
         override fun track(id: Int, type: Int): TrackOutput = TimestampTrackOutput(id).also { tracks += it }
 
         override fun endTracks() {
-            val selected = tracks.filter { it.score != null }.maxByOrNull { it.score!! }
-            tracks.forEach { it.accepted = it === selected }
-            selected?.let { track ->
+            tracks.forEach { it.accepted = it.score != null }
+            tracksEnded = true
+        }
+
+        fun selectBestTrack() {
+            val best = tracks.filter { it.score != null }.maxByOrNull {
+                referenceTrackSelectionScore(it.score!!, it.starts.size)
+            }
+            selected = best
+            best?.let { track ->
                 val format = track.format!!
                 metrics.track = "${track.id}:${format.language.orEmpty().lowercase()}:${format.sampleMimeType.orEmpty().lowercase()}"
-                Log.i(TAG, "DEMUX_SELECTED track=${metrics.track} score=${track.score}")
+                Log.i(
+                    TAG,
+                    "DEMUX_SELECTED track=${metrics.track} score=${track.score} cues=${track.starts.size}",
+                )
             }
-            tracksEnded = true
         }
 
         private inner class TimestampTrackOutput(val id: Int) : TrackOutput {
             var format: Format? = null
             var score: Int? = null
             var accepted = false
+            val starts = mutableListOf<Long>()
+            val cues = mutableListOf<CuesWithTiming>()
             private val sampleBuffer = ByteArrayOutputStream()
             private val cueDecoder = CueDecoder()
 
@@ -368,7 +386,7 @@ internal class Media3EmbeddedReferenceReader(
 
     private companion object {
         const val TAG = "SubSync"
-        const val REFERENCE_CUES = 40
+        const val REFERENCE_CUES = 20
         const val DEMUX_TIMEOUT_MS = 30_000L
         const val MAX_SEEKS = 200
     }

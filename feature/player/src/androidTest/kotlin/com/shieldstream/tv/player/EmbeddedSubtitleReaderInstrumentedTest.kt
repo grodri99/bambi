@@ -47,6 +47,17 @@ class EmbeddedSubtitleReaderInstrumentedTest {
     }
 
     @Test
+    fun sparseTrackIsRejectedForDenseDialogueTrack() = runBlocking {
+        serveAsset("multi-track.mkv")
+        val result = read("multi-track.mkv")
+
+        val success = result as? ReferenceReadResult.Success
+            ?: error("Expected multi-track reference, got $result")
+        assertTrue(success.reference.track.contains(":ru:"))
+        assertTrue(success.reference.intervals.size >= SubtitleSync.MIN_REFERENCE_CUES)
+    }
+
+    @Test
     fun mkvSeeksNearResumePosition() = runBlocking {
         serveAsset("reference.mkv")
         val result = read("reference.mkv", positionMs = 10_000)

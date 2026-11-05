@@ -37,6 +37,7 @@ class EmbeddedSubtitleReaderTest {
             .build()
         assertTrue(referenceTrackScore(english)!! > referenceTrackScore(russian)!!)
         assertTrue(referenceTrackScore(russian)!! > referenceTrackScore(forcedEnglish)!!)
+        assertTrue(referenceTrackSelectionScore(100, 20) > referenceTrackSelectionScore(200, 5))
     }
 
     @Test
