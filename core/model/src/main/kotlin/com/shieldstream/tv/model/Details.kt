@@ -30,7 +30,7 @@ data class Episode(
 
 enum class HomeFilter { ALL, MOVIES, TV }
 
-enum class RowStyle { POSTER, TOP10, CONTINUE, NEW_EPISODES }
+enum class RowStyle { POSTER, TOP10, CONTINUE, NEW_EPISODES, UP_NEXT }
 
 data class ShowAiring(
     val item: CatalogItem,

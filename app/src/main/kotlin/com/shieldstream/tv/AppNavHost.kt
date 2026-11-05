@@ -102,6 +102,16 @@ fun AppNavHost(holder: SelectedContentHolder) {
                         navController.navigate("details")
                     }
                 },
+                onUpNext = { item, episode ->
+                    if (entry.isVisible()) {
+                        holder.selectItem(
+                            item,
+                            EpisodeTarget(episode.season, episode.number),
+                            playImmediately = true,
+                        )
+                        navController.navigate("details")
+                    }
+                },
                 onOpenSettings = { navController.navigate("settings") },
             )
             UpdatePrompt()

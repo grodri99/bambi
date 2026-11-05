@@ -37,6 +37,9 @@
     <string name="home_new_episodes">Nuevos episodios</string>
     <string name="home_my_list_f0348a">Mi lista</string>
     <string name="home_recommended_for_you">Recomendado para ti</string>
+    <string name="home_up_next">A continuación</string>
+    <string name="home_mark_watched">Marcar como visto</string>
+    <string name="home_remove_from_up_next">Quitar de A continuación</string>
     <string name="home_couldn_t_load_the_catalog_check_your">No se pudo cargar el catálogo. Revisa la conexión.</string>
     <string name="home_error_loading_the_catalog">Error cargando el catálogo</string>
     <string name="home_search_error">Error en la búsqueda</string>

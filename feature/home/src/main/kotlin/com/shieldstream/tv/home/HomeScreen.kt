@@ -103,6 +103,7 @@ fun HomeScreen(
     onItemClick: (CatalogItem) -> Unit,
     onContinueClick: (CatalogItem, ContinueInfo) -> Unit,
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
+    onUpNextClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     topBar: @Composable (Modifier) -> Unit,
     topBarRequester: FocusRequester,
@@ -146,8 +147,11 @@ fun HomeScreen(
             onItemClick = onItemClick,
             onContinueClick = onContinueClick,
             onNewEpisodeClick = onNewEpisodeClick,
+            onUpNextClick = onUpNextClick,
             onOpenCategory = onOpenCategory,
             onRemoveContinue = viewModel::removeFromContinue,
+            onMarkUpNextWatched = viewModel::markUpNextWatched,
+            onRemoveUpNext = viewModel::removeUpNext,
             topBar = topBar,
             topBarRequester = topBarRequester,
             focusTopBar = focusTopBar,
@@ -159,6 +163,8 @@ fun HomeScreen(
 
 private enum class TopFocus { HERO, CHIPS }
 private data class ContinueMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem)
+private data class UpNextMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem, val episode: Episode)
+private data class PendingFocus(val rowId: String, val itemKey: String?, val fallbackKey: String)
 
 @Composable
 private fun HomeContent(
@@ -168,8 +174,11 @@ private fun HomeContent(
     onItemClick: (CatalogItem) -> Unit,
     onContinueClick: (CatalogItem, ContinueInfo) -> Unit,
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
+    onUpNextClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
+    onMarkUpNextWatched: (CatalogItem, Episode) -> Unit,
+    onRemoveUpNext: (CatalogItem, Episode) -> Unit,
     topBar: @Composable (Modifier) -> Unit,
     topBarRequester: FocusRequester,
     focusTopBar: () -> Unit,
@@ -185,7 +194,10 @@ private fun HomeContent(
             onItemClick = onItemClick,
             onContinueClick = onContinueClick,
             onNewEpisodeClick = onNewEpisodeClick,
+            onUpNextClick = onUpNextClick,
             onRemoveContinue = onRemoveContinue,
+            onMarkUpNextWatched = onMarkUpNextWatched,
+            onRemoveUpNext = onRemoveUpNext,
             onExitTop = {
                 topFocus = TopFocus.CHIPS
                 inRows = false
@@ -297,6 +309,9 @@ internal fun RowsBrowser(
     onExitTop: (() -> Unit)?,
     onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)? = null,
     onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)? = null,
+    onUpNextClick: ((CatalogItem, Episode) -> Unit)? = null,
+    onMarkUpNextWatched: ((CatalogItem, Episode) -> Unit)? = null,
+    onRemoveUpNext: ((CatalogItem, Episode) -> Unit)? = null,
     onBack: () -> Unit,
     header: String? = null,
 ) {
@@ -304,8 +319,9 @@ internal fun RowsBrowser(
     fun validKey(key: String) = if (findByKey(rows, key) != null) key else firstKey(rows.first())
     var restoreKey by remember { mutableStateOf(Snapshot.withoutReadObservation { validKey(savedFocus.value) }) }
     var lastVerticalRepeat by remember { mutableStateOf(0L) }
-    var pendingRefocus by remember { mutableStateOf(false) }
+    var pendingFocus by remember { mutableStateOf<PendingFocus?>(null) }
     var continueMenu by remember { mutableStateOf<ContinueMenu?>(null) }
+    var upNextMenu by remember { mutableStateOf<UpNextMenu?>(null) }
 
     var hero by remember { mutableStateOf(Snapshot.withoutReadObservation { findByKey(rows, restoreKey) ?: rows.first().items.first() }) }
     LaunchedEffect(rows) {
@@ -321,11 +337,14 @@ internal fun RowsBrowser(
         runCatching { restoreRequester.requestFocus() }
     }
     LaunchedEffect(rows) {
-        if (pendingRefocus) {
-            withFrameNanos { }
-            runCatching { restoreRequester.requestFocus() }
-            pendingRefocus = false
-        }
+        val pending = pendingFocus ?: return@LaunchedEffect
+        restoreKey = pending.itemKey
+            ?.let { itemKey -> focusKeyForItem(rows, pending.rowId, itemKey) }
+            ?: pending.fallbackKey
+        savedFocus.value = restoreKey
+        withFrameNanos { }
+        runCatching { restoreRequester.requestFocus() }
+        pendingFocus = null
     }
 
     Box(
@@ -373,7 +392,9 @@ internal fun RowsBrowser(
                             onItemClick = onItemClick,
                             onNewEpisodeClick = onNewEpisodeClick,
                             onContinueClick = onContinueClick,
+                            onUpNextClick = onUpNextClick,
                             onContinueMenu = { virtual, item -> continueMenu = ContinueMenu(row, virtual, item) },
+                            onUpNextMenu = { virtual, item, episode -> upNextMenu = UpNextMenu(row, virtual, item, episode) },
                             modifier = if (rowIndex == 0 && onExitTop != null) {
                                 Modifier.onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
@@ -399,13 +420,35 @@ internal fun RowsBrowser(
                     onItemClick(menu.item)
                 },
                 onRemove = {
-                    savedFocus.value = neighbourKey(rows, menu.row, menu.virtual)
-                    restoreKey = savedFocus.value
-                    pendingRefocus = true
+                    pendingFocus = PendingFocus(menu.row.id, itemKey = null, fallbackKey = neighbourKey(rows, menu.row, menu.virtual))
                     onRemoveContinue(menu.item)
                     continueMenu = null
                 },
                 onCancel = { continueMenu = null },
+            )
+        }
+        upNextMenu?.let { menu ->
+            UpNextActions(
+                item = menu.item,
+                onDetails = {
+                    upNextMenu = null
+                    onItemClick(menu.item)
+                },
+                onMarkWatched = {
+                    pendingFocus = PendingFocus(
+                        menu.row.id,
+                        itemKey = menu.item.key,
+                        fallbackKey = neighbourKey(rows, menu.row, menu.virtual),
+                    )
+                    onMarkUpNextWatched?.invoke(menu.item, menu.episode)
+                    upNextMenu = null
+                },
+                onRemove = {
+                    pendingFocus = PendingFocus(menu.row.id, itemKey = null, fallbackKey = neighbourKey(rows, menu.row, menu.virtual))
+                    onRemoveUpNext?.invoke(menu.item, menu.episode)
+                    upNextMenu = null
+                },
+                onCancel = { upNextMenu = null },
             )
         }
     }
@@ -446,6 +489,42 @@ private fun ContinueActions(
 }
 
 @Composable
+private fun UpNextActions(
+    item: CatalogItem,
+    onDetails: () -> Unit,
+    onMarkWatched: () -> Unit,
+    onRemove: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { requester.requestFocus() }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .onBackKey(enabled = true, onBack = onCancel),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .width(360.dp)
+                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.focusRequester(requester))
+            TvButton(text = localizedStringResource(StringsR.string.home_mark_watched), onClick = onMarkWatched)
+            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_up_next), onClick = onRemove)
+            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel)
+        }
+    }
+}
+
+@Composable
 private fun CatalogRowView(
     row: CatalogRow,
     focusKey: String?,
@@ -454,7 +533,9 @@ private fun CatalogRowView(
     onItemClick: (CatalogItem) -> Unit,
     onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)?,
     onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)?,
+    onUpNextClick: ((CatalogItem, Episode) -> Unit)?,
     onContinueMenu: (Int, CatalogItem) -> Unit,
+    onUpNextMenu: (Int, CatalogItem, Episode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -467,7 +548,7 @@ private fun CatalogRowView(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White,
             )
-            if (row.style == RowStyle.CONTINUE) {
+            if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT) {
                 Text(
                     text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
                     style = MaterialTheme.typography.bodySmall,
@@ -523,6 +604,29 @@ private fun CatalogRowView(
                                     onClick = {
                                         if (episode == null || onNewEpisodeClick == null) onItemClick(item)
                                         else onNewEpisodeClick(item, episode)
+                                    },
+                                    onFocused = { onFocused(virtual) },
+                                    modifier = itemModifier,
+                                )
+                            }
+                            RowStyle.UP_NEXT -> {
+                                val episode = row.newEpisodes[item.key]
+                                val episodeCode = episode?.localizedCode()
+                                val episodeLabel = remember(row.newEpisodes, item.key, episodeCode) {
+                                    episode?.let {
+                                        listOf(episodeCode.orEmpty(), it.title).filter { part -> part.isNotEmpty() }.joinToString(" · ")
+                                    }.orEmpty()
+                                }
+                                NewEpisodeCard(
+                                    item = item,
+                                    label = episodeLabel,
+                                    badgeText = localizedStringResource(StringsR.string.home_up_next),
+                                    onClick = {
+                                        if (episode == null || onUpNextClick == null) onItemClick(item)
+                                        else onUpNextClick(item, episode)
+                                    },
+                                    onLongClick = episode?.let { target ->
+                                        { onUpNextMenu(virtual, item, target) }
                                     },
                                     onFocused = { onFocused(virtual) },
                                     modifier = itemModifier,
@@ -741,6 +845,13 @@ private fun findByKey(rows: List<CatalogRow>, key: String?): CatalogItem? {
     val virtual = key.substringAfterLast('/').toIntOrNull() ?: return null
     if (!shouldLoop(row.items.size) && virtual >= row.items.size) return null
     return row.items[virtual % row.items.size]
+}
+
+internal fun focusKeyForItem(rows: List<CatalogRow>, rowId: String, itemKey: String): String? {
+    val row = rows.firstOrNull { it.id == rowId } ?: return null
+    val index = row.items.indexOfFirst { it.key == itemKey }
+    if (index < 0) return null
+    return keyOf(row, firstVirtualIndex(row.items.size) + index)
 }
 
 private fun neighbourKey(rows: List<CatalogRow>, row: CatalogRow, virtual: Int): String {

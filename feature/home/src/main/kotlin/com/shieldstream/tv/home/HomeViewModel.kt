@@ -12,6 +12,8 @@ import com.shieldstream.tv.domain.MyListRepository
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.NewEpisodes
+import com.shieldstream.tv.domain.UpNext
+import com.shieldstream.tv.domain.UpNextCandidate
 import com.shieldstream.tv.domain.ContinueEntry
 import com.shieldstream.tv.domain.ContinueWatching
 import com.shieldstream.tv.domain.WatchProgressRepository
@@ -19,6 +21,7 @@ import com.shieldstream.tv.domain.mapConcurrent
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
 import com.shieldstream.tv.model.ContinueInfo
+import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
@@ -33,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
@@ -49,6 +53,12 @@ sealed interface HomeUiState {
 
 private data class NewEpisodeQuery(
     val showIds: List<String>,
+    val watchedKeys: Set<String>,
+    val dismissedKeys: Set<String>,
+)
+
+private data class UpNextQuery(
+    val candidates: List<UpNextCandidate>,
     val watchedKeys: Set<String>,
     val dismissedKeys: Set<String>,
 )
@@ -93,25 +103,31 @@ class HomeViewModel @Inject constructor(
 
     private val myListRows = MutableStateFlow<List<CatalogRow>?>(null)
 
+    private val upNextRows = MutableStateFlow<List<CatalogRow>>(emptyList())
+
     private val recommendationRows = MutableStateFlow<List<CatalogRow>>(emptyList())
+
+    private val trailingRows = combine(myListRows, recommendationRows) { listRow, recommendationRow ->
+        listRow?.plus(recommendationRow)
+    }
 
     val uiState: StateFlow<HomeUiState> = combine(
         _uiState,
         continueRows,
         newEpisodeRows,
-        myListRows,
-        recommendationRows,
-    ) { catalog, continueRow, newRow, listRow, recommendationRow ->
+        upNextRows,
+        trailingRows,
+    ) { catalog, continueRow, newRow, upNextRow, trailingRow ->
         when {
             catalog !is HomeUiState.Content -> catalog
-            continueRow == null || newRow == null || listRow == null -> HomeUiState.Loading
+            continueRow == null || newRow == null || trailingRow == null -> HomeUiState.Loading
             else -> {
                 val releases = newRow.flatMap { it.newEpisodes.entries }.associate { it.key to it.value }
                 val counts = newRow.flatMap { it.newEpisodeCounts.entries }.associate { it.key to it.value }
-                val rows = continueRow + newRow + listRow + recommendationRow + catalog.rows
+                val rows = continueRow + upNextRow + newRow + trailingRow + catalog.rows
                 catalog.copy(
                     rows = rows.map { row ->
-                        if (row.style == RowStyle.NEW_EPISODES || releases.isEmpty()) return@map row
+                        if (row.style == RowStyle.NEW_EPISODES || row.style == RowStyle.UP_NEXT || releases.isEmpty()) return@map row
                         row.copy(
                             newEpisodes = row.items.mapNotNull { item ->
                                 releases[item.key]?.let { episode -> item.key to episode }
@@ -170,6 +186,25 @@ class HomeViewModel @Inject constructor(
                 .collect { myListRows.value = it }
         }
         viewModelScope.launch {
+            combine(
+                filterFlow.filterNotNull(),
+                watchProgress.progress,
+                tracking.dismissedEpisodeKeys,
+            ) { filter, progress, dismissed ->
+                UpNextQuery(
+                    candidates = UpNext.candidates(progress, filter),
+                    watchedKeys = progress.filterValues { it.isWatched }.keys,
+                    dismissedKeys = dismissed,
+                )
+            }
+                .distinctUntilChangedBy { query ->
+                    // Position saves change updatedAt without changing the target inputs.
+                    query.copy(candidates = query.candidates.map { it.copy(updatedAt = 0L) })
+                }
+                .mapLatest { query -> listOfNotNull(buildUpNextRow(query)) }
+                .collect { upNextRows.value = it }
+        }
+        viewModelScope.launch {
             combine(filterFlow.filterNotNull(), profiles.active) { filter, profile ->
                 RecommendationQuery(filter, profile.id, profile.traktUser, profile.kids)
             }
@@ -196,6 +231,21 @@ class HomeViewModel @Inject constructor(
             .forEach(watchProgress::clear)
     }
 
+    fun markUpNextWatched(item: CatalogItem, episode: Episode) {
+        val key = com.shieldstream.tv.model.WatchProgress.episodeKey(item.id, episode.season, episode.number)
+        trakt.setWatched(listOf(key), watched = true)
+        val duration = watchProgress.get(key)?.durationMs?.takeIf { it > 1 }
+            ?: episode.runtimeMinutes?.toLong()?.times(60_000L)
+            ?: 1L
+        watchProgress.save(key, duration, duration)
+    }
+
+    fun removeUpNext(item: CatalogItem, episode: Episode) {
+        tracking.dismissEpisodes(
+            listOf(com.shieldstream.tv.model.WatchProgress.episodeKey(item.id, episode.season, episode.number)),
+        )
+    }
+
     private suspend fun buildContinueRow(entries: List<ContinueEntry>): CatalogRow? {
         if (entries.isEmpty()) return null
         val loaded = entries.mapConcurrent(concurrency = 4) { entry ->
@@ -218,6 +268,62 @@ class HomeViewModel @Inject constructor(
                     episode = entry.episode,
                 )
             },
+        )
+    }
+
+    private suspend fun buildUpNextRow(query: UpNextQuery): CatalogRow? {
+        if (query.candidates.isEmpty()) return null
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val loaded = query.candidates.mapConcurrent(concurrency = 4) { candidate ->
+            withTimeoutOrNull(8_000) {
+                runCatching {
+                    val airing = catalogRepository.getShowAiring(candidate.showId) ?: return@runCatching null
+                    val seasons = UpNext.seasonsToLoad(candidate, airing.seasons)
+                    if (seasons.isEmpty()) return@runCatching null
+                    val currentSeason = seasons.first()
+                    val currentSeasonEpisodes = catalogRepository.getEpisodes(airing.item, currentSeason.number)
+                    if (!UpNext.hasCompleteEpisodeList(currentSeason, currentSeasonEpisodes)) {
+                        return@runCatching null
+                    }
+                    val currentEpisodes = mapOf(currentSeason.number to currentSeasonEpisodes)
+                    var episode = UpNext.nextEpisode(
+                        candidate,
+                        currentEpisodes,
+                        query.watchedKeys,
+                        query.dismissedKeys,
+                        today,
+                    )
+                    if (
+                        episode == null &&
+                        !UpNext.hasNextUnwatched(candidate, currentEpisodes, query.watchedKeys) &&
+                        seasons.size > 1
+                    ) {
+                        val nextSeason = seasons[1]
+                        val nextSeasonEpisodes = catalogRepository.getEpisodes(airing.item, nextSeason.number)
+                        if (!UpNext.hasCompleteEpisodeList(nextSeason, nextSeasonEpisodes)) {
+                            return@runCatching null
+                        }
+                        episode = UpNext.nextEpisode(
+                            candidate,
+                            mapOf(nextSeason.number to nextSeasonEpisodes),
+                            query.watchedKeys,
+                            query.dismissedKeys,
+                            today,
+                        )
+                    }
+                    if (episode == null) return@runCatching null
+                    if (airing.item.posterUrl == null) null else Triple(airing.item, episode, candidate.updatedAt)
+                }.getOrNull()
+            }
+        }.filterNotNull()
+        if (loaded.isEmpty()) return null
+        val entries = loaded.sortedByDescending { it.third }.take(UpNext.MAX_ITEMS)
+        return CatalogRow(
+            id = UP_NEXT_ROW_ID,
+            title = texts.get(StringsR.string.home_up_next),
+            items = entries.map { it.first },
+            style = RowStyle.UP_NEXT,
+            newEpisodes = entries.associate { (item, episode, _) -> item.key to episode },
         )
     }
 
@@ -313,6 +419,7 @@ class HomeViewModel @Inject constructor(
     private companion object {
         const val CONTINUE_ROW_ID = "continue_watching"
         const val NEW_EPISODES_ROW_ID = "new_episodes"
+        const val UP_NEXT_ROW_ID = "up_next"
         const val MY_LIST_ROW_ID = "my_list"
         const val RECOMMENDATIONS_ROW_ID = "recommended_for_you"
         const val MY_LIST_MAX = 40

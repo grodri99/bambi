@@ -5,6 +5,7 @@ import com.shieldstream.tv.domain.EpisodeReleaseRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.MyListEntry
 import com.shieldstream.tv.domain.MyListRepository
+import com.shieldstream.tv.domain.NewEpisodes
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.TraktRepository
@@ -16,6 +17,8 @@ import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.RowStyle
+import com.shieldstream.tv.model.Season
+import com.shieldstream.tv.model.ShowAiring
 import com.shieldstream.tv.model.ShowEpisodeStatus
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.strings.Texts
@@ -23,6 +26,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,6 +41,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -254,6 +259,173 @@ class HomeViewModelsTest {
     }
 
     @Test
+    fun `up next targets the next unwatched aired episode`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val first = Episode(1, 1, "First", "", null, 45, today)
+        val second = Episode(1, 2, "Second", "", null, 45, today)
+        val third = Episode(1, 3, "Third", "", null, 45, today)
+        val catalog = catalog(show)
+        coEvery { catalog.getShowAiring("show") } returns ShowAiring(
+            show,
+            seasons = listOf(Season(1, "Season 1", 3), Season(2, "Season 2", 1)),
+        )
+        coEvery { catalog.getEpisodes(show, 1) } returns listOf(first, second, third)
+        val progress = mapOf(
+            WatchProgress.episodeKey("show", 1, 1) to watched(100),
+            WatchProgress.episodeKey("show", 1, 2) to watched(200),
+        )
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), progress = progress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+
+        val upNext = viewModel.upNextRow()!!
+        assertEquals(RowStyle.UP_NEXT, upNext.style)
+        assertEquals(third, upNext.newEpisodes[show.key])
+        assertEquals(listOf("up_next", "base"), viewModel.rowIds())
+        coVerify(exactly = 0) { catalog.getEpisodes(show, 2) }
+    }
+
+    @Test
+    fun `up next rejects incomplete season data without loading the following season`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val first = Episode(1, 1, "First", "", null, 45, today)
+        val catalog = catalog(show)
+        coEvery { catalog.getShowAiring("show") } returns ShowAiring(
+            show,
+            seasons = listOf(Season(1, "Season 1", 2), Season(2, "Season 2", 1)),
+        )
+        coEvery { catalog.getEpisodes(show, 1) } returns listOf(first)
+        val progress = mapOf(WatchProgress.episodeKey("show", 1, 1) to watched(100))
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), progress = progress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+
+        assertNull(viewModel.upNextRow())
+        coVerify(exactly = 0) { catalog.getEpisodes(show, 2) }
+    }
+
+    @Test
+    fun `up next crosses a season boundary only after a complete season is exhausted`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val first = Episode(1, 1, "First", "", null, 45, today)
+        val second = Episode(1, 2, "Second", "", null, 45, today)
+        val following = Episode(2, 1, "Following", "", null, 45, today)
+        val catalog = catalog(show)
+        coEvery { catalog.getShowAiring("show") } returns ShowAiring(
+            show,
+            seasons = listOf(Season(1, "Season 1", 2), Season(2, "Season 2", 1)),
+        )
+        coEvery { catalog.getEpisodes(show, 1) } returns listOf(first, second)
+        coEvery { catalog.getEpisodes(show, 2) } returns listOf(following)
+        val progress = mapOf(
+            WatchProgress.episodeKey("show", 1, 1) to watched(100),
+            WatchProgress.episodeKey("show", 1, 2) to watched(200),
+        )
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), progress = progress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+
+        assertEquals(following, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+        coVerify(exactly = 1) { catalog.getEpisodes(show, 1) }
+        coVerify(exactly = 1) { catalog.getEpisodes(show, 2) }
+    }
+
+    @Test
+    fun `up next ignores timestamp only updates for watched progress`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val first = Episode(1, 1, "First", "", null, 45, today)
+        val second = Episode(1, 2, "Second", "", null, 45, today)
+        val catalog = catalog(show)
+        coEvery { catalog.getShowAiring("show") } returns ShowAiring(
+            show,
+            seasons = listOf(Season(1, "Season 1", 2)),
+        )
+        coEvery { catalog.getEpisodes(show, 1) } returns listOf(first, second)
+        val key = WatchProgress.episodeKey("show", 1, 1)
+        val progress = MutableStateFlow(mapOf(key to watched(100)))
+        val watchProgress = mockk<WatchProgressRepository> { every { this@mockk.progress } returns progress }
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), watchProgress = watchProgress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+        assertEquals(second, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+
+        progress.value = mapOf(key to WatchProgress(3_500_000, 3_600_000, updatedAt = 200))
+        advanceUntilIdle()
+
+        assertEquals(second, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+        coVerify(exactly = 1) { catalog.getShowAiring("show") }
+        coVerify(exactly = 1) { catalog.getEpisodes(show, 1) }
+    }
+
+    @Test
+    fun `mark up next watched updates Trakt and local progress`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val episode = Episode(1, 2, "Second", "", null, 45, "2026-11-02")
+        val key = WatchProgress.episodeKey(show.id, episode.season, episode.number)
+        val watchProgress = mockk<WatchProgressRepository> {
+            every { progress } returns MutableStateFlow(emptyMap())
+            every { this@mockk.get(key) } returns null
+            every { save(any(), any(), any()) } returns Unit
+        }
+        val trakt = mockk<TraktRepository>(relaxed = true)
+        val viewModel = homeViewModel(
+            catalog = catalog(show),
+            trakt = trakt,
+            active = profileFlow(),
+            watchProgress = watchProgress,
+        )
+
+        viewModel.markUpNextWatched(show, episode)
+
+        verify(exactly = 1) { trakt.setWatched(listOf(key), watched = true) }
+        verify(exactly = 1) { watchProgress.save(key, 45 * 60_000L, 45 * 60_000L) }
+    }
+
+    @Test
+    fun `remove up next only dismisses the target`() = runTest {
+        val show = item("show", MediaType.TV, "Show")
+        val episode = Episode(1, 2, "Second", "", null, 45, "2026-11-02")
+        val key = WatchProgress.episodeKey(show.id, episode.season, episode.number)
+        val watchProgress = mockk<WatchProgressRepository> {
+            every { progress } returns MutableStateFlow(emptyMap())
+        }
+        val tracking = tracking()
+        val trakt = mockk<TraktRepository>(relaxed = true)
+        val viewModel = homeViewModel(
+            catalog = catalog(show),
+            trakt = trakt,
+            active = profileFlow(),
+            watchProgress = watchProgress,
+            episodeTracking = tracking,
+        )
+
+        viewModel.removeUpNext(show, episode)
+
+        verify(exactly = 1) { tracking.dismissEpisodes(listOf(key)) }
+        verify(exactly = 0) { watchProgress.save(any(), any(), any()) }
+        verify(exactly = 0) { trakt.setWatched(any(), any()) }
+    }
+
+    @Test
+    fun `up next focus key follows show identity after reordering`() {
+        val first = item("first", MediaType.TV, "First")
+        val second = item("second", MediaType.TV, "Second")
+        val row = CatalogRow("up_next", "Up next", listOf(second, first), style = RowStyle.UP_NEXT)
+
+        assertEquals("up_next/0", focusKeyForItem(listOf(row), row.id, second.key))
+        assertEquals("up_next/1", focusKeyForItem(listOf(row), row.id, first.key))
+        assertNull(focusKeyForItem(listOf(row), row.id, "missing"))
+    }
+
+    @Test
     fun `my list supports recent and title sorting filtering and completed hiding`() = runTest {
         val tv = item("tv", MediaType.TV, "Zulu")
         val movie = item("movie", MediaType.MOVIE, "Alpha")
@@ -302,6 +474,9 @@ class HomeViewModelsTest {
     private fun HomeViewModel.recommendedRow() =
         (uiState.value as HomeUiState.Content).rows.firstOrNull { it.id == "recommended_for_you" }
 
+    private fun HomeViewModel.upNextRow() =
+        (uiState.value as HomeUiState.Content).rows.firstOrNull { it.id == "up_next" }
+
     private fun profileFlow(
         profileId: String = "main",
         traktUser: String? = "viewer",
@@ -311,11 +486,14 @@ class HomeViewModelsTest {
         catalog: CatalogRepository,
         trakt: TraktRepository,
         active: MutableStateFlow<Profile>,
+        progress: Map<String, WatchProgress> = emptyMap(),
+        watchProgress: WatchProgressRepository? = null,
+        episodeTracking: EpisodeTrackingRepository = tracking(),
     ) = HomeViewModel(
         catalogRepository = catalog,
-        watchProgress = mockk { every { progress } returns MutableStateFlow(emptyMap()) },
+        watchProgress = watchProgress ?: mockk { every { this@mockk.progress } returns MutableStateFlow(progress) },
         episodeReleases = mockk(),
-        tracking = tracking(),
+        tracking = episodeTracking,
         settings = mockk { every { hiddenCategories } returns MutableStateFlow(emptySet()) },
         myList = mockk { every { entries } returns MutableStateFlow(emptyList()) },
         profiles = mockk { every { this@mockk.active } returns active },
@@ -336,6 +514,7 @@ class HomeViewModelsTest {
     private fun tracking() = mockk<EpisodeTrackingRepository> {
         every { followedShowIds } returns MutableStateFlow(emptySet())
         every { dismissedEpisodeKeys } returns MutableStateFlow(emptySet())
+        every { dismissEpisodes(any()) } returns Unit
     }
 
     private fun item(id: String, type: MediaType, title: String) = CatalogItem(
@@ -352,6 +531,12 @@ class HomeViewModelsTest {
 
     private fun progress(updatedAt: Long) = WatchProgress(
         positionMs = 60_000,
+        durationMs = 3_600_000,
+        updatedAt = updatedAt,
+    )
+
+    private fun watched(updatedAt: Long) = WatchProgress(
+        positionMs = 3_600_000,
         durationMs = 3_600_000,
         updatedAt = updatedAt,
     )
