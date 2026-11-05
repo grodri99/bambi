@@ -68,8 +68,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
+import com.shieldstream.tv.domain.NewEpisodes
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.Episode
+import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.strings.localizedCode
 import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.model.HdrType
@@ -87,6 +89,21 @@ import java.util.Locale
 
 private val Green = Color(0xFF46D369)
 private val Grey = Color(0xFFB3B3B3)
+
+internal enum class DetailsBackAction { DISMISS_ACTIONS, DISMISS_SOURCES, EXIT_DETAILS }
+
+internal fun detailsBackAction(actionsOpen: Boolean, panelOpen: Boolean): DetailsBackAction = when {
+    actionsOpen -> DetailsBackAction.DISMISS_ACTIONS
+    panelOpen -> DetailsBackAction.DISMISS_SOURCES
+    else -> DetailsBackAction.EXIT_DETAILS
+}
+
+internal fun detailsSourcesVisible(panelOpen: Boolean, actionsOpen: Boolean): Boolean = panelOpen && !actionsOpen
+
+internal fun detailsMoreVisible(pendingPlay: Boolean): Boolean = !pendingPlay
+
+internal fun upcomingEpisodeDate(airDate: String?, today: String): String? =
+    airDate?.takeIf { it.isNotBlank() && it > today }
 
 @Composable
 fun DetailsScreen(
@@ -132,16 +149,22 @@ private fun DetailsContent(
     onBack: () -> Unit,
 ) {
     var panelOpen by remember { mutableStateOf(false) }
-    BackHandler(enabled = panelOpen) { panelOpen = false }
-    BackHandler(enabled = !panelOpen) { onBack() }
+    var actionsOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = actionsOpen || !panelOpen) {
+        when (detailsBackAction(actionsOpen, panelOpen)) {
+            DetailsBackAction.DISMISS_ACTIONS -> actionsOpen = false
+            DetailsBackAction.DISMISS_SOURCES -> panelOpen = false
+            DetailsBackAction.EXIT_DETAILS -> onBack()
+        }
+    }
 
     val playRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         runCatching { playRequester.requestFocus() }
     }
-    LaunchedEffect(panelOpen) {
-        if (!panelOpen) {
+    LaunchedEffect(panelOpen, actionsOpen) {
+        if (!panelOpen && !actionsOpen) {
             withFrameNanos { }
             runCatching { playRequester.requestFocus() }
         }
@@ -149,7 +172,7 @@ private fun DetailsContent(
 
     val item = state.details.item
 
-    Box(Modifier.fillMaxSize().onBackKey(enabled = panelOpen) { panelOpen = false }) {
+    Box(Modifier.fillMaxSize().onBackKey(enabled = panelOpen && !actionsOpen) { panelOpen = false }) {
         AsyncImage(
             model = item.backdropUrl ?: item.posterUrl,
             contentDescription = null,
@@ -175,13 +198,13 @@ private fun DetailsContent(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(top = 44.dp, bottom = 32.dp),
+                .then(if (!state.isSeries) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(top = 44.dp, bottom = 8.dp),
         ) {
             InfoBlock(
                 details = state.details,
                 state = state,
-                interactive = !panelOpen,
+                interactive = !panelOpen && !actionsOpen,
                 playRequester = playRequester,
                 onPlay = { viewModel.play() },
                 onPlayFromStart = { viewModel.play(fromStart = true) },
@@ -189,27 +212,27 @@ private fun DetailsContent(
                     viewModel.ensureSources()
                     panelOpen = true
                 },
-                onToggleWatched = { if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched() },
-                onToggleMyList = viewModel::toggleMyList,
-                onToggleFollowing = viewModel::toggleFollowing,
+                onOpenActions = { actionsOpen = true },
                 modifier = Modifier.padding(start = 56.dp, end = 56.dp),
             )
 
             if (state.isSeries) {
-                Spacer(Modifier.height(28.dp))
-                SeasonsAndEpisodes(
-                    state = state,
-                    interactive = !panelOpen,
-                    onSeason = { viewModel.selectSeason(it) },
-                    onEpisode = { viewModel.playEpisode(it) },
-                    onEpisodeLongPress = { viewModel.toggleEpisodeWatched(it) },
-                )
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    SeasonsAndEpisodes(
+                        state = state,
+                        interactive = !panelOpen && !actionsOpen,
+                        onSeason = { viewModel.selectSeason(it) },
+                        onEpisode = { viewModel.playEpisode(it) },
+                        onEpisodeLongPress = { viewModel.toggleEpisodeWatched(it) },
+                    )
+                }
             }
         }
         }
 
         AnimatedVisibility(
-            visible = panelOpen,
+            visible = detailsSourcesVisible(panelOpen, actionsOpen),
             enter = fadeIn() + slideInHorizontally { it / 3 },
             exit = fadeOut() + slideOutHorizontally { it / 3 },
             modifier = Modifier.zIndex(2f),
@@ -222,6 +245,24 @@ private fun DetailsContent(
                 },
                 isBlocked = viewModel::isBlocked,
                 onToggleSpanishOnly = viewModel::toggleSpanishOnly,
+            )
+        }
+        if (actionsOpen) {
+            DetailsActions(
+                state = state,
+                onToggleWatched = {
+                    if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched()
+                    actionsOpen = false
+                },
+                onToggleMyList = {
+                    viewModel.toggleMyList()
+                    actionsOpen = false
+                },
+                onToggleFollowing = {
+                    viewModel.toggleFollowing()
+                    actionsOpen = false
+                },
+                onDismiss = { actionsOpen = false },
             )
         }
     }
@@ -243,9 +284,7 @@ private fun InfoBlock(
     onPlay: () -> Unit,
     onPlayFromStart: () -> Unit,
     onOpenSources: () -> Unit,
-    onToggleWatched: () -> Unit,
-    onToggleMyList: () -> Unit,
-    onToggleFollowing: () -> Unit,
+    onOpenActions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val item = details.item
@@ -272,7 +311,7 @@ private fun InfoBlock(
         MetaRow(details, state)
         if (details.genres.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
-            Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
+            Text(details.genres.take(3).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
         }
         details.nextEpisode?.let { next ->
             val nextCode = next.localizedCode()
@@ -295,7 +334,7 @@ private fun InfoBlock(
             text = item.overview.ifBlank { details.tagline.orEmpty() },
             color = Color.White.copy(alpha = 0.9f),
             style = MaterialTheme.typography.bodyLarge,
-            maxLines = 4,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(20.dp))
@@ -333,46 +372,12 @@ private fun InfoBlock(
                 onClick = onOpenSources,
                 enabled = interactive,
             )
-            val watchedLabel = if (state.isSeries) {
-                val season = state.selectedSeason
-                val eps = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
-                if (season != null && eps.isNotEmpty()) {
-                    if (eps.all { state.progressOf(it)?.isWatched == true }) localizedStringResource(StringsR.string.details_season_watched, season)
-                    else localizedStringResource(StringsR.string.details_mark_season_watched, season)
-                } else null
-            } else {
-                if (state.mainProgress?.isWatched == true) localizedStringResource(StringsR.string.details_watched) else localizedStringResource(StringsR.string.details_mark_watched)
-            }
-            if (watchedLabel != null && !state.pendingPlay) {
-                val done = if (state.isSeries) {
-                    (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty().let { eps ->
-                        eps.isNotEmpty() && eps.all { state.progressOf(it)?.isWatched == true }
-                    }
-                } else {
-                    state.mainProgress?.isWatched == true
-                }
+            if (detailsMoreVisible(state.pendingPlay)) {
                 TvButton(
-                    text = watchedLabel,
-                    icon = if (done) AppIcons.Check else null,
-                    onClick = onToggleWatched,
+                    text = localizedStringResource(StringsR.string.details_more),
+                    onClick = onOpenActions,
                     enabled = interactive,
                 )
-            }
-            if (!state.pendingPlay) {
-                TvButton(
-                    text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
-                    icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
-                    onClick = onToggleMyList,
-                    enabled = interactive,
-                )
-                if (state.isSeries) {
-                    TvButton(
-                        text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
-                        icon = if (state.following) AppIcons.Check else AppIcons.Add,
-                        onClick = onToggleFollowing,
-                        enabled = interactive,
-                    )
-                }
             }
         }
         state.mainProgress?.takeIf { it.isResumable }?.let { p ->
@@ -394,6 +399,90 @@ private fun InfoBlock(
         Spacer(Modifier.height(12.dp))
         SourcesStatus(state)
     }
+}
+
+@Composable
+private fun DetailsActions(
+    state: DetailsUiState.Content,
+    onToggleWatched: () -> Unit,
+    onToggleMyList: () -> Unit,
+    onToggleFollowing: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { requester.requestFocus() }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.82f))
+            .onBackKey(enabled = true, onBack = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .width(360.dp)
+                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = state.details.item.title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val watchedLabel = watchedLabel(state)
+            if (watchedLabel != null) {
+                TvButton(
+                    text = watchedLabel,
+                    icon = if (watchedDone(state)) AppIcons.Check else null,
+                    onClick = onToggleWatched,
+                    modifier = Modifier.focusRequester(requester),
+                )
+            }
+            TvButton(
+                text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
+                icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
+                onClick = onToggleMyList,
+                modifier = if (watchedLabel == null) Modifier.focusRequester(requester) else Modifier,
+            )
+            if (state.isSeries) {
+                TvButton(
+                    text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
+                    icon = if (state.following) AppIcons.Check else AppIcons.Add,
+                    onClick = onToggleFollowing,
+                )
+            }
+            TvButton(text = localizedStringResource(StringsR.string.details_cancel), onClick = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun watchedLabel(state: DetailsUiState.Content): String? {
+    if (!state.isSeries) {
+        return localizedStringResource(
+            if (state.mainProgress?.isWatched == true) StringsR.string.details_watched else StringsR.string.details_mark_watched,
+        )
+    }
+    val season = state.selectedSeason
+    val episodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+    if (season == null || episodes.isEmpty()) return null
+    return if (episodes.all { state.progressOf(it)?.isWatched == true }) {
+        localizedStringResource(StringsR.string.details_season_watched, season)
+    } else {
+        localizedStringResource(StringsR.string.details_mark_season_watched, season)
+    }
+}
+
+private fun watchedDone(state: DetailsUiState.Content): Boolean {
+    if (!state.isSeries) return state.mainProgress?.isWatched == true
+    val episodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+    return episodes.isNotEmpty() && episodes.all { state.progressOf(it)?.isWatched == true }
 }
 
 @Composable
@@ -445,29 +534,47 @@ private fun Badge(text: String) {
 
 @Composable
 private fun SourcesStatus(state: DetailsUiState.Content) {
-    val text = state.message ?: when (val s = state.sources) {
-        SourcesState.Idle -> if (state.isSeries) localizedStringResource(StringsR.string.details_pick_an_episode_or_press_play_hold) else ""
-        SourcesState.Loading -> localizedStringResource(StringsR.string.details_finding_sources)
-        is SourcesState.Error -> s.message
+    state.message?.let {
+        Text(it, color = Grey, style = MaterialTheme.typography.bodyMedium)
+        return
+    }
+    when (val s = state.sources) {
+        SourcesState.Idle -> Unit
+        SourcesState.Loading -> Text(localizedStringResource(StringsR.string.details_finding_sources), color = Grey, style = MaterialTheme.typography.bodyMedium)
+        is SourcesState.Error -> Text(s.message, color = Grey, style = MaterialTheme.typography.bodyMedium)
         is SourcesState.Ready -> {
-            val sources = s.sources.filter { !state.spanishOnly || it.advertisesSpanishAudio }
-            val cached = sources.count { it.isCached }
+            val sources = s.sources
+                .filter { !state.spanishOnly || it.advertisesSpanishAudio }
+                .distinctBy { it.infoHash.lowercase() }
             val scope = state.selectedEpisode?.takeIf { state.isSeries }?.let { localizedStringResource(StringsR.string.details_for_episode, it.localizedCode()) }.orEmpty()
             when {
-                sources.isEmpty() && s.pending.isNotEmpty() -> localizedStringResource(StringsR.string.details_finding_sources)
-                sources.isEmpty() && state.spanishOnly -> localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile)
-                sources.isEmpty() -> localizedStringResource(StringsR.string.details_no_sources_for, scope)
-                cached > 0 -> {
-                    val service = sources.firstNotNullOfOrNull { it.debrid }
-                    val where = if (service == null) localizedStringResource(StringsR.string.details_already_in_your_real_debrid) else localizedStringResource(StringsR.string.details_cached_on, service)
-                    localizedStringResource(StringsR.string.details_sources_summary, sources.distinctBy { it.infoHash.lowercase() }.size, scope, cached, where)
+                sources.isEmpty() && s.pending.isNotEmpty() -> Text(localizedStringResource(StringsR.string.details_finding_sources), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                sources.isEmpty() && state.spanishOnly -> Text(localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                sources.isEmpty() -> Text(localizedStringResource(StringsR.string.details_no_sources_for, scope), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        AppIcons.List,
+                        contentDescription = localizedStringResource(StringsR.string.details_sources),
+                        tint = Grey,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(sources.size.toString(), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                    val cached = sources.count { it.isCached }
+                    if (cached > 0) {
+                        Spacer(Modifier.width(14.dp))
+                        Icon(
+                            AppIcons.Bolt,
+                            contentDescription = localizedStringResource(StringsR.string.details_cached),
+                            tint = Grey,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(cached.toString(), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
-                else -> localizedStringResource(StringsR.string.details_sources_count_for, sources.distinctBy { it.infoHash.lowercase() }.size, scope)
             }
         }
-    }
-    if (text.isNotEmpty()) {
-        Text(text, color = Grey, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -480,44 +587,59 @@ private fun SeasonsAndEpisodes(
     onEpisodeLongPress: (Episode) -> Unit,
 ) {
     val seasons = state.details.seasons
+    val loadedEpisodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+    val watched = loadedEpisodes.count { state.progressOf(it)?.isWatched == true }
     Column {
         if (seasons.size > 1) {
-            ProvidePivotScroll(leading = 56.dp) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 56.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(seasons, key = { it.number }) { season ->
-                        SeasonChip(
-                            label = localizedStringResource(StringsR.string.details_season_number, season.number),
-                            selected = season.number == state.selectedSeason,
-                            enabled = interactive,
-                            onClick = { onSeason(season.number) },
-                        )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 56.dp),
+            ) {
+                ProvidePivotScroll(leading = 0.dp) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        items(seasons, key = { it.number }) { season ->
+                            SeasonChip(
+                                label = localizedStringResource(StringsR.string.details_season_number, season.number),
+                                selected = season.number == state.selectedSeason,
+                                enabled = interactive,
+                                onClick = { onSeason(season.number) },
+                            )
+                        }
                     }
+                }
+                if (loadedEpisodes.isNotEmpty()) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
+                        color = Grey,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
             Spacer(Modifier.height(10.dp))
         } else {
-            Text(
-                text = localizedStringResource(StringsR.string.details_episodes),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(start = 56.dp, bottom = 10.dp),
-            )
+            ) {
+                Text(
+                    text = localizedStringResource(StringsR.string.details_episodes),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+                if (loadedEpisodes.isNotEmpty()) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
+                        color = Grey,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
-        val loadedEpisodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
-        if (loadedEpisodes.isNotEmpty()) {
-            val watched = loadedEpisodes.count { state.progressOf(it)?.isWatched == true }
-            Text(
-                text = localizedStringResource(StringsR.string.details_watched_count, watched, loadedEpisodes.size),
-                color = Grey,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 56.dp),
-            )
-            Spacer(Modifier.height(10.dp))
-        }
-
         when (val eps = state.episodes) {
             EpisodesState.Loading -> Text(localizedStringResource(StringsR.string.details_loading_episodes), color = Grey, modifier = Modifier.padding(start = 56.dp))
             is EpisodesState.Error -> Text(eps.message, color = Grey, modifier = Modifier.padding(start = 56.dp))
@@ -580,7 +702,7 @@ private fun EpisodeCard(
     val shape = RoundedCornerShape(6.dp)
     Column(
         Modifier
-            .width(240.dp)
+            .width(200.dp)
             .zIndex(if (focused) 1f else 0f)
             .graphicsLayer {
                 scaleX = scale
@@ -648,8 +770,16 @@ private fun EpisodeCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        episode.runtimeMinutes?.let {
-            Text("$it min", color = Grey, style = MaterialTheme.typography.bodySmall)
+        val today = remember { NewEpisodes.dateWindow(System.currentTimeMillis()).second }
+        val releaseDate = remember(episode.airDate, today, Lang.current) {
+            formatEpisodeDate(upcomingEpisodeDate(episode.airDate, today), includeYear = true)
+        }
+        val metadata = listOfNotNull(
+            episode.runtimeMinutes?.let { "$it min" },
+            releaseDate.ifBlank { null },
+        ).joinToString(" · ")
+        if (metadata.isNotEmpty()) {
+            Text(metadata, color = Grey, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

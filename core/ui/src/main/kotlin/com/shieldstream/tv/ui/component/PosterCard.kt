@@ -185,7 +185,6 @@ fun NewEpisodeCard(
     onFocused: () -> Unit = {},
     count: Int = 1,
     onLongClick: (() -> Unit)? = null,
-    badgeText: String? = null,
 ) {
     PosterCard(item = item, onClick = onClick, modifier = modifier, onFocused = onFocused, onLongClick = onLongClick) {
         Box(
@@ -207,7 +206,7 @@ fun NewEpisodeCard(
                 .padding(8.dp),
         ) {
             Text(
-                text = badgeText ?: if (count == 0) {
+                text = if (count == 0) {
                     localizedStringResource(R.string.coming_soon)
                 } else {
                     localizedPluralResource(R.plurals.new_episode_count, count, count)

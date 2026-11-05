@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="details_preparing">Preparing…</string>
-    <string name="details_from_the_beginning">From the beginning</string>
+    <string name="details_from_the_beginning">Start over</string>
+    <string name="details_more">More</string>
+    <string name="details_cancel">Cancel</string>
     <string name="details_sources">Sources</string>
+    <string name="details_cached">Cached</string>
     <string name="details_watched">Watched</string>
     <string name="details_mark_watched">Mark watched</string>
     <string name="details_in_my_list">In my list</string>
@@ -45,5 +48,6 @@
     <string name="details_sources_count_for">%1$d sources%2$s</string>
     <string name="details_season_number">Season %1$d</string>
     <string name="details_watched_count">%1$d / %2$d episodes watched</string>
+    <string name="details_watched_count_short">%1$d/%2$d watched</string>
     <string name="details_source_count">%1$d sources</string>
 </resources>

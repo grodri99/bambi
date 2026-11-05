@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
             val lightweightUi by settings.lightweightUi.collectAsState(initial = settings.lightweightUiEnabled)
             CompositionLocalProvider(LocalLightweightUi provides lightweightUi) {
                 FranklixTheme {
-                    AppNavHost(holder = holder)
+                    AppNavHost(holder = holder, onExit = { finish() })
                 }
             }
         }

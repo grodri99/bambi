@@ -147,6 +147,25 @@ class SharedComponentsLocaleTest {
         composeRule.onNodeWithText("French").assertExists()
     }
 
+    @Test
+    fun `up next card renders series episode and release metadata`() {
+        composeRule.setContent {
+            UpNextCard(
+                item = testItem,
+                episode = Episode(2, 1, "Pilot", "", null, 45, "2026-11-05"),
+                label = "S2:E1 · Pilot",
+                releaseLabel = "Nov 5",
+                badgeText = "New season",
+                onClick = {},
+            )
+        }
+
+        composeRule.onNodeWithText(testItem.title).assertExists()
+        composeRule.onNodeWithText("S2:E1 · Pilot").assertExists()
+        composeRule.onNodeWithText("Nov 5").assertExists()
+        composeRule.onNodeWithText("New season").assertExists()
+    }
+
     private fun renderBadges() {
         composeRule.setContent {
             Column {

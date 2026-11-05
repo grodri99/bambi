@@ -1,5 +1,6 @@
 package com.shieldstream.tv.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 
 @Composable
 fun MainScreen(
+    onExit: () -> Unit,
     onOpenItem: (CatalogItem) -> Unit,
     onContinue: (CatalogItem, ContinueInfo) -> Unit,
     onOpenNewEpisode: (CatalogItem, Episode) -> Unit,
@@ -42,6 +44,8 @@ fun MainScreen(
     var tab by rememberSaveable { mutableStateOf(TopTab.HOME) }
     var category by rememberSaveable { mutableStateOf<Category?>(null) }
     var focusMenuAfterSwitch by remember { mutableStateOf(false) }
+    var topBarFocused by remember { mutableStateOf(false) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
     val topBarRequester = remember { FocusRequester() }
     val filter = when (tab) {
         TopTab.TV -> HomeFilter.TV
@@ -64,11 +68,15 @@ fun MainScreen(
             onSettings = onOpenSettings,
             selectedRequester = topBarRequester,
             newEpisodeCount = (episodeState as? EpisodeCenterUiState.Content)?.newEpisodeCount ?: 0,
-            modifier = modifier,
+            modifier = modifier.onFocusChanged { topBarFocused = it.hasFocus },
             profileInitial = profileInitial,
             profileAvatar = profileAvatar,
             onProfile = onSwitchProfile,
         )
+    }
+
+    BackHandler(enabled = showExitConfirmation || shouldRequestExit(category != null, topBarFocused)) {
+        showExitConfirmation = !showExitConfirmation
     }
 
     val saveable = rememberSaveableStateHolder()
@@ -82,9 +90,8 @@ fun MainScreen(
                 onBack = { category = null },
             )
             tab == TopTab.SEARCH || tab == TopTab.MY_LIST || tab == TopTab.EPISODES -> {
-                var topBarFocused by remember { mutableStateOf(false) }
                 Column(Modifier.fillMaxSize().onBackKey(enabled = !topBarFocused) { focusTopBar() }) {
-                    topBar(Modifier.onFocusChanged { topBarFocused = it.hasFocus })
+                    topBar(Modifier)
                     Box(Modifier.fillMaxWidth().weight(1f)) {
                         when (tab) {
                             TopTab.SEARCH -> SearchScreen(onItemClick = onOpenItem)
@@ -102,6 +109,7 @@ fun MainScreen(
                     onNewEpisodeClick = onOpenNewEpisode,
                     onUpNextClick = onUpNext,
                     onOpenCategory = { category = it },
+                    onContentReady = episodeCenter::activate,
                     topBar = topBar,
                     topBarRequester = topBarRequester,
                     focusTopBar = focusTopBar,
@@ -110,5 +118,13 @@ fun MainScreen(
                 )
             }
         }
+        if (showExitConfirmation) {
+            ExitConfirmationDialog(
+                onDismiss = { showExitConfirmation = false },
+                onExit = onExit,
+            )
+        }
     }
 }
+
+internal fun shouldRequestExit(categoryOpen: Boolean, topBarFocused: Boolean): Boolean = !categoryOpen && topBarFocused

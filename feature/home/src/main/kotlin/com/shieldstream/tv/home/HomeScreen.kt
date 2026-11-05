@@ -81,6 +81,7 @@ import com.shieldstream.tv.ui.component.PosterWidth
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.Top10Card
 import com.shieldstream.tv.ui.component.TvButton
+import com.shieldstream.tv.ui.component.UpNextCard
 import com.shieldstream.tv.ui.component.firstVirtualIndex
 import com.shieldstream.tv.ui.component.formatEpisodeDate
 import com.shieldstream.tv.ui.component.loopingItems
@@ -97,6 +98,14 @@ import java.util.Locale
 
 private val ContentStart = 48.dp
 
+internal enum class UpNextBadge { UP_NEXT, NEW_EPISODE, NEW_SEASON }
+
+internal fun upNextBadge(info: com.shieldstream.tv.model.UpNextInfo?): UpNextBadge = when {
+    info?.isNewEpisode == true && info.isNewSeason -> UpNextBadge.NEW_SEASON
+    info?.isNewEpisode == true -> UpNextBadge.NEW_EPISODE
+    else -> UpNextBadge.UP_NEXT
+}
+
 @Composable
 fun HomeScreen(
     filter: HomeFilter,
@@ -105,6 +114,7 @@ fun HomeScreen(
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
     onUpNextClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
+    onContentReady: () -> Unit = {},
     topBar: @Composable (Modifier) -> Unit,
     topBarRequester: FocusRequester,
     focusTopBar: () -> Unit,
@@ -135,7 +145,9 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
-        is HomeUiState.Content -> HomeContent(
+        is HomeUiState.Content -> {
+            LaunchedEffect(Unit) { onContentReady() }
+            HomeContent(
             rows = s.rows,
             featured = s.featured,
             categories = remember(filter, hidden) {
@@ -157,7 +169,8 @@ fun HomeScreen(
             focusTopBar = focusTopBar,
             preferTopBarFocus = preferTopBarFocus,
             onTopBarFocusConsumed = onTopBarFocusConsumed,
-        )
+            )
+        }
     }
 }
 
@@ -549,6 +562,7 @@ private fun CatalogRowView(
                 color = Color.White,
             )
             if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT) {
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
                     style = MaterialTheme.typography.bodySmall,
@@ -610,27 +624,45 @@ private fun CatalogRowView(
                                 )
                             }
                             RowStyle.UP_NEXT -> {
-                                val episode = row.newEpisodes[item.key]
+                                val info = row.upNext[item.key]
+                                val episode = info?.episode
                                 val episodeCode = episode?.localizedCode()
-                                val episodeLabel = remember(row.newEpisodes, item.key, episodeCode) {
+                                val episodeLabel = remember(row.upNext, item.key, episodeCode) {
                                     episode?.let {
                                         listOf(episodeCode.orEmpty(), it.title).filter { part -> part.isNotEmpty() }.joinToString(" · ")
                                     }.orEmpty()
                                 }
-                                NewEpisodeCard(
-                                    item = item,
-                                    label = episodeLabel,
-                                    badgeText = localizedStringResource(StringsR.string.home_up_next),
-                                    onClick = {
-                                        if (episode == null || onUpNextClick == null) onItemClick(item)
-                                        else onUpNextClick(item, episode)
-                                    },
-                                    onLongClick = episode?.let { target ->
-                                        { onUpNextMenu(virtual, item, target) }
-                                    },
-                                    onFocused = { onFocused(virtual) },
-                                    modifier = itemModifier,
-                                )
+                                val releaseLabel = remember(row.upNext, item.key) {
+                                    formatEpisodeDate(episode?.airDate)
+                                }
+                                val badgeText = when (upNextBadge(info)) {
+                                    UpNextBadge.NEW_SEASON -> localizedStringResource(StringsR.string.home_new_season)
+                                    UpNextBadge.NEW_EPISODE -> localizedStringResource(StringsR.string.home_new_episode)
+                                    UpNextBadge.UP_NEXT -> localizedStringResource(StringsR.string.home_up_next)
+                                }
+                                if (episode == null) {
+                                    PosterCard(
+                                        item = item,
+                                        onClick = { onItemClick(item) },
+                                        onFocused = { onFocused(virtual) },
+                                        modifier = itemModifier,
+                                    )
+                                } else {
+                                    UpNextCard(
+                                        item = item,
+                                        episode = episode,
+                                        label = episodeLabel,
+                                        releaseLabel = releaseLabel,
+                                        badgeText = badgeText,
+                                        onClick = {
+                                            if (onUpNextClick == null) onItemClick(item)
+                                            else onUpNextClick(item, episode)
+                                        },
+                                        onLongClick = { onUpNextMenu(virtual, item, episode) },
+                                        onFocused = { onFocused(virtual) },
+                                        modifier = itemModifier,
+                                    )
+                                }
                             }
                             RowStyle.TOP10 -> Top10Card(
                                 rank = index + 1,

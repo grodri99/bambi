@@ -23,6 +23,14 @@ data class CatalogRow(
     val progress: Map<String, ContinueInfo> = emptyMap(),
     val newEpisodes: Map<String, Episode> = emptyMap(),
     val newEpisodeCounts: Map<String, Int> = emptyMap(),
+    val upNext: Map<String, UpNextInfo> = emptyMap(),
+)
+
+data class UpNextInfo(
+    val episode: Episode,
+    val lastWatched: Long,
+    val isNewEpisode: Boolean,
+    val isNewSeason: Boolean,
 )
 
 data class ContinueInfo(

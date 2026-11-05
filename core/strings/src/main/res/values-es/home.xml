@@ -31,6 +31,8 @@
     <string name="home_view_details">Ver detalles</string>
     <string name="home_remove_from_continue_watching">Quitar de Seguir viendo</string>
     <string name="home_cancel">Cancelar</string>
+    <string name="home_exit_title">¿Salir de Franklix?</string>
+    <string name="home_exit_confirm">Salir</string>
     <string name="home_hold_ok_for_options">   Mantén OK para opciones</string>
     <string name="home_retry">Reintentar</string>
     <string name="home_continue_watching">Seguir viendo</string>
@@ -38,6 +40,8 @@
     <string name="home_my_list_f0348a">Mi lista</string>
     <string name="home_recommended_for_you">Recomendado para ti</string>
     <string name="home_up_next">A continuación</string>
+    <string name="home_new_episode">Nuevo episodio</string>
+    <string name="home_new_season">Nueva temporada</string>
     <string name="home_mark_watched">Marcar como visto</string>
     <string name="home_remove_from_up_next">Quitar de A continuación</string>
     <string name="home_couldn_t_load_the_catalog_check_your">No se pudo cargar el catálogo. Revisa la conexión.</string>

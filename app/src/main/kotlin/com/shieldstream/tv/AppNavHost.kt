@@ -31,7 +31,7 @@ import com.shieldstream.tv.settings.update.UpdatePrompt
 import com.shieldstream.tv.ui.component.restartApp
 
 @Composable
-fun AppNavHost(holder: SelectedContentHolder) {
+fun AppNavHost(holder: SelectedContentHolder, onExit: () -> Unit) {
     val navController = rememberNavController()
     val gate: SetupGateViewModel = hiltViewModel()
     val start = remember { if (gate.needsSetup) "setup" else "profiles" }
@@ -78,6 +78,7 @@ fun AppNavHost(holder: SelectedContentHolder) {
             val profiles: ProfilesViewModel = hiltViewModel()
             val active by profiles.active.collectAsState()
             MainScreen(
+                onExit = onExit,
                 profileInitial = active.initial,
                 profileAvatar = active.avatar,
                 onSwitchProfile = { if (entry.isVisible()) navController.navigate("profiles") },

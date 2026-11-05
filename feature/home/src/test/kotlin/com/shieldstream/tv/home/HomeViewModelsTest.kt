@@ -22,6 +22,7 @@ import com.shieldstream.tv.model.ShowAiring
 import com.shieldstream.tv.model.ShowEpisodeStatus
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.ui.component.upNextImageUrl
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -282,7 +283,10 @@ class HomeViewModelsTest {
 
         val upNext = viewModel.upNextRow()!!
         assertEquals(RowStyle.UP_NEXT, upNext.style)
-        assertEquals(third, upNext.newEpisodes[show.key])
+        assertEquals(third, upNext.upNext[show.key]?.episode)
+        assertEquals(true, upNext.upNext[show.key]?.isNewEpisode)
+        assertEquals(false, upNext.upNext[show.key]?.isNewSeason)
+        assertEquals(UpNextBadge.NEW_EPISODE, upNextBadge(upNext.upNext[show.key]))
         assertEquals(listOf("up_next", "base"), viewModel.rowIds())
         coVerify(exactly = 0) { catalog.getEpisodes(show, 2) }
     }
@@ -331,9 +335,87 @@ class HomeViewModelsTest {
         viewModel.load(HomeFilter.TV)
         advanceUntilIdle()
 
-        assertEquals(following, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+        val info = viewModel.upNextRow()?.upNext?.get(show.key)
+        assertEquals(following, info?.episode)
+        assertEquals(true, info?.isNewEpisode)
+        assertEquals(true, info?.isNewSeason)
+        assertEquals(UpNextBadge.NEW_SEASON, upNextBadge(info))
         coVerify(exactly = 1) { catalog.getEpisodes(show, 1) }
         coVerify(exactly = 1) { catalog.getEpisodes(show, 2) }
+    }
+
+    @Test
+    fun `up next keeps posterless shows with fallback artwork`() = runTest {
+        val show = item("show", MediaType.TV, "Show").copy(posterUrl = null, backdropUrl = "https://image.test/backdrop.jpg")
+        val first = Episode(1, 1, "First", "", null, 45, "2026-11-01")
+        val second = Episode(1, 2, "Second", "", "https://image.test/still.jpg", 45, "2026-11-02")
+        val catalog = catalog(show)
+        coEvery { catalog.getShowAiring("show") } returns ShowAiring(show, seasons = listOf(Season(1, "Season 1", 2)))
+        coEvery { catalog.getEpisodes(show, 1) } returns listOf(first, second)
+        val progress = mapOf(WatchProgress.episodeKey("show", 1, 1) to watched(100))
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), progress = progress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+
+        assertEquals(second, viewModel.upNextRow()?.upNext?.get(show.key)?.episode)
+    }
+
+    @Test
+    fun `up next badges reject same day and older air dates`() = runTest {
+        val today = NewEpisodes.dateWindow(System.currentTimeMillis()).second
+        val sameDayShow = item("same-day", MediaType.TV, "Same day")
+        val oldSeasonShow = item("old-season", MediaType.TV, "Old season")
+        val sameDayTarget = Episode(1, 2, "Same day target", "", null, 45, today)
+        val oldSeasonTarget = Episode(2, 1, "Old season target", "", null, 45, "2000-01-01")
+        val catalog = catalog(sameDayShow, oldSeasonShow)
+        coEvery { catalog.getShowAiring("same-day") } returns ShowAiring(
+            sameDayShow,
+            seasons = listOf(Season(1, "Season 1", 2)),
+        )
+        coEvery { catalog.getShowAiring("old-season") } returns ShowAiring(
+            oldSeasonShow,
+            seasons = listOf(Season(1, "Season 1", 1), Season(2, "Season 2", 1)),
+        )
+        coEvery { catalog.getEpisodes(sameDayShow, 1) } returns listOf(
+            Episode(1, 1, "Watched", "", null, 45, today),
+            sameDayTarget,
+        )
+        coEvery { catalog.getEpisodes(oldSeasonShow, 1) } returns listOf(
+            Episode(1, 1, "Watched", "", null, 45, "2000-01-01"),
+        )
+        coEvery { catalog.getEpisodes(oldSeasonShow, 2) } returns listOf(oldSeasonTarget)
+        val now = System.currentTimeMillis()
+        val progress = mapOf(
+            WatchProgress.episodeKey("same-day", 1, 1) to watched(now),
+            WatchProgress.episodeKey("old-season", 1, 1) to watched(now - 1),
+        )
+        val viewModel = homeViewModel(catalog, mockk(), profileFlow(), progress = progress)
+
+        viewModel.load(HomeFilter.TV)
+        advanceUntilIdle()
+
+        val rows = viewModel.upNextRow()?.upNext.orEmpty()
+        assertEquals(false, rows[sameDayShow.key]?.isNewEpisode)
+        assertEquals(UpNextBadge.UP_NEXT, upNextBadge(rows[sameDayShow.key]))
+        assertEquals(false, rows[oldSeasonShow.key]?.isNewEpisode)
+        assertEquals(true, rows[oldSeasonShow.key]?.isNewSeason)
+        assertEquals(UpNextBadge.UP_NEXT, upNextBadge(rows[oldSeasonShow.key]))
+    }
+
+    @Test
+    fun `up next artwork prefers still then backdrop then poster`() {
+        val show = item("show", MediaType.TV, "Show").copy(
+            posterUrl = "poster",
+            backdropUrl = "backdrop",
+        )
+        val withoutStill = Episode(1, 2, "Target", "", null, 45)
+        val withStill = withoutStill.copy(stillUrl = "still")
+
+        assertEquals("still", upNextImageUrl(show, withStill))
+        assertEquals("backdrop", upNextImageUrl(show, withoutStill))
+        assertEquals("poster", upNextImageUrl(show.copy(backdropUrl = null), withoutStill))
+        assertNull(upNextImageUrl(show.copy(backdropUrl = null, posterUrl = null), withoutStill))
     }
 
     @Test
@@ -355,12 +437,12 @@ class HomeViewModelsTest {
 
         viewModel.load(HomeFilter.TV)
         advanceUntilIdle()
-        assertEquals(second, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+        assertEquals(second, viewModel.upNextRow()?.upNext?.get(show.key)?.episode)
 
         progress.value = mapOf(key to WatchProgress(3_500_000, 3_600_000, updatedAt = 200))
         advanceUntilIdle()
 
-        assertEquals(second, viewModel.upNextRow()?.newEpisodes?.get(show.key))
+        assertEquals(second, viewModel.upNextRow()?.upNext?.get(show.key)?.episode)
         coVerify(exactly = 1) { catalog.getShowAiring("show") }
         coVerify(exactly = 1) { catalog.getEpisodes(show, 1) }
     }

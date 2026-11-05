@@ -26,6 +26,7 @@ import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.RowStyle
+import com.shieldstream.tv.model.UpNextInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -312,7 +313,14 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     if (episode == null) return@runCatching null
-                    if (airing.item.posterUrl == null) null else Triple(airing.item, episode, candidate.updatedAt)
+                    val lastWatchedDate = NewEpisodes.dateWindow(candidate.updatedAt).second
+                    val info = UpNextInfo(
+                        episode = episode,
+                        lastWatched = candidate.updatedAt,
+                        isNewEpisode = episode.airDate?.let { it > lastWatchedDate } == true,
+                        isNewSeason = episode.season != candidate.season,
+                    )
+                    Triple(airing.item, info, candidate.updatedAt)
                 }.getOrNull()
             }
         }.filterNotNull()
@@ -323,7 +331,7 @@ class HomeViewModel @Inject constructor(
             title = texts.get(StringsR.string.home_up_next),
             items = entries.map { it.first },
             style = RowStyle.UP_NEXT,
-            newEpisodes = entries.associate { (item, episode, _) -> item.key to episode },
+            upNext = entries.associate { (item, info, _) -> item.key to info },
         )
     }
 
