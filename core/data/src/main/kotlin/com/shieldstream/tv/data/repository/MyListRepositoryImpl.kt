@@ -29,8 +29,10 @@ class MyListRepositoryImpl @Inject constructor(
     profiles: ProfileRepository,
 ) : MyListRepository {
 
+    private data class ActiveStore(val profileId: String, val prefs: SharedPreferences)
+
     @Volatile
-    private var prefs: SharedPreferences = prefsFor(profiles.active.value.id)
+    private var store = storeFor(profiles.active.value.id)
 
     private val _entries = MutableStateFlow(load())
     override val entries: StateFlow<List<MyListEntry>> = _entries.asStateFlow()
@@ -41,7 +43,7 @@ class MyListRepositoryImpl @Inject constructor(
     init {
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
             profiles.active.distinctUntilChangedBy { it.id }.drop(1).collect { profile ->
-                prefs = prefsFor(profile.id)
+                store = storeFor(profile.id)
                 _entries.value = load()
             }
         }
@@ -52,30 +54,35 @@ class MyListRepositoryImpl @Inject constructor(
 
     override fun add(type: MediaType, id: String) {
         if (contains(type, id)) return
-        prefs.edit().putLong(MyListEntry.keyOf(type, id), System.currentTimeMillis()).apply()
+        val current = store
+        current.prefs.edit().putLong(MyListEntry.keyOf(type, id), System.currentTimeMillis()).apply()
         _entries.value = load()
-        _changes.tryEmit(MyListChange(type, id, added = true))
+        _changes.tryEmit(MyListChange(current.profileId, type, id, added = true))
     }
 
     override fun remove(type: MediaType, id: String) {
         if (!contains(type, id)) return
-        prefs.edit().remove(MyListEntry.keyOf(type, id)).apply()
+        val current = store
+        current.prefs.edit().remove(MyListEntry.keyOf(type, id)).apply()
         _entries.value = load()
-        _changes.tryEmit(MyListChange(type, id, added = false))
+        _changes.tryEmit(MyListChange(current.profileId, type, id, added = false))
     }
 
     override fun importRemote(added: List<MyListEntry>, removedKeys: Collection<String>) {
         if (added.isEmpty() && removedKeys.isEmpty()) return
-        val editor = prefs.edit()
-        added.forEach { e -> if (!prefs.contains(e.key)) editor.putLong(e.key, e.addedAt) }
+        val current = store
+        val editor = current.prefs.edit()
+        added.forEach { e -> if (!current.prefs.contains(e.key)) editor.putLong(e.key, e.addedAt) }
         removedKeys.forEach(editor::remove)
         editor.apply()
         _entries.value = load()
     }
 
+    private fun storeFor(profileId: String) = ActiveStore(profileId, prefsFor(profileId))
+
     private fun prefsFor(profileId: String) = context.getSharedPreferences(prefsNameFor(profileId), Context.MODE_PRIVATE)
 
-    private fun load(): List<MyListEntry> = prefs.all.mapNotNull { (key, value) ->
+    private fun load(): List<MyListEntry> = store.prefs.all.mapNotNull { (key, value) ->
         val type = runCatching { MediaType.valueOf(key.substringBefore('_')) }.getOrNull() ?: return@mapNotNull null
         val id = key.substringAfter('_').takeIf { it.isNotBlank() } ?: return@mapNotNull null
         MyListEntry(type, id, (value as? Long) ?: 0L)

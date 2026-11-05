@@ -54,6 +54,7 @@ class TraktRepositoryImpl @Inject constructor(
     private val progress: WatchProgressRepository,
     private val myList: MyListRepository,
     private val tokens: TokenStore,
+    private val cleanup: ProfileDataCleaner,
     private val json: Json,
     private val texts: Texts,
 ) : TraktRepository {
@@ -62,7 +63,7 @@ class TraktRepositoryImpl @Inject constructor(
     private val syncMutex = Mutex()
     private val tokenLocks = ConcurrentHashMap<String, Mutex>()
     private val scrobbleLocks = ConcurrentHashMap<String, Mutex>()
-    private val syncPrefs = context.getSharedPreferences("trakt_sync", Context.MODE_PRIVATE)
+    private val syncPrefs = context.getSharedPreferences(TRAKT_SYNC_PREFS, Context.MODE_PRIVATE)
 
     private val playbackIds = ConcurrentHashMap<String, Long>()
     @Volatile private var lastSyncAttempt = 0L
@@ -77,7 +78,7 @@ class TraktRepositoryImpl @Inject constructor(
             }
         }
         scope.launch {
-            progress.cleared.collect { key -> removePlayback(profiles.active.value.id, key) }
+            progress.cleared.collect { change -> removePlayback(change.profileId, change.key) }
         }
         scope.launch {
             myList.changes.collect { pushWatchlist(it) }
@@ -287,7 +288,7 @@ class TraktRepositoryImpl @Inject constructor(
     }
 
     private fun pushWatchlist(change: MyListChange) {
-        val profileId = profiles.active.value.id
+        val profileId = change.profileId
         if (session(profileId) == null) return
         val path = if (change.added) "/sync/watchlist" else "/sync/watchlist/remove"
         scope.launch {
@@ -506,8 +507,7 @@ class TraktRepositoryImpl @Inject constructor(
     }
 
     private fun forget(profileId: String) {
-        tokens.setSecret(TraktSession.storeKey(profileId), null)
-        syncPrefs.edit().remove("all_$profileId").remove("last_$profileId").remove("remote_$profileId").apply()
+        cleanup.clearTrakt(profileId)
         profiles.profiles.value.firstOrNull { it.id == profileId }?.let { profiles.save(it.copy(traktUser = null)) }
     }
 

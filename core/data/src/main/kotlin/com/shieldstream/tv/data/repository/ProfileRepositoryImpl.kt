@@ -3,8 +3,6 @@ package com.shieldstream.tv.data.repository
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.Texts
 import android.content.Context
-import android.os.Build
-import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.AppLanguage
@@ -26,7 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class ProfileRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val tokens: TokenStore,
+    private val cleanup: ProfileDataCleaner,
     private val texts: Texts,
 ) : ProfileRepository {
 
@@ -75,14 +73,7 @@ class ProfileRepositoryImpl @Inject constructor(
         if (list.size <= 1 || list.none { it.id == id }) return
         val updated = list.filterNot { it.id == id }
         store(updated)
-        for (name in listOf(WatchProgressRepositoryImpl.prefsNameFor(id), MyListRepositoryImpl.prefsNameFor(id))) {
-            if (Build.VERSION.SDK_INT >= 24) {
-                context.deleteSharedPreferences(name)
-            } else {
-                context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().apply()
-            }
-        }
-        tokens.setSecret(TraktSession.storeKey(id), null)
+        cleanup.delete(id)
         if (_active.value.id == id) select(updated.first().id)
     }
 

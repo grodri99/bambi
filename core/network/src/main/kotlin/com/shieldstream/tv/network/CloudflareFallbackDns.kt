@@ -9,10 +9,11 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
 object CloudflareFallbackDns : Dns {
-    private val failed = ConcurrentHashMap.newKeySet<InetAddress>()
+    private val failed = Collections.newSetFromMap(ConcurrentHashMap<InetAddress, Boolean>())
     @Volatile private var extras: List<InetAddress> = emptyList()
 
     override fun lookup(hostname: String): List<InetAddress> {

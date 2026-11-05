@@ -4,6 +4,8 @@ import com.shieldstream.tv.model.WatchProgress
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
+data class WatchProgressClear(val profileId: String, val key: String)
+
 interface WatchProgressRepository {
     val progress: StateFlow<Map<String, WatchProgress>>
 
@@ -13,7 +15,7 @@ interface WatchProgressRepository {
 
     fun clear(key: String)
 
-    val cleared: SharedFlow<String>
+    val cleared: SharedFlow<WatchProgressClear>
 
     fun importRemote(entries: Map<String, WatchProgress>)
 

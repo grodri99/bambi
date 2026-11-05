@@ -1,12 +1,15 @@
 package com.shieldstream.tv.media
 
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
 import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.PlaybackVideoInfo
 import com.shieldstream.tv.model.VideoCodec
 
+@OptIn(UnstableApi::class)
 object VideoFormatInspector {
     fun inspect(format: Format, decoderName: String? = null): PlaybackVideoInfo {
         val codecs = format.codecs.orEmpty().lowercase()

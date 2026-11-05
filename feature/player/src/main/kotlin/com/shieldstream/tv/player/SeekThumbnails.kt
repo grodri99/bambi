@@ -169,7 +169,7 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
     }
 }
 
-@OptIn(UnstableApi::class)
+@UnstableApi
 private val HardwareWithoutDolbyVision = MediaCodecSelector { mimeType, secure, tunneling ->
     if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) MediaCodecSelector.DEFAULT.getDecoderInfos(MimeTypes.VIDEO_H265, secure, tunneling)
     else MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)

@@ -3,11 +3,13 @@ package com.shieldstream.tv.data.repository
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.shieldstream.tv.data.security.TokenStore
+import com.shieldstream.tv.domain.MyListChange
 import com.shieldstream.tv.domain.MyListRepository
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.ScrobbleAction
 import com.shieldstream.tv.domain.TraktCredentials
 import com.shieldstream.tv.domain.WatchProgressRepository
+import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
@@ -114,6 +116,27 @@ class TraktRepositoryImplTest {
         assertEquals(listOf(ScrobbleAction.PAUSE, ScrobbleAction.STOP), completions)
     }
 
+    @Test
+    fun `watchlist removal keeps its originating profile after active profile changes`() {
+        val fixture = fixture(expiresAt = System.currentTimeMillis() + 86_400_000)
+        fixture.profiles.save(Profile(id = OTHER_PROFILE, name = "Other", avatar = 1))
+        val removalSent = CountDownLatch(1)
+        coEvery { fixture.client.post("/sync/watchlist/remove", any(), "old-access") } coAnswers {
+            removalSent.countDown()
+            TraktResponse(200, null)
+        }
+        fixture.profiles.select(OTHER_PROFILE)
+        assertEquals(OTHER_PROFILE, fixture.profiles.active.value.id)
+
+        runBlocking {
+            (fixture.myList.changes as MutableSharedFlow<MyListChange>).emit(
+                MyListChange(PROFILE, MediaType.MOVIE, "1", added = false),
+            )
+        }
+
+        assertTrue("removal was not sent to the originating profile", removalSent.await(1, TimeUnit.SECONDS))
+    }
+
     private fun fixture(expiresAt: Long): Fixture {
         val profile = Profile(id = PROFILE, name = "Viewer", avatar = 0, traktUser = "viewer")
         val profiles = FakeProfileRepository(profile)
@@ -136,6 +159,7 @@ class TraktRepositoryImplTest {
             every { entries } returns MutableStateFlow(emptyList())
             every { changes } returns MutableSharedFlow()
         }
+        fixture.myList = myList
         fixture.repository = TraktRepositoryImpl(
             context = context,
             client = fixture.client,
@@ -144,6 +168,7 @@ class TraktRepositoryImplTest {
             progress = watchProgress,
             myList = myList,
             tokens = tokens,
+            cleanup = ProfileDataCleaner(context, tokens),
             json = json,
             texts = mockk<Texts>(relaxed = true),
         )
@@ -162,6 +187,7 @@ class TraktRepositoryImplTest {
         val secrets: MutableMap<String, String>,
     ) {
         val client = mockk<TraktClient>()
+        lateinit var myList: MyListRepository
         lateinit var repository: TraktRepositoryImpl
         var onSessionSaved: (String) -> Unit = {}
     }
@@ -169,9 +195,15 @@ class TraktRepositoryImplTest {
     private class FakeProfileRepository(initial: Profile) : ProfileRepository {
         override val profiles = MutableStateFlow(listOf(initial))
         override val active = MutableStateFlow(initial)
-        override fun select(id: String) = Unit
+        override fun select(id: String) {
+            profiles.value.firstOrNull { it.id == id }?.let { active.value = it }
+        }
         override fun save(profile: Profile): Profile {
-            profiles.value = profiles.value.map { if (it.id == profile.id) profile else it }
+            profiles.value = if (profiles.value.any { it.id == profile.id }) {
+                profiles.value.map { if (it.id == profile.id) profile else it }
+            } else {
+                profiles.value + profile
+            }
             if (active.value.id == profile.id) active.value = profile
             return profile
         }
@@ -181,5 +213,6 @@ class TraktRepositoryImplTest {
 
     private companion object {
         const val PROFILE = "profile"
+        const val OTHER_PROFILE = "other-profile"
     }
 }

@@ -21,6 +21,7 @@ import androidx.annotation.IntDef;
 import androidx.media3.common.C;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.extractor.ExtractorInput;
 import java.io.EOFException;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.lang.annotation.Target;
 import java.util.ArrayDeque;
 
 /** Default implementation of {@link EbmlReader}. */
+@UnstableApi
 /* package */ final class DefaultEbmlReader implements EbmlReader {
 
   @Documented

@@ -12,7 +12,7 @@ data class MyListEntry(val type: MediaType, val id: String, val addedAt: Long) {
     }
 }
 
-data class MyListChange(val type: MediaType, val id: String, val added: Boolean)
+data class MyListChange(val profileId: String, val type: MediaType, val id: String, val added: Boolean)
 
 interface MyListRepository {
     val entries: StateFlow<List<MyListEntry>>

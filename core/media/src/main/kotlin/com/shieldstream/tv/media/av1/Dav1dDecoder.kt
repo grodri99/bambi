@@ -19,6 +19,7 @@ internal object Dav1dLibrary {
     }
 }
 
+@UnstableApi
 class Dav1dDecoderException(message: String, cause: Throwable? = null) : DecoderException(message, cause)
 
 @Suppress("UNCHECKED_CAST")

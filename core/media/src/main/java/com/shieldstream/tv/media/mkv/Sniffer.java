@@ -17,6 +17,7 @@ package com.shieldstream.tv.media.mkv;
 
 import androidx.media3.common.C;
 import androidx.media3.common.util.ParsableByteArray;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.extractor.Extractor;
 import androidx.media3.extractor.ExtractorInput;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.io.IOException;
  * Utility class that peeks from the input stream in order to determine whether it appears to be
  * compatible input for this extractor.
  */
+@UnstableApi
 /* package */ final class Sniffer {
 
   /** The number of bytes to search for a valid header in {@link #sniff(ExtractorInput)}. */

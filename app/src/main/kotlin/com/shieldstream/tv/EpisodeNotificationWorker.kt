@@ -1,5 +1,6 @@
 package com.shieldstream.tv
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -37,6 +38,7 @@ class EpisodeNotificationWorker @AssistedInject constructor(
     private val texts: Texts,
 ) : CoroutineWorker(context, params) {
 
+    @SuppressLint("MissingPermission") // areNotificationsEnabled and runCatching handle denied or revoked access.
     override suspend fun doWork(): Result {
         if (!tracking.notificationsEnabled.value) return Result.success()
         val followed = tracking.followedShowIds.value

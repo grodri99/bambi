@@ -151,7 +151,7 @@ class SubtitleRepositoryImpl @Inject constructor(
         val head = String(bytes, 0, minOf(bytes.size, 400), Charsets.ISO_8859_1)
         return when {
             head.contains("[Script Info]") -> "ass"
-            head.trimStart('﻿', ' ', '\n', '\r').startsWith("WEBVTT") -> "vtt"
+            head.trimStart('\uFEFF', ' ', '\n', '\r').startsWith("WEBVTT") -> "vtt"
             else -> "srt"
         }
     }
@@ -165,7 +165,7 @@ class SubtitleRepositoryImpl @Inject constructor(
         } catch (_: CharacterCodingException) {
             String(bytes, Charset.forName(LEGACY_CHARSETS[language] ?: "windows-1252"))
         }
-        return text.removePrefix("﻿")
+        return text.removePrefix("\uFEFF")
     }
 
     private fun mimeFor(ext: String) = when (ext) {

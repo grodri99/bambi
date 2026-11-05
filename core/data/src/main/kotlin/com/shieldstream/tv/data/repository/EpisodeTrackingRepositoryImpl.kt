@@ -76,11 +76,13 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
 
     private fun prefsFor(profileId: String) = context.getSharedPreferences("episode_tracking_$profileId", Context.MODE_PRIVATE)
 
-    private companion object {
-        const val FOLLOWED = "followed"
-        const val DISMISSED = "dismissed"
-        const val NOTIFIED = "notified"
-        const val NOTIFICATIONS = "notifications"
+    companion object {
+        fun prefsNameFor(profileId: String) = "episode_tracking_$profileId"
+
+        private const val FOLLOWED = "followed"
+        private const val DISMISSED = "dismissed"
+        private const val NOTIFIED = "notified"
+        private const val NOTIFICATIONS = "notifications"
     }
 }
 

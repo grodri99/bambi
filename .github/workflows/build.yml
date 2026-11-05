@@ -1,7 +1,7 @@
-# Compila Bambi en cada push y pull request (y a mano desde la pestaña Actions).
-# Sin claves: local.properties no está en git, así que el APK sale sin claves precargadas (como seedKeys=false)
-# y firmado con la clave de depuración. Sirve para comprobar que todo compila, no para publicar.
-name: Compilar
+# Build Bambi on every push and pull request, and manually from the Actions tab.
+# Without credentials: local.properties is not tracked, so the APK contains no preloaded keys
+# (equivalent to seedKeys=false) and is signed with the debug key. This validates the build; it does not publish it.
+name: Build
 
 on:
   push:
@@ -21,22 +21,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      # Desde Windows, gradlew puede llegar a git sin permiso de ejecución.
-      - run: chmod +x gradlew
+      # On Windows, git may check out gradlew without the executable bit.
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
 
-      - name: Compilar (debug) y pasar los tests
+      - name: Build debug APK and run unit tests
         run: ./gradlew --no-daemon assembleDebug :core:model:test :core:domain:test testDebugUnitTest
 
-      - uses: actions/upload-artifact@v4
+      - name: Run Android lint
+        run: ./gradlew --no-daemon lintDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
         with:
           name: Bambi-debug
           path: app/build/outputs/apk/debug/*.apk
