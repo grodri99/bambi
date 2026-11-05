@@ -150,6 +150,7 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
 - **Castellano primero** (Ajustes) sube arriba las fuentes con audio en español, y el botón **Solo en español**
   del panel esconde las demás.
 - **Anime**: además de "S01E05" busca por numeración absoluta ("One Piece - 894"), como se llaman sus releases.
+- **Distintivos visuales** de resolución, HDR/Dolby Vision, codec y decodificación por CPU según lo que anuncia cada release.
 - **⚡ = en caché**: se reproduce al instante. Lo que un buscador sabe que está en caché se marca también en los demás.
 - **"Reproducir" elige solo**: prueba las fuentes en orden hasta que una funciona. Se salta las que Real-Debrid
   bloquea o que no son vídeo, y frena si Real-Debrid pide calma.
@@ -171,6 +172,8 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
 
 - **Media3 (ExoPlayer)** afinado para la Shield: **4K HDR10, Dolby Vision** (incluido el perfil 7 de los remux de
   Blu-ray) y **AV1** por software (dav1d).
+- **Distintivos del vídeo real** en los controles: resolución, HDR/DV, codec y decoder HW/CPU detectados por Media3.
+  Si una fuente Dolby Vision perfil 7 usa su capa base, el reproductor muestra HDR10 en vez de repetir la etiqueta DV.
 - **Búsqueda con miniaturas**: ◀ ▶ pausan y muestran fotogramas del punto elegido; OK salta ahí.
 - Panel de **audio y subtítulos** con todas las pistas del archivo.
 - **Subtítulos externos** de OpenSubtitles, Podnapisi y SubDL, con **sincronización automática** usando como

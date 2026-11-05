@@ -17,6 +17,8 @@ import androidx.media3.extractor.text.CuesWithTiming
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import com.shieldstream.tv.domain.ResolveState
 import com.shieldstream.tv.domain.ResolveStreamUseCase
 import com.shieldstream.tv.domain.SelectedContentHolder
@@ -30,8 +32,10 @@ import com.shieldstream.tv.domain.ScrobbleAction
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.media.Media3Factory
 import com.shieldstream.tv.media.PlaybackPolicyProvider
+import com.shieldstream.tv.media.VideoFormatInspector
 import androidx.media3.common.PlaybackException
 import com.shieldstream.tv.model.ExternalSubtitle
+import com.shieldstream.tv.model.PlaybackVideoInfo
 import com.shieldstream.tv.model.SubtitleQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +104,9 @@ class PlayerViewModel @Inject constructor(
 
     private val _player = MutableStateFlow<ExoPlayer?>(null)
     val player: StateFlow<ExoPlayer?> = _player.asStateFlow()
+
+    private val _videoInfo = MutableStateFlow<PlaybackVideoInfo?>(null)
+    val videoInfo: StateFlow<PlaybackVideoInfo?> = _videoInfo.asStateFlow()
 
     private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving(tr("Preparando…", "Preparing…"), 1, 1))
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -184,6 +191,7 @@ class PlayerViewModel @Inject constructor(
     // instante (calibración) sin recargar el vídeo. Sobrevive a recrear el player (Home → volver).
     private val _activeExternal = MutableStateFlow<ActiveExternalSubtitle?>(null)
     val activeExternal: StateFlow<ActiveExternalSubtitle?> = _activeExternal.asStateFlow()
+    private var currentExternal: ExternalSubtitle? = null
 
     private val _subtitleTiming = MutableStateFlow(SubtitleTiming())
     val subtitleTiming: StateFlow<SubtitleTiming> = _subtitleTiming.asStateFlow()
@@ -315,8 +323,12 @@ class PlayerViewModel @Inject constructor(
 
     fun downloadExternalSubtitle(item: ExternalSubtitle) {
         val query = buildQuery(item.language) ?: return
+        if (currentExternal != null) {
+            Log.w(TAG, "AUTO_SYNC_FAILURE reason=replaced_by_user ${externalContext(currentExternal)}")
+        }
         val previous = _externalSubs.value
         subsJob?.cancel()
+        Log.i(TAG, "SUBTITLE_DOWNLOAD_START ${externalContext(item)}")
         _externalSubs.value = ExternalSubsState.Downloading(item.language, item)
         subsJob = viewModelScope.launch {
             runCatching {
@@ -326,10 +338,13 @@ class PlayerViewModel @Inject constructor(
                 file to segments
             }
                 .onSuccess { (file, segments) ->
+                    currentExternal = item
                     attachExternal(file.label, segments)
+                    Log.i(TAG, "SUBTITLE_DOWNLOAD_SUCCESS ${externalContext(item)}")
                     _externalSubs.value = ExternalSubsState.Attached(file.label)
                 }
                 .onFailure { e ->
+                    Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}", e)
                     _externalSubs.value = ExternalSubsState.Error(item.language, e.message ?: tr("No se pudo descargar", "Couldn't download"))
                     if (previous is ExternalSubsState.Results) {
                         delay(2_500)
@@ -348,6 +363,10 @@ class PlayerViewModel @Inject constructor(
         val media = mediaSnapshot ?: return null
         return SubtitleQuery(media = media, language = language, fileName = playingFileName)
     }
+
+    private fun externalContext(item: ExternalSubtitle?): String = item?.let {
+        "provider=${it.provider} id=${it.id} release=${it.release.take(100).ifBlank { "unknown" }}"
+    } ?: "subtitle=none"
 
     private fun buildMediaItem(url: String): MediaItem = MediaItem.Builder().setUri(url).build()
 
@@ -384,6 +403,7 @@ class PlayerViewModel @Inject constructor(
         referenceAwaitingStart = false
         reference.reset()
         _activeExternal.value = null
+        currentExternal = null
         _subtitleTiming.value = SubtitleTiming()
         _syncStatus.value = SyncStatus.Off
     }
@@ -395,6 +415,11 @@ class PlayerViewModel @Inject constructor(
         if (_activeExternal.value == null) return
         syncJob?.cancel()
         val timing = _subtitleTiming.value.let { it.copy(offsetMs = it.offsetMs + deltaMs) }
+        Log.w(
+            TAG,
+            "AUTO_SYNC_FAILURE reason=manual_adjustment newOffsetMs=${timing.offsetMs} " +
+                "scale=${timing.scale} ${externalContext(currentExternal)}",
+        )
         _subtitleTiming.value = timing
         _syncStatus.value = SyncStatus.Manual(timing)
     }
@@ -403,6 +428,7 @@ class PlayerViewModel @Inject constructor(
     fun autoSyncNow() {
         val ext = _activeExternal.value ?: return
         if (!referenceAvailable) {
+            Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reference ${externalContext(currentExternal)}")
             _syncStatus.value = SyncStatus.NoReference
             _notice.value = tr("Este archivo no trae subtítulos de referencia: solo se puede ajustar a mano", "This file has no reference subtitles: it can only be adjusted manually")
             return
@@ -435,6 +461,7 @@ class PlayerViewModel @Inject constructor(
             .filterNot { (g, i) -> isForced(g.getTrackFormat(i)) }
             .maxByOrNull { (g, i) -> referenceScore(g.getTrackFormat(i)) }
         if (candidate == null) {
+            Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reference ${externalContext(currentExternal)}")
             referenceAvailable = false
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                 .clearOverridesOfType(C.TRACK_TYPE_TEXT)
@@ -523,6 +550,7 @@ class PlayerViewModel @Inject constructor(
                     if (first != null && result.agreesWith(first)) return@launch // confirmado: fin
                     applied = result
                 } else if (count >= 80 && applied == null) {
+                    Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reliable_offset refs=$count ${externalContext(currentExternal)}")
                     _syncStatus.value = SyncStatus.Unsure
                     _notice.value = tr("No he podido sincronizar solo los subtítulos: Audio y subtítulos › Sincronizar", "Couldn't sync the subtitles automatically: Audio & subtitles › Sync")
                     return@launch
@@ -533,6 +561,12 @@ class PlayerViewModel @Inject constructor(
 
     private fun applyAuto(timing: SubtitleTiming, announce: Boolean, force: Boolean) {
         if (!force && _syncStatus.value is SyncStatus.Manual) return
+        if (announce) {
+            Log.i(
+                TAG,
+                "AUTO_SYNC_SUCCESS offsetMs=${timing.offsetMs} scale=${timing.scale} ${externalContext(currentExternal)}",
+            )
+        }
         _subtitleTiming.value = timing
         _syncStatus.value = SyncStatus.Auto(timing)
         if (announce) {
@@ -801,6 +835,7 @@ class PlayerViewModel @Inject constructor(
             p.release()
         }
         _player.value = null
+        _videoInfo.value = null
     }
 
     fun onStart() {
@@ -816,6 +851,32 @@ class PlayerViewModel @Inject constructor(
             settings.seekThumbnails.first(),
         )
         val player = media3Factory.createPlayer(policy)
+        _videoInfo.value = null
+        var activeDecoderName: String? = null
+        fun updateVideoInfo(format: Format? = player.videoFormat) {
+            if (format != null) _videoInfo.value = VideoFormatInspector.inspect(format, activeDecoderName)
+        }
+        player.addAnalyticsListener(
+            object : AnalyticsListener {
+                override fun onVideoDecoderInitialized(
+                    eventTime: AnalyticsListener.EventTime,
+                    decoderName: String,
+                    initializedTimestampMs: Long,
+                    initializationDurationMs: Long,
+                ) {
+                    activeDecoderName = decoderName
+                    updateVideoInfo()
+                }
+
+                override fun onVideoInputFormatChanged(
+                    eventTime: AnalyticsListener.EventTime,
+                    format: Format,
+                    decoderReuseEvaluation: DecoderReuseEvaluation?,
+                ) {
+                    _videoInfo.value = VideoFormatInspector.inspect(format, activeDecoderName)
+                }
+            },
+        )
         if (spanishFirst) {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                 .setPreferredAudioLanguages("es", "spa")
@@ -825,6 +886,7 @@ class PlayerViewModel @Inject constructor(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
+                        updateVideoInfo()
                         checkSpanishAudio(player, player.currentTracks)
                         if (checkErrorSlate(player)) return
                     }
@@ -922,6 +984,7 @@ class PlayerViewModel @Inject constructor(
         scrobble(ScrobbleAction.STOP)
         _player.value?.release()
         _player.value = null
+        _videoInfo.value = null
         super.onCleared()
     }
 

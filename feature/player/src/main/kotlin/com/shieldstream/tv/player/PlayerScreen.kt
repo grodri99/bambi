@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextOverflow
 import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.model.PlaybackVideoInfo
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -76,6 +77,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.shieldstream.tv.ui.component.AppIcons
+import com.shieldstream.tv.ui.component.PlaybackMediaBadges
 import com.shieldstream.tv.ui.component.onBackKey
 import kotlinx.coroutines.delay
 
@@ -88,6 +90,7 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val player by viewModel.player.collectAsStateWithLifecycle()
+    val videoInfo by viewModel.videoInfo.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val title by viewModel.title.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
@@ -351,6 +354,7 @@ fun PlayerScreen(
             AnimatedVisibility(visible = controlsVisible && !syncOpen, enter = fadeIn(), exit = fadeOut()) {
                 ControlsOverlay(
                     title = title,
+                    videoInfo = videoInfo,
                     playback = playback,
                     scrubMs = scrubMs,
                     thumbs = thumbs,
@@ -512,6 +516,7 @@ private fun rememberPlaybackState(player: ExoPlayer?): PlaybackState {
 @Composable
 private fun ControlsOverlay(
     title: String,
+    videoInfo: PlaybackVideoInfo?,
     playback: PlaybackState,
     scrubMs: Long?,
     thumbs: SeekThumbnails?,
@@ -525,12 +530,21 @@ private fun ControlsOverlay(
                 .height(150.dp)
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent))),
         )
-        Text(
-            text = title,
-            color = Color.White,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.align(Alignment.TopStart).padding(start = 48.dp, top = 32.dp, end = 48.dp),
-        )
+        Column(
+            Modifier.align(Alignment.TopStart).padding(start = 48.dp, top = 28.dp, end = 48.dp),
+        ) {
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            videoInfo?.let {
+                Spacer(Modifier.height(8.dp))
+                PlaybackMediaBadges(it)
+            }
+        }
 
         Column(
             Modifier

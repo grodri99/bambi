@@ -73,6 +73,7 @@ import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.ui.component.AppIcons
+import com.shieldstream.tv.ui.component.SourceMediaBadges
 import com.shieldstream.tv.ui.component.ProvideMinimalScroll
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.TvButton
@@ -805,19 +806,32 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
             if (source.isCached) Icon(AppIcons.Bolt, contentDescription = tr("En tu Real-Debrid", "In your Real-Debrid"), tint = if (focused) Color(0xFF0A8F3C) else Green)
         }
         Column(Modifier.weight(1f)) {
-            Text(
-                text = buildString {
-                    append(source.quality.label)
-                    if (source.hdrType != HdrType.SDR) append(" · ").append(source.hdrType.label)
-                    if (source.sizeBytes > 0) append(" · ").append(formatSize(source.sizeBytes))
-                    source.seeders?.let { append(" · ").append(it).append(" seeds") }
-                    if (source.languages.isNotEmpty()) append(" · ").append(source.languages.joinToString("/"))
-                    if (source.softwareDecode) append(" · AV1 (CPU)")
-                    if (blocked) append(tr(" · Bloqueada por Real-Debrid", " · Blocked by Real-Debrid"))
-                },
-                color = fg,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceMediaBadges(source)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = buildString {
+                        if (source.sizeBytes > 0) append(formatSize(source.sizeBytes))
+                        source.seeders?.let {
+                            if (isNotEmpty()) append(" · ")
+                            append(it).append(" seeds")
+                        }
+                        if (source.languages.isNotEmpty()) {
+                            if (isNotEmpty()) append(" · ")
+                            append(source.languages.joinToString("/"))
+                        }
+                        if (blocked) {
+                            if (isNotEmpty()) append(" · ")
+                            append(tr("Bloqueada por Real-Debrid", "Blocked by Real-Debrid"))
+                        }
+                    },
+                    color = fg,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Text(
                 text = source.title,
                 color = sub,

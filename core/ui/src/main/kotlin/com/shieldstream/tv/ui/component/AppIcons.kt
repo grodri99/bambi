@@ -68,6 +68,14 @@ object AppIcons {
     val Add = icon("add", "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z")
     val Check = icon("check", "M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z")
     val Lock = icon("lock", "M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10c0,-1.1 -0.9,-2 -2,-2zM12,17c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM15.1,8H8.9V6c0,-1.71 1.39,-3.1 3.1,-3.1 1.71,0 3.1,1.39 3.1,3.1v2z")
+    val Hdr = icon(
+        "hdr",
+        "M19,4H5C3.89,4 3,4.9 3,6v12c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V6C21,4.9 20.1,4 19,4zM11,15H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11V15zM18,14c0,0.55 -0.45,1 -1,1h-4V9h4c0.55,0 1,0.45 1,1V14zM16.5,10.5h-2v3h2V10.5z",
+    )
+    val Memory = icon(
+        "memory",
+        "M15,9H9v6h6V9zM19,11h2v2h-2v2h-2v2h-2v2h-2v-2h-2v2H9v-2H7v-2H5v-2h2v-2H5v-2h2V9H5V7h2V5h2V3h2v2h2V3h2v2h2v2h2v2h-2v2zM17,7H7v10h10V7z",
+    )
     val SkipNext = icon("skip_next", "M6,18l8.5,-6L6,6v12zM16,6v12h2V6h-2z")
     val FastForward = icon("fast_forward", "M4,18l8.5,-6L4,6v12zM13,6v12l8.5,-6L13,6z")
 
