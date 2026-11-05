@@ -100,6 +100,7 @@ fun PlayerScreen(
     val activeExternal by viewModel.activeExternal.collectAsStateWithLifecycle()
     val subtitleTiming by viewModel.subtitleTiming.collectAsStateWithLifecycle()
     val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
+    val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
     val thumbnailsEnabled by viewModel.seekThumbnails.collectAsStateWithLifecycle()
     val nextUp by viewModel.nextUp.collectAsStateWithLifecycle()
     val skipPrompt by viewModel.skipPrompt.collectAsStateWithLifecycle()
@@ -319,11 +320,12 @@ fun PlayerScreen(
                 update = { view ->
                     view.player = exoPlayer
                     val evaluating = (externalSubs as? ExternalSubsState.Results)?.evaluating == true
+                    view.subtitleView?.applySubtitleAppearance(subtitleAppearance)
                     view.subtitleView?.visibility = if (activeExternal != null || evaluating) View.GONE else View.VISIBLE
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-            activeExternal?.let { ExternalSubtitleOverlay(exoPlayer, it, subtitleTiming) }
+            activeExternal?.let { ExternalSubtitleOverlay(exoPlayer, it, subtitleTiming, subtitleAppearance) }
         }
 
         if (state == PlayerUiState.Playing) {
@@ -383,6 +385,8 @@ fun PlayerScreen(
                     onCloseExternal = { viewModel.resetExternalSubtitles() },
                     externalLabel = activeExternal?.label,
                     syncDetail = syncStatus.describe(texts).ifBlank { subtitleTiming.describe(texts) },
+                    appearance = subtitleAppearance,
+                    onAppearanceChange = viewModel::setSubtitleAppearance,
                     onExternalOff = { viewModel.disableExternalSubtitle() },
                     onManualSubtitleSelection = viewModel::onManualSubtitleSelection,
                     onOpenSync = {

@@ -11,6 +11,7 @@ data class Profile(
     val spanishOnlySources: Boolean = kids,
     val hiddenCategories: Set<String> = Category.DEFAULT_HIDDEN,
     val subtitlePreference: SubtitlePreference = SubtitlePreference.OFF,
+    val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val experimentalSubtitleSync: Boolean = true,
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"

@@ -28,8 +28,11 @@ import com.shieldstream.tv.model.PlaybackPolicy
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.StreamSource
+import com.shieldstream.tv.model.SubtitleAppearance
+import com.shieldstream.tv.model.SubtitleColor
 import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.strings.Texts
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -46,6 +49,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.setMain
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -105,6 +109,22 @@ class PlayerViewModelTest {
         viewModel.onStop()
     }
 
+    @Test
+    fun `subtitle appearance updates immediately and persists normalized values`() = runBlocking {
+        val fixture = fixture(FakePlayers(Tracks.EMPTY), flowOf(40), SubtitlePreference.OFF)
+        val requested = SubtitleAppearance(
+            sizePercent = 999,
+            verticalPositionPercent = -5,
+            textColor = SubtitleColor.YELLOW,
+        )
+        val expected = requested.normalized()
+
+        fixture.viewModel.setSubtitleAppearance(requested)
+
+        assertEquals(expected, fixture.viewModel.subtitleAppearance.value)
+        coVerify(exactly = 1) { fixture.settings.setSubtitleAppearance(expected) }
+    }
+
     private fun fixture(
         players: FakePlayers,
         bufferSecondsFlow: Flow<Int>,
@@ -160,7 +180,8 @@ class PlayerViewModelTest {
             )
         }
         return Fixture(
-            PlayerViewModel(
+            settings = settings,
+            viewModel = PlayerViewModel(
                 media3Factory = media3Factory,
                 playbackPolicies = playbackPolicies,
                 resolveStreamUseCase = resolve,
@@ -205,7 +226,10 @@ class PlayerViewModelTest {
         return Tracks(listOf(group))
     }
 
-    private data class Fixture(val viewModel: PlayerViewModel)
+    private data class Fixture(
+        val viewModel: PlayerViewModel,
+        val settings: SettingsRepository,
+    )
 
     private class FakePlayers(private val tracks: Tracks) {
         val parameters = mutableListOf<TrackSelectionParameters>()

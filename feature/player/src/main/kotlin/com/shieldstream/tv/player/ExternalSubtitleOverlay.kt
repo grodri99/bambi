@@ -32,6 +32,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.SubtitleView
+import com.shieldstream.tv.model.SubtitleAppearance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -41,6 +42,7 @@ internal fun ExternalSubtitleOverlay(
     player: Player,
     subtitle: ActiveExternalSubtitle,
     timing: SubtitleTiming,
+    appearance: SubtitleAppearance,
     modifier: Modifier = Modifier,
 ) {
     var view by remember { mutableStateOf<SubtitleView?>(null) }
@@ -53,6 +55,7 @@ internal fun ExternalSubtitleOverlay(
             }.also { view = it }
         },
         modifier = modifier.fillMaxSize(),
+        update = { it.applySubtitleAppearance(appearance) },
     )
     LaunchedEffect(player, subtitle, view) {
         val v = view ?: return@LaunchedEffect

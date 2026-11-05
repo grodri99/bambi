@@ -7,6 +7,8 @@ import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.Category
+import com.shieldstream.tv.model.SubtitleAppearance
+import com.shieldstream.tv.model.SubtitleColor
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.ProfileAvatars
 import com.shieldstream.tv.model.SubtitlePreference
@@ -116,6 +118,12 @@ class ProfileRepositoryImpl @Inject constructor(
         val spanishOnlySources: Boolean? = null,
         val hiddenCategories: Set<String>? = null,
         val subtitlePreference: SubtitlePreference? = null,
+        val subtitleSizePercent: Int? = null,
+        val subtitleVerticalPositionPercent: Int? = null,
+        val subtitleTextColor: SubtitleColor? = null,
+        val subtitleBackgroundColor: SubtitleColor? = null,
+        val subtitleOutlineColor: SubtitleColor? = null,
+        val subtitleApplyEmbeddedStyles: Boolean? = null,
         val experimentalSubtitleSync: Boolean? = null,
     ) {
         fun toProfile(legacyFirst: Boolean, legacyOnly: Boolean, legacyHidden: Set<String>) = Profile(
@@ -124,13 +132,36 @@ class ProfileRepositoryImpl @Inject constructor(
             spanishOnlySources = spanishOnlySources ?: (kids || legacyOnly),
             hiddenCategories = hiddenCategories ?: legacyHidden,
             subtitlePreference = subtitlePreference ?: SubtitlePreference.OFF,
+            subtitleAppearance = SubtitleAppearance(
+                sizePercent = subtitleSizePercent ?: 100,
+                verticalPositionPercent = subtitleVerticalPositionPercent ?: 5,
+                textColor = subtitleTextColor ?: SubtitleColor.WHITE,
+                backgroundColor = subtitleBackgroundColor ?: SubtitleColor.TRANSPARENT,
+                outlineColor = subtitleOutlineColor ?: SubtitleColor.BLACK,
+                applyEmbeddedStyles = subtitleApplyEmbeddedStyles ?: true,
+            ).normalized(),
             experimentalSubtitleSync = experimentalSubtitleSync ?: true,
         )
 
         companion object {
             fun from(p: Profile) = StoredProfile(
-                p.id, p.name, p.avatar, p.traktUser, p.pinHash, p.kids,
-                p.spanishFirst, p.spanishOnlySources, p.hiddenCategories, p.subtitlePreference, p.experimentalSubtitleSync,
+                id = p.id,
+                name = p.name,
+                avatar = p.avatar,
+                traktUser = p.traktUser,
+                pinHash = p.pinHash,
+                kids = p.kids,
+                spanishFirst = p.spanishFirst,
+                spanishOnlySources = p.spanishOnlySources,
+                hiddenCategories = p.hiddenCategories,
+                subtitlePreference = p.subtitlePreference,
+                subtitleSizePercent = p.subtitleAppearance.sizePercent,
+                subtitleVerticalPositionPercent = p.subtitleAppearance.verticalPositionPercent,
+                subtitleTextColor = p.subtitleAppearance.textColor,
+                subtitleBackgroundColor = p.subtitleAppearance.backgroundColor,
+                subtitleOutlineColor = p.subtitleAppearance.outlineColor,
+                subtitleApplyEmbeddedStyles = p.subtitleAppearance.applyEmbeddedStyles,
+                experimentalSubtitleSync = p.experimentalSubtitleSync,
             )
         }
     }

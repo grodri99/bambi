@@ -141,4 +141,22 @@
     <string name="language_italian">Italian</string>
     <string name="language_portuguese">Portuguese</string>
     <string name="language_german">German</string>
+    <string name="subtitle_appearance">Subtitle appearance</string>
+    <string name="subtitle_size">Size</string>
+    <string name="subtitle_position">Bottom margin</string>
+    <string name="subtitle_text_color">Text color</string>
+    <string name="subtitle_background_color">Background color</string>
+    <string name="subtitle_outline_color">Outline color</string>
+    <string name="subtitle_embedded_style">Embedded style</string>
+    <string name="subtitle_style_original">Original</string>
+    <string name="subtitle_style_custom">Custom</string>
+    <string name="subtitle_size_value">%1$d%%</string>
+    <string name="subtitle_position_value">%1$d%%</string>
+    <string name="subtitle_color_white">White</string>
+    <string name="subtitle_color_yellow">Yellow</string>
+    <string name="subtitle_color_green">Green</string>
+    <string name="subtitle_color_cyan">Cyan</string>
+    <string name="subtitle_color_red">Red</string>
+    <string name="subtitle_color_black">Black</string>
+    <string name="subtitle_color_transparent">None</string>
 </resources>

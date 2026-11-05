@@ -2,6 +2,7 @@ package com.shieldstream.tv.domain
 
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitlePreference
 import kotlinx.coroutines.flow.Flow
 
@@ -36,6 +37,9 @@ interface SettingsRepository {
 
     val subtitlePreference: Flow<SubtitlePreference>
     suspend fun setSubtitlePreference(preference: SubtitlePreference)
+
+    val subtitleAppearance: Flow<SubtitleAppearance>
+    suspend fun setSubtitleAppearance(appearance: SubtitleAppearance)
 
     val experimentalSubtitleSync: Flow<Boolean>
     suspend fun setExperimentalSubtitleSync(enabled: Boolean)

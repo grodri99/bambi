@@ -18,6 +18,7 @@ import com.shieldstream.tv.media.PlaybackPolicyProvider
 import com.shieldstream.tv.model.DeviceCapabilities
 import com.shieldstream.tv.model.DeviceOptimization
 import com.shieldstream.tv.model.MemoryProfile
+import com.shieldstream.tv.model.SubtitleAppearance
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -158,6 +159,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setExperimentalSubtitleSync(enabled: Boolean) {
         viewModelScope.launch { settings.setExperimentalSubtitleSync(enabled) }
+    }
+
+    val subtitleAppearance: StateFlow<SubtitleAppearance> = settings.subtitleAppearance
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SubtitleAppearance())
+
+    fun setSubtitleAppearance(appearance: SubtitleAppearance) {
+        viewModelScope.launch { settings.setSubtitleAppearance(appearance.normalized()) }
     }
 
     fun toggleProvider(p: SourceProvider) {

@@ -13,6 +13,7 @@ import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.enabledSourceProviders
 import com.shieldstream.tv.model.DeviceProfile
+import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -72,6 +73,13 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSubtitlePreference(preference: SubtitlePreference) {
         profiles.save(profiles.active.value.copy(subtitlePreference = preference))
+    }
+
+    override val subtitleAppearance: Flow<SubtitleAppearance> = profiles.active
+        .map { it.subtitleAppearance }.distinctUntilChanged()
+
+    override suspend fun setSubtitleAppearance(appearance: SubtitleAppearance) {
+        profiles.save(profiles.active.value.copy(subtitleAppearance = appearance.normalized()))
     }
 
     override val experimentalSubtitleSync: Flow<Boolean> = profiles.active

@@ -5,6 +5,7 @@ import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.strings.rememberTexts
 import com.shieldstream.tv.model.Lang
+import com.shieldstream.tv.model.SubtitleAppearance
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,6 +82,8 @@ fun TracksPanel(
     onCloseExternal: () -> Unit,
     externalLabel: String? = null,
     syncDetail: String = "",
+    appearance: SubtitleAppearance,
+    onAppearanceChange: (SubtitleAppearance) -> Unit,
     onExternalOff: () -> Unit = {},
     onManualSubtitleSelection: () -> Unit = {},
     onOpenSync: () -> Unit = {},
@@ -93,28 +101,37 @@ fun TracksPanel(
     }
 
     var showExternal by remember { mutableStateOf(false) }
+    var showAppearance by remember { mutableStateOf(false) }
 
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.85f))
-            .onBackKey(enabled = showExternal) {
-                showExternal = false
-                onCloseExternal()
+            .onBackKey(enabled = showExternal || showAppearance) {
+                if (showExternal) {
+                    showExternal = false
+                    onCloseExternal()
+                } else {
+                    showAppearance = false
+                }
             },
     ) {
-        if (showExternal) {
-            ExternalSubtitlesView(
+        when {
+            showExternal -> ExternalSubtitlesView(
                 state = external,
                 onSearch = onSearchExternal,
                 onPick = onPickExternal,
             )
-        } else {
+            showAppearance -> SubtitleAppearanceView(
+                appearance = appearance,
+                onChange = onAppearanceChange,
+            )
+            else -> {
             val hasSpanish = remember(tracks) { hasEmbeddedSubtitle(tracks, Lang.current.code) }
             val externalSubtitleText = texts.get(StringsR.string.player_external_subtitle)
             val syncSubtitlesText = texts.get(StringsR.string.player_sync_subtitles_3af0a4)
             val audio = remember(tracks) { audioOptions(tracks, player, texts) }
-            val text = remember(tracks, hasSpanish, externalLabel, syncDetail) {
+            val text = remember(tracks, hasSpanish, externalLabel, syncDetail, appearance) {
                 buildList {
                     add(externalOption(hasSpanish, texts) { showExternal = true })
                     if (externalLabel != null) {
@@ -131,12 +148,23 @@ fun TracksPanel(
                             texts = texts,
                         ),
                     )
+                    add(
+                        TrackOption(
+                            key = "t_appearance",
+                            title = texts.get(StringsR.string.subtitle_appearance) + " ›",
+                            detail = texts.get(StringsR.string.subtitle_size_value, appearance.sizePercent) +
+                                " · " + texts.get(StringsR.string.subtitle_position_value, appearance.verticalPositionPercent),
+                            selected = false,
+                            onSelect = { showAppearance = true },
+                        ),
+                    )
                 }
             }
             TracksView(audio = audio, text = text)
+            }
         }
         Text(
-            text = if (showExternal) localizedStringResource(StringsR.string.player_back_to_return_to_audio_subtitles) else localizedStringResource(StringsR.string.player_back_to_return_to_the_movie),
+            text = if (showExternal || showAppearance) localizedStringResource(StringsR.string.player_back_to_return_to_audio_subtitles) else localizedStringResource(StringsR.string.player_back_to_return_to_the_movie),
             color = Color.White.copy(alpha = 0.5f),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
@@ -316,6 +344,7 @@ private fun OptionColumn(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(bottom = 48.dp),
+                modifier = Modifier.weight(1f),
             ) {
                 itemsIndexed(options, key = { _, o -> o.key }) { index, option ->
                     OptionRow(
@@ -330,6 +359,103 @@ private fun OptionColumn(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SubtitleAppearanceView(
+    appearance: SubtitleAppearance,
+    onChange: (SubtitleAppearance) -> Unit,
+) {
+    val initialFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { initialFocus.requestFocus() }
+    }
+    Box(
+        modifier = Modifier.fillMaxSize().padding(48.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(Modifier.width(720.dp)) {
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = localizedStringResource(StringsR.string.subtitle_appearance),
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        )
+        Spacer(Modifier.height(4.dp))
+        AppearanceControlRow(
+            title = localizedStringResource(StringsR.string.subtitle_size),
+            value = localizedStringResource(StringsR.string.subtitle_size_value, appearance.sizePercent),
+            modifier = Modifier.focusRequester(initialFocus),
+            onShift = { delta ->
+                onChange(
+                    appearance.copy(
+                        sizePercent = (appearance.sizePercent + delta * SubtitleAppearance.SIZE_STEP)
+                            .coerceIn(SubtitleAppearance.MIN_SIZE, SubtitleAppearance.MAX_SIZE),
+                    ),
+                )
+            },
+        )
+        AppearanceControlRow(
+            title = localizedStringResource(StringsR.string.subtitle_position),
+            value = localizedStringResource(StringsR.string.subtitle_position_value, appearance.verticalPositionPercent),
+            onShift = { delta ->
+                onChange(
+                    appearance.copy(
+                        verticalPositionPercent = (
+                            appearance.verticalPositionPercent + delta * SubtitleAppearance.POSITION_STEP
+                        ).coerceIn(SubtitleAppearance.MIN_POSITION, SubtitleAppearance.MAX_POSITION),
+                    ),
+                )
+            },
+        )
+        }
+    }
+}
+
+@Composable
+private fun AppearanceControlRow(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onShift: (Int) -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val foreground = if (focused) Color.Black else Color.White
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionLeft -> { onShift(-1); true }
+                    Key.DirectionRight -> { onShift(1); true }
+                    else -> false
+                }
+            }
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .tvClickable(onClick = { onShift(1) })
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = title,
+            color = foreground,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Text(text = "‹", color = foreground.copy(alpha = 0.65f), style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = value,
+            color = foreground,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+        Text(text = "›", color = foreground.copy(alpha = 0.65f), style = MaterialTheme.typography.titleMedium)
     }
 }
 

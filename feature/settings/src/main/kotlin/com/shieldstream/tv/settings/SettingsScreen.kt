@@ -7,6 +7,7 @@ import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.strings.titleResource
 import com.shieldstream.tv.strings.usedForResource
 import com.shieldstream.tv.strings.whereToGetResource
+import com.shieldstream.tv.strings.labelResource
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -19,6 +20,8 @@ import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.DeviceCapabilities
 import com.shieldstream.tv.model.DeviceOptimization
 import com.shieldstream.tv.model.MemoryProfile
+import com.shieldstream.tv.model.SubtitleAppearance
+import com.shieldstream.tv.model.SubtitleColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -104,6 +107,7 @@ fun SettingsScreen(
     val ready = state as? SettingsUiState.Ready
     val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
     Box(
         Modifier
             .fillMaxSize()
@@ -121,6 +125,8 @@ fun SettingsScreen(
                     onDebrid = viewModel::setDebrid,
                     onDeviceOptimization = viewModel::setDeviceOptimization,
                     onExperimentalSync = viewModel::setExperimentalSubtitleSync,
+                    subtitleAppearance = subtitleAppearance,
+                    onSubtitleAppearance = viewModel::setSubtitleAppearance,
                     onOpenSetup = onOpenSetup,
                     onOpenPhoneConfig = onOpenPhoneConfig,
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
@@ -150,6 +156,8 @@ private fun SettingsList(
     onDebrid: (DebridService) -> Unit,
     onDeviceOptimization: (DeviceOptimization) -> Unit,
     onExperimentalSync: (Boolean) -> Unit,
+    subtitleAppearance: SubtitleAppearance,
+    onSubtitleAppearance: (SubtitleAppearance) -> Unit,
     onOpenSetup: () -> Unit,
     onOpenPhoneConfig: () -> Unit,
     onLanguage: (AppLanguage) -> Unit,
@@ -159,6 +167,7 @@ private fun SettingsList(
     val requesters = remember { ApiService.entries.associateWith { FocusRequester() } }
     val debridRequester = remember { FocusRequester() }
     var lastEdited by rememberSaveable { mutableStateOf<ApiService?>(null) }
+    var subtitleAppearanceExpanded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.editor == null) {
         if (state.editor == null) {
             withFrameNanos { }
@@ -245,6 +254,106 @@ private fun SettingsList(
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
             item { ExperimentalSyncCard(enabled = state.experimentalSubtitleSync, onChange = onExperimentalSync) }
             item {
+                SubtitleAppearanceHeaderCard(
+                    appearance = subtitleAppearance,
+                    expanded = subtitleAppearanceExpanded,
+                    onClick = { subtitleAppearanceExpanded = !subtitleAppearanceExpanded },
+                )
+            }
+            if (subtitleAppearanceExpanded) {
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_size),
+                    value = localizedStringResource(StringsR.string.subtitle_size_value, subtitleAppearance.sizePercent),
+                    onShift = { delta ->
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(
+                                sizePercent = (subtitleAppearance.sizePercent + delta * SubtitleAppearance.SIZE_STEP)
+                                    .coerceIn(SubtitleAppearance.MIN_SIZE, SubtitleAppearance.MAX_SIZE),
+                            ),
+                        )
+                    },
+                )
+            }
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_position),
+                    value = localizedStringResource(
+                        StringsR.string.subtitle_position_value,
+                        subtitleAppearance.verticalPositionPercent,
+                    ),
+                    onShift = { delta ->
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(
+                                verticalPositionPercent = (
+                                    subtitleAppearance.verticalPositionPercent + delta * SubtitleAppearance.POSITION_STEP
+                                ).coerceIn(SubtitleAppearance.MIN_POSITION, SubtitleAppearance.MAX_POSITION),
+                            ),
+                        )
+                    },
+                )
+            }
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_text_color),
+                    value = localizedStringResource(subtitleAppearance.textColor.labelResource),
+                    swatch = subtitleAppearance.textColor,
+                    onShift = { delta ->
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(
+                                textColor = subtitleAppearance.textColor.shift(SubtitleAppearance.textColors, delta),
+                            ),
+                        )
+                    },
+                )
+            }
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_background_color),
+                    value = localizedStringResource(subtitleAppearance.backgroundColor.labelResource),
+                    swatch = subtitleAppearance.backgroundColor,
+                    onShift = { delta ->
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(
+                                backgroundColor = subtitleAppearance.backgroundColor.shift(
+                                    SubtitleAppearance.backgroundColors,
+                                    delta,
+                                ),
+                            ),
+                        )
+                    },
+                )
+            }
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_outline_color),
+                    value = localizedStringResource(subtitleAppearance.outlineColor.labelResource),
+                    swatch = subtitleAppearance.outlineColor,
+                    onShift = { delta ->
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(
+                                outlineColor = subtitleAppearance.outlineColor.shift(SubtitleAppearance.outlineColors, delta),
+                            ),
+                        )
+                    },
+                )
+            }
+            item {
+                SubtitleAppearanceCard(
+                    title = localizedStringResource(StringsR.string.subtitle_embedded_style),
+                    value = localizedStringResource(
+                        if (subtitleAppearance.applyEmbeddedStyles) StringsR.string.subtitle_style_original
+                        else StringsR.string.subtitle_style_custom
+                    ),
+                    onShift = {
+                        onSubtitleAppearance(
+                            subtitleAppearance.copy(applyEmbeddedStyles = !subtitleAppearance.applyEmbeddedStyles),
+                        )
+                    },
+                )
+            }
+            }
+            item {
                 DeviceOptimizationCard(
                     optimization = state.optimization,
                     capabilities = state.capabilities,
@@ -310,6 +419,82 @@ private fun FocusCard(
     ) {
         content(focused)
     }
+}
+
+@Composable
+private fun SubtitleAppearanceHeaderCard(
+    appearance: SubtitleAppearance,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    FocusCard(onClick = onClick) { focused ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = localizedStringResource(StringsR.string.subtitle_appearance),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    text = localizedStringResource(StringsR.string.subtitle_size_value, appearance.sizePercent) +
+                        " · " + localizedStringResource(appearance.textColor.labelResource),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Text(
+                text = if (expanded) "▾" else "▸",
+                style = MaterialTheme.typography.headlineSmall,
+                color = if (focused) Color.White else Muted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SubtitleAppearanceCard(
+    title: String,
+    value: String,
+    swatch: SubtitleColor? = null,
+    onShift: (Int) -> Unit,
+) {
+    FocusCard(
+        onClick = { onShift(1) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { onShift(-1); true }
+                Key.DirectionRight -> { onShift(1); true }
+                else -> false
+            }
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+            )
+            if (swatch != null) {
+                Box(Modifier.size(20.dp).background(Color(swatch.argb), CircleShape))
+                Spacer(Modifier.width(12.dp))
+            }
+            Arrow("◀", enabled = it)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 18.dp),
+            )
+            Arrow("▶", enabled = it)
+        }
+    }
+}
+
+private fun SubtitleColor.shift(colors: List<SubtitleColor>, delta: Int): SubtitleColor {
+    val index = colors.indexOf(this).coerceAtLeast(0)
+    return colors[(index + delta + colors.size) % colors.size]
 }
 
 @Composable

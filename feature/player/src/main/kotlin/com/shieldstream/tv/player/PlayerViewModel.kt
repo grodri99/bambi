@@ -33,6 +33,7 @@ import com.shieldstream.tv.media.VideoFormatInspector
 import androidx.media3.common.PlaybackException
 import com.shieldstream.tv.model.ExternalSubtitle
 import com.shieldstream.tv.model.PlaybackVideoInfo
+import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -129,6 +130,8 @@ class PlayerViewModel @Inject constructor(
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private val subtitlePreference = profiles.active.value.subtitlePreference
+    private val _subtitleAppearance = MutableStateFlow(profiles.active.value.subtitleAppearance)
+    val subtitleAppearance: StateFlow<SubtitleAppearance> = _subtitleAppearance.asStateFlow()
     private val experimentalSubtitleSync = profiles.active.value.experimentalSubtitleSync
 
     private var started = false
@@ -242,6 +245,12 @@ class PlayerViewModel @Inject constructor(
     fun disableExternalSubtitle() = subtitleCoordinator.disable()
 
     fun adjustSubtitleOffset(deltaMs: Long) = subtitleCoordinator.adjustOffset(deltaMs)
+
+    fun setSubtitleAppearance(appearance: SubtitleAppearance) {
+        val normalized = appearance.normalized()
+        _subtitleAppearance.value = normalized
+        viewModelScope.launch { settings.setSubtitleAppearance(normalized) }
+    }
 
     fun autoSyncNow() = subtitleCoordinator.autoSyncNow()
 

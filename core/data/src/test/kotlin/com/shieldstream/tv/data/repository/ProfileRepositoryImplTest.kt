@@ -3,9 +3,12 @@ package com.shieldstream.tv.data.repository
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.shieldstream.tv.model.Profile
+import com.shieldstream.tv.model.SubtitleAppearance
+import com.shieldstream.tv.model.SubtitleColor
 import com.shieldstream.tv.strings.Texts
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -38,6 +41,28 @@ class ProfileRepositoryImplTest {
         val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
         assertFalse(reloaded.active.value.experimentalSubtitleSync)
         assertTrue(Profile(id = "default", name = "Default", avatar = 0).experimentalSubtitleSync)
+    }
+
+    @Test
+    fun `subtitle appearance persists across repository reloads`() {
+        val cleanup = mockk<ProfileDataCleaner>(relaxed = true)
+        val texts = mockk<Texts>(relaxed = true)
+        val repository = ProfileRepositoryImpl(context, cleanup, texts)
+        val appearance = SubtitleAppearance(
+            sizePercent = 150,
+            verticalPositionPercent = 20,
+            textColor = SubtitleColor.YELLOW,
+            backgroundColor = SubtitleColor.BLACK,
+            outlineColor = SubtitleColor.TRANSPARENT,
+            applyEmbeddedStyles = false,
+        )
+        val profile = Profile(id = "appearance", name = "Appearance", avatar = 0, subtitleAppearance = appearance)
+        repository.save(profile)
+        repository.select(profile.id)
+
+        val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
+
+        assertEquals(appearance, reloaded.active.value.subtitleAppearance)
     }
 
     @Test

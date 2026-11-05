@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.FeaturedBadge
+import com.shieldstream.tv.model.SubtitleColor
 
 @get:StringRes
 val Category.titleResource: Int
@@ -49,6 +50,18 @@ val FeaturedBadge.labelResource: Int
         FeaturedBadge.MOVIE_NOW -> R.string.featured_movie_now
         FeaturedBadge.RISING -> R.string.featured_rising
         FeaturedBadge.ACCLAIMED -> R.string.featured_acclaimed
+    }
+
+@get:StringRes
+val SubtitleColor.labelResource: Int
+    get() = when (this) {
+        SubtitleColor.WHITE -> R.string.subtitle_color_white
+        SubtitleColor.YELLOW -> R.string.subtitle_color_yellow
+        SubtitleColor.GREEN -> R.string.subtitle_color_green
+        SubtitleColor.CYAN -> R.string.subtitle_color_cyan
+        SubtitleColor.RED -> R.string.subtitle_color_red
+        SubtitleColor.BLACK -> R.string.subtitle_color_black
+        SubtitleColor.TRANSPARENT -> R.string.subtitle_color_transparent
     }
 
 @Composable
