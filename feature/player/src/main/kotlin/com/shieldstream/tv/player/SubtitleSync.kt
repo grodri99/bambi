@@ -42,7 +42,9 @@ internal data class SyncResult(
     val strong: Boolean
         get() = when {
             timing.scale == 1.0 ->
-                (correlation >= 0.55f && ratio >= 1.5f) || (correlation >= 0.60f && ratio >= 1.4f)
+                (correlation >= 0.55f && ratio >= 1.5f) ||
+                (correlation >= 0.60f && ratio >= 1.4f) ||
+                (correlation >= 0.65f && ratio >= 1.3f)
             correlation >= 0.75f -> ratio >= 1.1f
             else -> correlation >= 0.6f && ratio >= 1.8f
         }

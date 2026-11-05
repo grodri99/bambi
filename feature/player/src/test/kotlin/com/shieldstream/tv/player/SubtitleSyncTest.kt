@@ -57,6 +57,17 @@ class SubtitleSyncTest {
     }
 
     @Test
+    fun `near zero offset with high correlation is accepted`() {
+        val result = SyncResult(
+            timing = SubtitleTiming(-220, 1.0),
+            correlation = 0.66814303f,
+            ratio = 1.3648326f,
+            referenceCues = 11,
+        )
+        assertTrue(result.strong)
+    }
+
+    @Test
     fun `high correlation frame rate match does not require a large peak ratio`() {
         val result = SyncResult(
             timing = SubtitleTiming(4_900, 25.0 / 23.976),
