@@ -15,6 +15,7 @@ import androidx.media3.extractor.DefaultExtractorInput
 import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.PositionHolder
+import androidx.media3.extractor.SeekMap
 import androidx.media3.extractor.avi.AviExtractor
 import androidx.media3.extractor.TrackOutput
 import androidx.media3.extractor.mkv.MatroskaExtractor
@@ -185,8 +186,20 @@ internal class Media3EmbeddedReferenceReader(
         extractor.init(output)
         val positionHolder = PositionHolder()
         var lastSeekPosition = -1L
+        var initialSeekHandled = positionMs == 0L
         while (output.starts.size < REFERENCE_CUES) {
             if (Thread.interrupted()) throw InterruptedException("Subtitle demux interrupted")
+            val seekMap = output.seekMap
+            if (!initialSeekHandled && seekMap != null) {
+                initialSeekHandled = true
+                val seekPoint = seekMap.getSeekPoints(positionMs * 1_000).first
+                if (seekPoint.position > 0L && ++metrics.seeks <= MAX_SEEKS) {
+                    extractor.seek(seekPoint.position, positionMs * 1_000)
+                    dataSource.close()
+                    input = openInput(dataSource, sourceUrl, seekPoint.position)
+                    continue
+                }
+            }
             val readResult = extractor.read(input, positionHolder)
             if (output.tracksEnded && metrics.track == null) {
                 return failure(ReferenceFailureReason.NO_TEXT_TRACK, retryable = false)
@@ -254,6 +267,7 @@ internal class Media3EmbeddedReferenceReader(
         private val metrics: DemuxMetrics,
     ) : ExtractorOutput {
         val starts = mutableListOf<Long>()
+        var seekMap: SeekMap? = null
         var tracksEnded = false
         private val tracks = mutableListOf<TimestampTrackOutput>()
 
@@ -317,7 +331,9 @@ internal class Media3EmbeddedReferenceReader(
                 if (accepted && timeUs >= positionMs * 1_000) starts += timeUs / 1_000
             }
         }
-        override fun seekMap(seekMap: androidx.media3.extractor.SeekMap) = Unit
+        override fun seekMap(seekMap: SeekMap) {
+            this.seekMap = seekMap
+        }
     }
 
     private companion object {

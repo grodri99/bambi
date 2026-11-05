@@ -43,6 +43,17 @@ class EmbeddedSubtitleReaderInstrumentedTest {
     }
 
     @Test
+    fun mkvSeeksNearResumePosition() = runBlocking {
+        serveAsset("reference.mkv")
+        val result = read("reference.mkv", positionMs = 10_000)
+
+        val success = result as? ReferenceReadResult.Success
+            ?: error("Expected resumed MKV reference, got $result")
+        assertTrue(success.reference.intervals.first().startMs >= 10_000)
+        assertTrue("Expected a seek, got ${success.reference}", success.reference.seeks > 0)
+    }
+
+    @Test
     fun mp4ReadsEmbeddedTx3gReference() = runBlocking {
         serveAsset("reference.mp4")
         val result = read("reference.mp4")
@@ -52,6 +63,17 @@ class EmbeddedSubtitleReaderInstrumentedTest {
         assertTrue(success.reference.intervals.size >= SubtitleSync.MIN_REFERENCE_CUES)
         assertTrue(success.reference.bytesRead > 0)
         assertTrue(success.reference.track.isNotBlank())
+    }
+
+    @Test
+    fun mp4SeeksNearResumePosition() = runBlocking {
+        serveAsset("reference.mp4")
+        val result = read("reference.mp4", positionMs = 10_000)
+
+        val success = result as? ReferenceReadResult.Success
+            ?: error("Expected resumed MP4 reference, got $result")
+        assertTrue(success.reference.intervals.first().startMs >= 10_000)
+        assertTrue("Expected a seek, got ${success.reference}", success.reference.seeks > 0)
     }
 
     @Test
@@ -77,9 +99,9 @@ class EmbeddedSubtitleReaderInstrumentedTest {
         assertFalse(failure.retryable)
     }
 
-    private fun read(name: String): ReferenceReadResult {
+    private fun read(name: String, positionMs: Long = 0): ReferenceReadResult {
         val reader = Media3EmbeddedReferenceReader(DefaultHttpDataSource.Factory())
-        return runBlocking { reader.read(server.url("/$name").toString(), positionMs = 0) }
+        return runBlocking { reader.read(server.url("/$name").toString(), positionMs) }
     }
 
     private fun serveAsset(name: String) {
