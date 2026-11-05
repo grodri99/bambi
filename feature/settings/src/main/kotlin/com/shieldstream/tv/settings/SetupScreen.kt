@@ -531,10 +531,9 @@ private fun ColumnScope.KeyStep(
                         localizedStringResource(service.titleResource),
                     ),
                     onDone = { onSubmit(input) },
-                    modifier = Modifier
-                        .focusRequester(fieldRequester)
-                        .focusProperties { if (selector != null) up = selectorRequester },
+                    upRequester = if (selector != null) selectorRequester else null,
                     downRequester = primaryRequester,
+                    modifier = Modifier.focusRequester(fieldRequester),
                 )
                 Spacer(Modifier.height(10.dp))
                 StatusLine(state, service)
@@ -627,6 +626,7 @@ private fun KeyField(
     onDone: () -> Unit,
     downRequester: FocusRequester,
     modifier: Modifier = Modifier,
+    upRequester: FocusRequester? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     var focused by remember { mutableStateOf(false) }
@@ -659,6 +659,11 @@ private fun KeyField(
                             pressedHere = false
                             keyboard?.show()
                         }
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        if (upRequester == null) return@onPreviewKeyEvent false
+                        if (event.type == KeyEventType.KeyDown) runCatching { upRequester.requestFocus() }
                         true
                     }
                     Key.DirectionDown -> {

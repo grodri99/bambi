@@ -52,7 +52,7 @@ interface SettingsRepository {
     val sourceProviders: Flow<Set<SourceProvider>>
     suspend fun setSourceProviders(providers: Set<SourceProvider>)
 
-    /** Servicio debrid en uso (Real-Debrid por defecto). */
+    /** Servicio debrid en uso (AllDebrid por defecto). */
     val debridService: Flow<DebridService>
     suspend fun setDebridService(service: DebridService)
 }
