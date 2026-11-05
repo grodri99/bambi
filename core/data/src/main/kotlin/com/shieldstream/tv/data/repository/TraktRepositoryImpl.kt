@@ -155,6 +155,16 @@ class TraktRepositoryImpl @Inject constructor(
         forget(profileId)
     }
 
+    override suspend fun recommendations(profileId: String, type: MediaType): List<String> {
+        val token = validToken(profileId) ?: return emptyList()
+        val kind = if (type == MediaType.MOVIE) "movies" else "shows"
+        val response = client.get("/recommendations/$kind?limit=$RECOMMENDATIONS_LIMIT", token)
+        if (!response.ok) throw TraktHttpException(response.code)
+        return (response.body as? JsonArray).orEmpty().mapNotNull { element ->
+            (element as? JsonObject)?.obj("ids")?.int("tmdb")?.toString()
+        }.distinct()
+    }
+
     override fun syncActive(force: Boolean) {
         val now = System.currentTimeMillis()
         if (!force && now - lastSyncAttempt < MIN_SYNC_INTERVAL_MS) return
@@ -523,6 +533,7 @@ class TraktRepositoryImpl @Inject constructor(
         const val CLOCK_SLACK_MS = 2_000L
         const val POST_SPACING_MS = 1_100L
         const val MAX_UPLOAD_RESUMABLE = 20
+        const val RECOMMENDATIONS_LIMIT = 40
     }
 }
 

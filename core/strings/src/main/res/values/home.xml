@@ -36,6 +36,7 @@
     <string name="home_continue_watching">Continue watching</string>
     <string name="home_new_episodes">New episodes</string>
     <string name="home_my_list_f0348a">My list</string>
+    <string name="home_recommended_for_you">Recommended for you</string>
     <string name="home_couldn_t_load_the_catalog_check_your">Couldn\'t load the catalog. Check your connection.</string>
     <string name="home_error_loading_the_catalog">Error loading the catalog</string>
     <string name="home_search_error">Search error</string>

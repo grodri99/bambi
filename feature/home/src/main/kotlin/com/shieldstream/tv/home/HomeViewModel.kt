@@ -9,6 +9,8 @@ import com.shieldstream.tv.domain.EpisodeReleaseRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.MyListRepository
+import com.shieldstream.tv.domain.ProfileRepository
+import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.NewEpisodes
 import com.shieldstream.tv.domain.ContinueEntry
 import com.shieldstream.tv.domain.ContinueWatching
@@ -33,6 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -50,6 +53,18 @@ private data class NewEpisodeQuery(
     val dismissedKeys: Set<String>,
 )
 
+private data class RecommendationQuery(
+    val filter: HomeFilter,
+    val profileId: String,
+    val traktUser: String?,
+    val kids: Boolean,
+)
+
+private data class RecommendationResult(
+    val query: RecommendationQuery,
+    val rows: List<CatalogRow>,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -59,7 +74,8 @@ class HomeViewModel @Inject constructor(
     private val tracking: EpisodeTrackingRepository,
     settings: SettingsRepository,
     myList: MyListRepository,
-    profiles: com.shieldstream.tv.domain.ProfileRepository,
+    profiles: ProfileRepository,
+    private val trakt: TraktRepository,
     private val texts: Texts,
 ) : ViewModel() {
 
@@ -77,14 +93,22 @@ class HomeViewModel @Inject constructor(
 
     private val myListRows = MutableStateFlow<List<CatalogRow>?>(null)
 
-    val uiState: StateFlow<HomeUiState> = combine(_uiState, continueRows, newEpisodeRows, myListRows) { catalog, continueRow, newRow, listRow ->
+    private val recommendationRows = MutableStateFlow<List<CatalogRow>>(emptyList())
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        _uiState,
+        continueRows,
+        newEpisodeRows,
+        myListRows,
+        recommendationRows,
+    ) { catalog, continueRow, newRow, listRow, recommendationRow ->
         when {
             catalog !is HomeUiState.Content -> catalog
             continueRow == null || newRow == null || listRow == null -> HomeUiState.Loading
             else -> {
                 val releases = newRow.flatMap { it.newEpisodes.entries }.associate { it.key to it.value }
                 val counts = newRow.flatMap { it.newEpisodeCounts.entries }.associate { it.key to it.value }
-                val rows = continueRow + newRow + listRow + catalog.rows
+                val rows = continueRow + newRow + listRow + recommendationRow + catalog.rows
                 catalog.copy(
                     rows = rows.map { row ->
                         if (row.style == RowStyle.NEW_EPISODES || releases.isEmpty()) return@map row
@@ -144,6 +168,26 @@ class HomeViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .mapLatest { entries -> listOfNotNull(buildMyListRow(entries)) }
                 .collect { myListRows.value = it }
+        }
+        viewModelScope.launch {
+            combine(filterFlow.filterNotNull(), profiles.active) { filter, profile ->
+                RecommendationQuery(filter, profile.id, profile.traktUser, profile.kids)
+            }
+                .distinctUntilChanged()
+                .onEach { recommendationRows.value = emptyList() }
+                .mapLatest { query -> RecommendationResult(query, listOfNotNull(buildRecommendationsRow(query))) }
+                .collect { result ->
+                    val profile = profiles.active.value
+                    val query = result.query
+                    if (
+                        filterFlow.value == query.filter &&
+                        profile.id == query.profileId &&
+                        profile.traktUser == query.traktUser &&
+                        profile.kids == query.kids
+                    ) {
+                        recommendationRows.value = result.rows
+                    }
+                }
         }
     }
 
@@ -208,6 +252,44 @@ class HomeViewModel @Inject constructor(
         return CatalogRow(id = MY_LIST_ROW_ID, title = texts.get(StringsR.string.home_my_list_f0348a), items = items)
     }
 
+    private suspend fun buildRecommendationsRow(query: RecommendationQuery): CatalogRow? {
+        if (query.kids || query.traktUser == null) return null
+        val entries = recommendationEntries(query).take(RECOMMENDATIONS_MAX)
+        if (entries.isEmpty()) return null
+        val items = entries.mapConcurrent(concurrency = 4) { (type, id) ->
+            withTimeoutOrNull(5_000) { runCatching { catalogRepository.getItem(type, id) }.getOrNull() }
+        }.filterNotNull()
+        if (items.isEmpty()) return null
+        return CatalogRow(
+            id = RECOMMENDATIONS_ROW_ID,
+            title = texts.get(StringsR.string.home_recommended_for_you),
+            items = items,
+        )
+    }
+
+    private suspend fun recommendationEntries(query: RecommendationQuery): List<Pair<MediaType, String>> = coroutineScope {
+        suspend fun load(type: MediaType): List<String> = withTimeoutOrNull(5_000) {
+            runCatching { trakt.recommendations(query.profileId, type) }.getOrNull()
+        }.orEmpty()
+
+        when (query.filter) {
+            HomeFilter.MOVIES -> load(MediaType.MOVIE).map { MediaType.MOVIE to it }
+            HomeFilter.TV -> load(MediaType.TV).map { MediaType.TV to it }
+            HomeFilter.ALL -> {
+                val movies = async { load(MediaType.MOVIE).map { MediaType.MOVIE to it } }
+                val shows = async { load(MediaType.TV).map { MediaType.TV to it } }
+                val movieEntries = movies.await()
+                val showEntries = shows.await()
+                buildList {
+                    for (index in 0 until maxOf(movieEntries.size, showEntries.size)) {
+                        movieEntries.getOrNull(index)?.let { add(it) }
+                        showEntries.getOrNull(index)?.let { add(it) }
+                    }
+                }
+            }
+        }
+    }
+
     private fun labelFor(entry: ContinueEntry): String {
         val remaining = formatRemaining(entry.progress.remainingMs)
         return if (entry.type == MediaType.TV) {
@@ -232,7 +314,9 @@ class HomeViewModel @Inject constructor(
         const val CONTINUE_ROW_ID = "continue_watching"
         const val NEW_EPISODES_ROW_ID = "new_episodes"
         const val MY_LIST_ROW_ID = "my_list"
+        const val RECOMMENDATIONS_ROW_ID = "recommended_for_you"
         const val MY_LIST_MAX = 40
+        const val RECOMMENDATIONS_MAX = 40
     }
 
     private fun prefetchOtherTabs() {

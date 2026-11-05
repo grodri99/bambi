@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -47,6 +48,27 @@ class TraktRepositoryImplTest {
     fun clearSyncState() {
         context = ApplicationProvider.getApplicationContext()
         context.getSharedPreferences("trakt_sync", Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    @Test
+    fun `recommendations return ordered TMDB ids for movies and shows`() {
+        val fixture = fixture(expiresAt = System.currentTimeMillis() + 86_400_000)
+        coEvery { fixture.client.get("/recommendations/movies?limit=40", "old-access") } returns TraktResponse(
+            200,
+            JsonArray(listOf(recommendation(20), recommendation(10), recommendation(20), recommendation(null))),
+        )
+        coEvery { fixture.client.get("/recommendations/shows?limit=40", "old-access") } returns TraktResponse(
+            200,
+            JsonArray(listOf(recommendation(30))),
+        )
+
+        val (movies, shows) = runBlocking {
+            fixture.repository.recommendations(PROFILE, MediaType.MOVIE) to
+                fixture.repository.recommendations(PROFILE, MediaType.TV)
+        }
+
+        assertEquals(listOf("20", "10"), movies)
+        assertEquals(listOf("30"), shows)
     }
 
     @Test
@@ -173,6 +195,10 @@ class TraktRepositoryImplTest {
             texts = mockk<Texts>(relaxed = true),
         )
         return fixture
+    }
+
+    private fun recommendation(tmdbId: Int?) = buildJsonObject {
+        if (tmdbId != null) put("ids", buildJsonObject { put("tmdb", tmdbId) })
     }
 
     private fun refreshedSession() = buildJsonObject {

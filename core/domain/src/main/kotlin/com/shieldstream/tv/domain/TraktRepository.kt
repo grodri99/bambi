@@ -1,5 +1,7 @@
 package com.shieldstream.tv.domain
 
+import com.shieldstream.tv.model.MediaType
+
 data class TraktCredentials(
     val clientId: String,
     val clientSecret: String = "",
@@ -35,6 +37,8 @@ interface TraktRepository {
     suspend fun pollDeviceToken(profileId: String, code: TraktDeviceCode): TraktAuthPoll
 
     suspend fun disconnect(profileId: String)
+
+    suspend fun recommendations(profileId: String, type: MediaType): List<String>
 
     fun syncActive(force: Boolean = false)
 
