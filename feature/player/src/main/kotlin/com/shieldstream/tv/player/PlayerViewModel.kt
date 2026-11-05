@@ -129,9 +129,6 @@ class PlayerViewModel @Inject constructor(
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private val subtitlePreference = profiles.active.value.subtitlePreference
-    private var spanishChecked = false
-    private var spanishSkips = 0
-    private var spanishFallback: Int? = null
 
     private var started = false
     private var playbackVisible = true
@@ -144,12 +141,15 @@ class PlayerViewModel @Inject constructor(
 
     private var playbackRetries = 0
 
-    private var queueIndex = 0
-    private var everPlayed = false
-    private var slateChecked = false
-    private var lastQueueError = ""
-    private var allNotCached = true
     private var saverJob: Job? = null
+
+    private val sourceFailover = SourceFailoverController(
+        queue = queueSnapshot,
+        resolveStreamUseCase = resolveStreamUseCase,
+        texts = texts,
+        spanishOnly = spanishOnly,
+        spanishFirst = spanishFirst,
+    )
 
     private val subtitleCoordinator = SubtitleCoordinator(
         scope = viewModelScope,
@@ -188,65 +188,36 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun playFrom(from: Int) {
-        val queue = queueSnapshot
         viewModelScope.launch {
-            var attempts = 0
-            for (index in from until queue.size) {
-                if (attempts >= MAX_ATTEMPTS) break
-                val source = queue[index]
-                var outcome: ResolveState? = null
-                resolveStreamUseCase(source).collect { state ->
-                    when (state) {
-                        is ResolveState.Progress -> {
-                            val prefix = if (index > 0) texts.get(StringsR.string.player_queue_source, index + 1, queue.size) else ""
-                            _uiState.value = PlayerUiState.Resolving(prefix + state.message, index + 1, queue.size)
-                        }
-                        is ResolveState.Ready, is ResolveState.Failed -> outcome = state
+            sourceFailover.resolve(from).collect { event ->
+                when (event) {
+                    is SourceResolutionEvent.Resolving -> {
+                        _uiState.value = PlayerUiState.Resolving(event.message, event.attempt, event.total)
                     }
-                }
-                when (val result = outcome) {
-                    is ResolveState.Ready -> {
-                        resolvedUrl = result.url
-                        queueIndex = index
-                        everPlayed = false
-                        slateChecked = false
-                        spanishChecked = false
-                        subtitleCoordinator.onNewSource()
-                        Log.i("PlayerVM", "Fuente ${index + 1}/${queue.size}: ${(source.fileName ?: source.title).take(120)}")
-                        playingFileName = source.fileName ?: source.title
-                        val resumeAt = savedResumePosition()
-                        trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
-                        launchPlayer(result.url, startPositionMs = resumeAt)
-                        if (resumeAt > 0) _notice.value = texts.get(StringsR.string.player_resume_from, formatTime(resumeAt))
-                        _uiState.value = PlayerUiState.Playing
-                        startProgressSaver()
-                        startSegmentsWatcher()
-                        return@launch
+                    is SourceResolutionEvent.Ready -> onSourceReady(event)
+                    is SourceResolutionEvent.Fallback -> {
+                        _notice.value = event.notice
+                        playFrom(event.index)
                     }
-                    is ResolveState.Failed -> {
-                        if (!result.blocked) attempts++
-                        lastQueueError = result.message
-                        if (!result.notCached) allNotCached = false
-                    }
-                    else -> Unit
+                    is SourceResolutionEvent.Error -> _uiState.value = PlayerUiState.Error(event.message)
                 }
             }
-            spanishFallback?.let { back ->
-                spanishFallback = null
-                spanishSkips = MAX_SPANISH_SKIPS
-                _notice.value = texts.get(StringsR.string.player_no_other_working_spanish_source_back_to)
-                playFrom(back)
-                return@launch
-            }
-            _uiState.value = PlayerUiState.Error(
-                if (allNotCached) {
-                    texts.get(StringsR.string.player_none_of_the_sources_tried_is_cached) +
-                        "${queue.firstNotNullOfOrNull { it.debrid } ?: "Real-Debrid"}.\n$lastQueueError"
-                } else {
-                    texts.get(StringsR.string.player_none_of_the_sources_tried_worked) + "\n$lastQueueError"
-                },
-            )
         }
+    }
+
+    private fun onSourceReady(event: SourceResolutionEvent.Ready) {
+        resolvedUrl = event.url
+        subtitleCoordinator.onNewSource()
+        val source = event.source
+        Log.i("PlayerVM", "Fuente ${event.index + 1}/${queueSnapshot.size}: ${(source.fileName ?: source.title).take(120)}")
+        playingFileName = source.fileName ?: source.title
+        val resumeAt = savedResumePosition()
+        trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
+        launchPlayer(event.url, startPositionMs = resumeAt)
+        if (resumeAt > 0) _notice.value = texts.get(StringsR.string.player_resume_from, formatTime(resumeAt))
+        _uiState.value = PlayerUiState.Playing
+        startProgressSaver()
+        startSegmentsWatcher()
     }
 
     fun clearNotice() {
@@ -358,65 +329,42 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun checkSpanishAudio(player: ExoPlayer, tracks: Tracks) {
-        if (spanishChecked || !spanishFirst) return
-        val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
-            .flatMap { g -> (0 until g.length).filter { g.isTrackSupported(it) }.map { g.getTrackFormat(it).language?.lowercase() } }
-        if (audio.isEmpty() && player.playbackState != Player.STATE_READY) return
-        spanishChecked = true
-        val source = queueSnapshot.getOrNull(queueIndex) ?: return
-        if (!spanishOnly && source.spanishAudioScore == 0) return
-        val known = audio.filterNotNull().filter { it != "und" && it != "mul" }
-        if (known.any { it == "es" || it.startsWith("es-") || it == "spa" } || (!spanishOnly && known.isEmpty())) {
-            if (spanishOnly) player.play()
-            return
-        }
-        Log.i("PlayerVM", "Sin audio en castellano (${known.distinct()}): ${source.title.take(80)}")
-        val next = (queueIndex + 1 until queueSnapshot.size).firstOrNull { queueSnapshot[it].spanishAudioScore > 0 }
-        if (next == null || spanishSkips >= MAX_SPANISH_SKIPS) {
-            if (spanishOnly) {
+        when (val action = sourceFailover.checkSpanishAudio(player.playbackState, tracks)) {
+            SourceFailoverAction.Ignored -> Unit
+            SourceFailoverAction.AudioAccepted -> if (spanishOnly) player.play()
+            is SourceFailoverAction.Notice -> _notice.value = action.message
+            is SourceFailoverAction.FatalError -> {
                 player.stop()
                 resolvedUrl = null
-                _uiState.value = PlayerUiState.Error(
-                    texts.get(StringsR.string.player_no_sources_with_verified_spanish_audio_available),
-                )
-            } else {
-                _notice.value = texts.get(StringsR.string.player_this_source_has_no_spanish_audio)
+                _uiState.value = PlayerUiState.Error(action.message)
             }
-            return
-        }
-        spanishSkips++
-        if (!spanishOnly && spanishFallback == null) spanishFallback = queueIndex
-        _notice.value = texts.get(StringsR.string.player_no_spanish_audio_trying_another_source)
-        player.pause()
-        viewModelScope.launch {
-            saveProgress()
-            resumePositionMs = player.currentPosition
-            player.release()
-            if (_player.value === player) _player.value = null
-            resolvedUrl = null
-            playFrom(next)
+            is SourceFailoverAction.SwitchSource -> switchSource(player, action, savePosition = true)
         }
     }
 
     private fun checkErrorSlate(player: ExoPlayer): Boolean {
-        if (slateChecked) return false
-        val duration = player.duration
-        if (duration == C.TIME_UNSET || duration <= 0) return false
-        slateChecked = true
-        val source = queueSnapshot.getOrNull(queueIndex) ?: return false
-        if (source.resolveUrl == null || duration >= SLATE_MAX_MS || source.sizeBytes < SLATE_MIN_BYTES) return false
-        if (queueIndex + 1 >= queueSnapshot.size) return false
-        Log.i("PlayerVM", "Vídeo de error del addon (${duration / 1000} s, dice ${source.sizeBytes / 1_000_000} MB): ${source.title.take(80)}")
-        lastQueueError = texts.get(StringsR.string.player_the_addon_couldn_t_find_this_source)
-        allNotCached = false
-        _notice.value = texts.get(StringsR.string.player_that_source_doesn_t_have_the_episode)
+        val action = sourceFailover.checkErrorSlate(player.duration) ?: return false
+        switchSource(player, action)
+        return true
+    }
+
+    private fun switchSource(
+        player: ExoPlayer,
+        action: SourceFailoverAction.SwitchSource,
+        savePosition: Boolean = false,
+    ) {
+        action.notice?.let { _notice.value = it }
+        if (savePosition) player.pause()
         viewModelScope.launch {
+            if (savePosition) {
+                saveProgress()
+                resumePositionMs = player.currentPosition
+            }
             player.release()
             if (_player.value === player) _player.value = null
             resolvedUrl = null
-            playFrom(queueIndex + 1)
+            playFrom(action.index)
         }
-        return true
     }
 
     fun playNextNow() {
@@ -567,21 +515,17 @@ class PlayerViewModel @Inject constructor(
                     saveProgress()
                     val sourceError = error.errorCode in
                         PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED
-                    if (!everPlayed && sourceError && queueIndex + 1 < queueSnapshot.size) {
-                        lastQueueError = texts.get(StringsR.string.player_source_open_error, error.errorCodeName)
-                        allNotCached = false
-                        viewModelScope.launch {
-                            player.release()
-                            if (_player.value === player) _player.value = null
-                            resolvedUrl = null
-                            playFrom(queueIndex + 1)
+                    if (sourceError) {
+                        val action = sourceFailover.onSourceOpenError(error.errorCodeName)
+                        if (action != null) {
+                            switchSource(player, action)
+                            return
                         }
-                        return
                     }
                     if (playbackRetries < 1) {
                         playbackRetries++
                         player.prepare()
-                        player.playWhenReady = !spanishOnly || spanishChecked
+                        player.playWhenReady = !spanishOnly || sourceFailover.spanishChecked
                     } else {
                         _uiState.value = PlayerUiState.Error(
                             texts.get(StringsR.string.player_playback_stopped, error.errorCodeName),
@@ -592,7 +536,7 @@ class PlayerViewModel @Inject constructor(
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     if (isPlaying) {
                         playbackRetries = 0
-                        everPlayed = true
+                        sourceFailover.everPlayed = true
                     }
                     if (!isPlaying) saveProgress()
                     if (isPlaying) scrobble(ScrobbleAction.START)
@@ -624,7 +568,7 @@ class PlayerViewModel @Inject constructor(
         )
         subtitleCoordinator.preparePlayer()
         player.setMediaItem(buildMediaItem(url), startPositionMs)
-        spanishChecked = false
+        sourceFailover.onPlayerCreated()
         _player.value = player
         player.playWhenReady = !spanishOnly
         player.prepare()
@@ -643,13 +587,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     private companion object {
-        const val MAX_ATTEMPTS = 8
         const val NEXT_UP_COUNTDOWN_MS = 10_000L
         const val NEXT_UP_FALLBACK_MIN_MS = 20_000L
         const val AFTER_CREDITS_SLACK_MS = 30_000L
-        const val MAX_SPANISH_SKIPS = 3
-        const val SLATE_MAX_MS = 4 * 60_000L
-        const val SLATE_MIN_BYTES = 150_000_000L
         const val MIN_EPISODE_MS = 5 * 60_000L
     }
 
