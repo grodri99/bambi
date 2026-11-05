@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.10] - 2026-11-05
+
+### Added
+
+- **Experimental subtitle sync:** a per-profile preference, enabled by default, controls automatic subtitle alignment in Settings and setup. Slow devices can disable demuxing while keeping automatic best-match subtitle downloads.
+- **Subtitle synchronization feedback:** show a bilingual syncing message while references are read and alignment is calculated.
+- **Playback and demux tests:** added lifecycle, coordinator, catalog, Home, and real MKV/MP4 instrumentation coverage, including resume reads, sparse tracks, and missing subtitle tracks.
+
+### Improved
+
+- **Subtitle references:** prefer embedded text tracks, select dense dialogue tracks, decode real cue durations, seek near the playback position, and reduce startup sampling to 20 cues.
+- **Alignment reliability:** use strong-match gates and two-window confirmation for plausible matches, with frame-rate scaling and high-correlation near-sync handling.
+- **Subtitle downloads:** reject ambiguous multi-CD archives, rank matching disc parts correctly, and filter Portuguese releases mislabeled as Spanish.
+- **Playback architecture:** immutable playback requests, deduplicated TMDB mapping, and focused Home/Continue Watching regression tests.
+
+### Fixed
+
+- Handle MKV, MP4, AVI, and MPEG-TS reference extraction with bounded seeks, cancellation, typed failures, and shared playback data-source configuration.
+- Prevent late subtitle search, download, demux, or alignment work from changing state after source changes, disabling subtitles, or leaving playback.
+- Preserve the active subtitle and timing when a replacement candidate fails to synchronize.
+- Report missing reference tracks immediately instead of downloading large streams until timeout.
+
 ## [1.0.9] - 2026-11-05
 
 ### Added
