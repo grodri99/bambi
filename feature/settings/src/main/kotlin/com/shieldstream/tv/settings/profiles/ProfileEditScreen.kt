@@ -50,8 +50,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ProfileAvatars
 import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.settings.HomeCategoriesDialog
 import com.shieldstream.tv.ui.component.ProfileAvatar
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.tvClickable
@@ -90,6 +92,7 @@ fun ProfileEditScreen(
     var creatingPin by remember { mutableStateOf(false) }
     var firstPin by remember { mutableStateOf<String?>(null) }
     var pinError by remember { mutableStateOf<String?>(null) }
+    var choosingCategories by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(ProfileBackground)) {
         // La Shield mide 960 dp de ancho: todo con márgenes, nada de anchos fijos grandes.
@@ -131,6 +134,21 @@ fun ProfileEditScreen(
                         onFocusLost = viewModel::cancelConfirmations,
                     )
                     Spacer(Modifier.height(12.dp))
+                    Text(tr("Audio de este perfil", "Audio for this profile"), color = ProfileMuted, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OptionChip(
+                            text = if (profile.spanishOnlySources) tr("Solo en español: Sí", "Spanish only: On") else tr("Solo en español: No", "Spanish only: Off"),
+                            highlighted = profile.spanishOnlySources,
+                            onClick = { viewModel.setSpanishOnly(!profile.spanishOnlySources) },
+                        )
+                        OptionChip(
+                            text = if (profile.spanishFirst || profile.spanishOnlySources) tr("Español primero: Sí", "Spanish first: On") else tr("Español primero: No", "Spanish first: Off"),
+                            highlighted = profile.spanishFirst || profile.spanishOnlySources,
+                            onClick = { if (!profile.spanishOnlySources) viewModel.setSpanishFirst(!profile.spanishFirst) },
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OptionChip(
                             text = if (profile.kids) tr("Perfil infantil: Sí", "Kids profile: On") else tr("Perfil infantil: No", "Kids profile: Off"),
@@ -155,6 +173,15 @@ fun ProfileEditScreen(
                                 }
                             },
                             onFocusLost = viewModel::cancelConfirmations,
+                            modifier = Modifier.focusProperties { down = saveRequester },
+                        )
+                        OptionChip(
+                            text = tr(
+                                "Categorías: ${Category.entries.count { it.name !in profile.hiddenCategories }}/${Category.entries.size}",
+                                "Categories: ${Category.entries.count { it.name !in profile.hiddenCategories }}/${Category.entries.size}",
+                            ),
+                            highlighted = profile.hiddenCategories.isNotEmpty(),
+                            onClick = { choosingCategories = true },
                             modifier = Modifier.focusProperties { down = saveRequester },
                         )
                     }
@@ -214,6 +241,15 @@ fun ProfileEditScreen(
                 firstPin = null
                 pinError = null
             },
+        )
+    }
+
+    if (choosingCategories) {
+        HomeCategoriesDialog(
+            hidden = profile.hiddenCategories,
+            onToggle = viewModel::toggleCategory,
+            onShowAll = viewModel::showAllCategories,
+            onClose = { choosingCategories = false },
         )
     }
 }

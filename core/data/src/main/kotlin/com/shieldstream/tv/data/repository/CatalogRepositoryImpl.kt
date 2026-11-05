@@ -31,6 +31,7 @@ import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.model.Season
 import com.shieldstream.tv.model.StreamSource
+import com.shieldstream.tv.model.VideoCodec
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
 import com.shieldstream.tv.data.security.TokenStore
@@ -722,13 +723,10 @@ class CatalogRepositoryImpl @Inject constructor(
         val hash = infoHash ?: return null
         // Torrentio: `name` = "Torrentio\n4k DV | HDR", `title` = "Release\n👤 12 💾 4.5 GB ⚙️ Fuente".
         val text = title.ifBlank { description.orEmpty() }
-        // VVC/x266: ningún decoder en la Shield → se descartan. AV1 va por CPU (dav1d) → se admite al final.
+        // VVC/x266: no hay decoder en los dispositivos compatibles actuales → se descartan.
         if (UNSUPPORTED_CODEC.containsMatchIn("$name $text")) return null
         val isAv1 = AV1_CODEC.containsMatchIn("$name $text")
-        // Medido en la Shield con dav1d: AV1 1080p 10 bits va fluido (<1 % de fotogramas perdidos); AV1 4K
-        // satura los 4 núcleos y se queda en ~7 fps → fuera. Se mira el nombre de la release, no el `name`
-        // de Torrentio (que marca como 4K los "DS4K"/"4KDS": 1080p reescalados desde 4K, que sí valen).
-        if (isAv1 && AV1_4K.containsMatchIn(text) && !text.contains("1080p", ignoreCase = true)) return null
+        // AV1 4K se filtra después según el dispositivo: por CPU no es viable, por hardware sí.
         val releaseName = text.lineSequence().firstOrNull { it.isNotBlank() } ?: item.title
         val fileName = behaviorHints?.filename
         val magnet = "magnet:?xt=urn:btih:${hash.lowercase()}&dn=${Uri.encode(fileName ?: releaseName)}"
@@ -746,6 +744,7 @@ class CatalogRepositoryImpl @Inject constructor(
             fileName = fileName,
             // Torrentio pone las banderas en el texto; Peerflix, en el nombre ("Peerflix 🇪🇸 720p").
             languages = parseLanguages("$name\n$text"),
+            videoCodec = if (isAv1) VideoCodec.AV1 else null,
             softwareDecode = isAv1,
         )
     }
@@ -802,7 +801,6 @@ class CatalogRepositoryImpl @Inject constructor(
         val SEEDERS_REGEX = Regex("👤\\s*(\\d+)")
         val UNSUPPORTED_CODEC = Regex("(?<![a-z0-9])(x266|vvc|h\\.?266)(?![a-z0-9])", RegexOption.IGNORE_CASE)
         val AV1_CODEC = Regex("(?<![a-z0-9])av1(?![a-z0-9])", RegexOption.IGNORE_CASE)
-        val AV1_4K = Regex("(?<![a-z0-9])(2160p?|4k|uhd)(?![a-z0-9])", RegexOption.IGNORE_CASE)
         val FLAG_TO_LANGUAGE = mapOf(
             "ES" to "ES", "MX" to "LAT", "AR" to "LAT", "GB" to "EN", "US" to "EN",
             "IT" to "IT", "FR" to "FR", "DE" to "DE", "PT" to "PT", "BR" to "PT-BR",

@@ -429,17 +429,19 @@ private fun SourcesStatus(state: DetailsUiState.Content) {
         SourcesState.Loading -> tr("Buscando fuentes…", "Finding sources…")
         is SourcesState.Error -> s.message
         is SourcesState.Ready -> {
-            val cached = s.sources.count { it.isCached }
+            val sources = s.sources.filter { !state.spanishOnly || it.advertisesSpanishAudio }
+            val cached = sources.count { it.isCached }
             val scope = state.selectedEpisode?.takeIf { state.isSeries }?.let { tr(" para ${it.code}", " for ${it.code}") }.orEmpty()
             when {
-                s.sources.isEmpty() && s.pending.isNotEmpty() -> tr("Buscando fuentes…", "Finding sources…")
-                s.sources.isEmpty() -> tr("Sin fuentes$scope", "No sources$scope")
+                sources.isEmpty() && s.pending.isNotEmpty() -> tr("Buscando fuentes…", "Finding sources…")
+                sources.isEmpty() && state.spanishOnly -> tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
+                sources.isEmpty() -> tr("Sin fuentes$scope", "No sources$scope")
                 cached > 0 -> {
-                    val service = s.sources.firstNotNullOfOrNull { it.debrid }
+                    val service = sources.firstNotNullOfOrNull { it.debrid }
                     val where = if (service == null) tr("ya en tu Real-Debrid", "already in your Real-Debrid") else tr("en la caché de $service", "cached on $service")
-                    tr("${s.sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope · $cached $where ⚡", "${s.sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope · $cached $where ⚡")
+                    tr("${sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope · $cached $where ⚡", "${sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope · $cached $where ⚡")
                 }
-                else -> tr("${s.sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope", "${s.sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope")
+                else -> tr("${sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope", "${sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope")
             }
         }
     }
@@ -646,7 +648,7 @@ private fun SourcesPanel(
         (byProvider.keys + unavailable.keys).distinct().sortedBy { order.indexOf(it) }.map { section ->
             section to byProvider[section].orEmpty()
                 // "Solo en español": castellano o "Spanish"/"Dual" (puntuación ≥ 2); fuera latino dudoso y VOSE.
-                .filter { !spanishOnly || it.spanishAudioScore >= 2 }
+                .filter { !spanishOnly || it.advertisesSpanishAudio }
                 .sortedWith(
                 compareByDescending<StreamSource> { if (spanishFirst) it.spanishAudioScore else 0 }
                     .thenByDescending { it.quality.rank }
@@ -694,8 +696,12 @@ private fun SourcesPanel(
                 SourcesState.Idle -> Text(tr("Elige un episodio primero", "Pick an episode first"), color = Grey)
                 SourcesState.Loading -> Text(tr("Buscando fuentes…", "Finding sources…"), color = Grey)
                 is SourcesState.Error -> Text(s.message, color = Grey)
-                is SourcesState.Ready -> if (s.sources.isEmpty() && s.pending.isEmpty()) {
-                    Text(tr("No hay fuentes", "No sources"), color = Grey)
+                is SourcesState.Ready -> if (groups.all { it.second.isEmpty() } && s.pending.isEmpty()) {
+                    Text(
+                        if (spanishOnly) tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
+                        else tr("No hay fuentes", "No sources"),
+                        color = Grey,
+                    )
                 } else {
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(6.dp),

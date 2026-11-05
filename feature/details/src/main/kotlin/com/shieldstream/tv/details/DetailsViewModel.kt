@@ -13,7 +13,8 @@ import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.TraktRepository
 import kotlinx.coroutines.flow.first
-import com.shieldstream.tv.media.DisplayCapabilityDetector
+import com.shieldstream.tv.media.DeviceCapabilityDetector
+import com.shieldstream.tv.model.DeviceOptimization
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.MediaType
@@ -68,7 +69,7 @@ sealed interface DetailsUiState {
         val progress: Map<String, WatchProgress> = emptyMap(),
         /** Ajuste "Castellano primero": ordena arriba las fuentes con audio en español. */
         val spanishFirst: Boolean = false,
-        /** Panel de Fuentes: solo las de audio en español (se recuerda; se cambia en el propio panel). */
+        /** Preferencia del perfil: solo fuentes en español, también al reproducir. */
         val spanishOnly: Boolean = false,
         /** Está en "Mi lista" del perfil. */
         val inMyList: Boolean = false,
@@ -94,7 +95,7 @@ class DetailsViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val realDebridRepository: RealDebridRepository,
     private val prioritizeSourcesUseCase: PrioritizeSourcesUseCase,
-    private val displayCapabilities: DisplayCapabilityDetector,
+    private val deviceCapabilities: DeviceCapabilityDetector,
     private val holder: SelectedContentHolder,
     private val watchProgress: WatchProgressRepository,
     private val settings: SettingsRepository,
@@ -234,6 +235,8 @@ class DetailsViewModel @Inject constructor(
                 details,
                 progress = watchProgress.progress.value,
                 inMyList = myList.contains(details.item.type, details.item.id),
+                spanishFirst = settings.spanishFirst.first(),
+                spanishOnly = settings.spanishOnlySources.first(),
             )
             if (details.item.type == MediaType.TV) {
                 val (season, episode) = continueTarget(details)
@@ -309,7 +312,7 @@ class DetailsViewModel @Inject constructor(
         }
         when (val s = c.sources) {
             // Aún sin fuentes pero con buscadores pendientes: se reproduce en cuanto llegue la primera.
-            is SourcesState.Ready -> if (s.sources.isEmpty() && s.pending.isNotEmpty()) {
+            is SourcesState.Ready -> if (s.sources.none { !c.spanishOnly || it.advertisesSpanishAudio } && s.pending.isNotEmpty()) {
                 pendingFromStart = fromStart
                 updateContent { it.copy(pendingPlay = true) }
             } else {
@@ -329,6 +332,10 @@ class DetailsViewModel @Inject constructor(
         val sameEpisode = c.selectedEpisode == episode
         val ready = c.sources as? SourcesState.Ready
         if (sameEpisode && ready != null) {
+            if (ready.sources.none { !c.spanishOnly || it.advertisesSpanishAudio } && ready.pending.isNotEmpty()) {
+                updateContent { it.copy(pendingPlay = true) }
+                return
+            }
             startPlayback(ready.sources, startIndex = 0, fromStart = fromStart)
             return
         }
@@ -391,6 +398,12 @@ class DetailsViewModel @Inject constructor(
         sourcesJob = viewModelScope.launch {
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
+            val optimization = settings.deviceOptimization.first()
+            val capabilities = deviceCapabilities.capabilities
+            val hardwareCodecs = when (optimization) {
+                DeviceOptimization.AUTOMATIC -> capabilities.hardwareVideoCodecs
+                DeviceOptimization.CUSTOM -> emptySet()
+            }
             updateContent { it.copy(spanishFirst = spanishFirst, spanishOnly = spanishOnly) }
             // Real-Debrid retiró instantAvailability (nov-2024): "cacheado" = ya en tu librería. Se pide una vez.
             var rdCached: Set<String>? = null
@@ -406,7 +419,12 @@ class DetailsViewModel @Inject constructor(
                     val enriched = result.sources.map {
                         if (it.resolveUrl == null) it.copy(isCached = it.infoHash.lowercase() in knownCached) else it
                     }
-                    result to prioritizeSourcesUseCase(enriched, displayCapabilities.supportedHdrTypes(), preferSpanish = spanishFirst)
+                    result to prioritizeSourcesUseCase(
+                        enriched,
+                        capabilities.supportedHdr,
+                        hardwareVideoCodecs = hardwareCodecs,
+                        preferSpanish = spanishFirst,
+                    )
                 }
                 .catch { e ->
                     updateContent {
@@ -422,14 +440,10 @@ class DetailsViewModel @Inject constructor(
                     // Reproducir pulsado mientras se buscaba: se espera a tener cola de verdad (3 en caché) o a que acaben
                     // todos los buscadores. Antes arrancaba con lo primero que llegaba (p. ej. 1 fuente de Comet) y si
                     // esa fallaba no había ninguna otra que probar.
-                    val enoughCached = sorted.count { it.isCached } >= MIN_CACHED_TO_START
+                    val enoughCached = sorted.count { it.isCached && (!now.spanishOnly || it.advertisesSpanishAudio) } >= MIN_CACHED_TO_START
                     if (now.pendingPlay && (enoughCached || result.pending.isEmpty())) {
                         updateContent { it.copy(pendingPlay = false) }
-                        if (sorted.isEmpty()) {
-                            updateContent { it.copy(message = tr("No hay fuentes disponibles para esto ahora mismo", "No sources available for this right now")) }
-                        } else {
-                            startPlayback(sorted, startIndex = 0, fromStart = pendingFromStart)
-                        }
+                        startPlayback(sorted, startIndex = 0, fromStart = pendingFromStart)
                     }
                 }
         }
@@ -441,10 +455,18 @@ class DetailsViewModel @Inject constructor(
         // En la cola automática solo entran las que ya están en caché, más la elegida (la primera).
         // Con Real-Debrid no pasa: lo que no estaba en caché se borra solo (ver ResolveStreamUseCase).
         val queue = sorted.drop(startIndex)
+            .filter { !c.spanishOnly || it.advertisesSpanishAudio }
             .distinctBy { it.infoHash.lowercase() } // la misma release puede salir en varios buscadores
             .filterIndexed { index, s -> index == 0 || s.resolveUrl == null || s.isCached }
             .take(MAX_QUEUE)
-        if (queue.isEmpty()) return
+        if (queue.isEmpty()) {
+            updateContent {
+                it.copy(message = if (c.spanishOnly)
+                    tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
+                else tr("No hay fuentes disponibles para esto ahora mismo", "No sources available for this right now"))
+            }
+            return
+        }
         val item = c.details.item
         val episode = c.selectedEpisode?.takeIf { c.isSeries }
         val label = episode?.let { "${item.title} · ${it.code} · ${it.title}" } ?: item.title

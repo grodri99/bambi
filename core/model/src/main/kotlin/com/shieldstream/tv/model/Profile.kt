@@ -16,6 +16,12 @@ data class Profile(
     val pinHash: String? = null,
     /** Perfil infantil: Inicio, categorías y búsqueda solo con contenido para niños. */
     val kids: Boolean = false,
+    /** Preferencia de audio del perfil, independiente del idioma de los menús. */
+    val spanishFirst: Boolean = kids || !Lang.isEnglish,
+    /** Se aplica tanto a Reproducir como a la cola de alternativas y al panel de fuentes. */
+    val spanishOnlySources: Boolean = kids,
+    /** Botones de categoría ocultos en el Inicio de este perfil (nombres de Category). */
+    val hiddenCategories: Set<String> = Category.DEFAULT_HIDDEN,
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
 

@@ -256,6 +256,7 @@ class HomeExtrasSource @Inject constructor(
     private data class Spec(val movie: Query?, val tv: Query?)
 
     private fun spec(category: Category): Spec = when (category) {
+        Category.ACCLAIMED -> Spec(Query(), Query()) // filas propias: todas con nota alta y suficientes votos
         Category.DRAMAS -> Spec(Query("18"), Query("18"))
         Category.THRILLERS -> Spec(Query("53"), Query("9648")) // series: misterio (TMDB no tiene "thriller" en TV)
         Category.CRIME -> Spec(Query("80"), Query("80"))
@@ -287,8 +288,11 @@ class HomeExtrasSource @Inject constructor(
     }
 
     suspend fun categoryRows(category: Category, filter: HomeFilter): List<CatalogRow> = coroutineScope {
-        val loaders: List<Pair<String, suspend () -> List<CatalogItem>>> =
-            if (category == Category.MOODS) moodRows(filter) else standardRows(category, filter)
+        val loaders: List<Pair<String, suspend () -> List<CatalogItem>>> = when (category) {
+            Category.MOODS -> moodRows(filter)
+            Category.ACCLAIMED -> acclaimedRows(filter)
+            else -> standardRows(category, filter)
+        }
         loaders.mapIndexed { index, (title, load) ->
             async {
                 runCatching {
@@ -297,6 +301,30 @@ class HomeExtrasSource @Inject constructor(
                 }.getOrNull()
             }
         }.awaitAll().filterNotNull().filter { it.items.isNotEmpty() }
+    }
+
+    /** Películas y series con nota ≥ 7,5 y bastantes votos; no usa géneros ni fechas. */
+    private fun acclaimedRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> = when (filter) {
+        HomeFilter.ALL -> listOf(
+            tr("Las mejor valoradas", "Top rated") to suspend {
+                mix(movies(Query(), acclaimed(500)), series(Query(), acclaimed(150)))
+            },
+            tr("Películas aclamadas", "Acclaimed movies") to suspend { movies(Query(), acclaimed(500), page = 2) },
+            tr("Series aclamadas", "Acclaimed TV shows") to suspend { series(Query(), acclaimed(150), page = 2) },
+            tr("Más joyas por descubrir", "More gems to discover") to suspend {
+                mix(movies(Query(), acclaimed(500), page = 3), series(Query(), acclaimed(150), page = 3))
+            },
+        )
+        HomeFilter.MOVIES -> listOf(
+            tr("Películas aclamadas", "Acclaimed movies") to suspend { movies(Query(), acclaimed(500)) },
+            tr("Más películas aclamadas", "More acclaimed movies") to suspend { movies(Query(), acclaimed(500), page = 2) },
+            tr("Joyas por descubrir", "Gems to discover") to suspend { movies(Query(), acclaimed(500), page = 3) },
+        )
+        HomeFilter.TV -> listOf(
+            tr("Series aclamadas", "Acclaimed TV shows") to suspend { series(Query(), acclaimed(150)) },
+            tr("Más series aclamadas", "More acclaimed TV shows") to suspend { series(Query(), acclaimed(150), page = 2) },
+            tr("Joyas por descubrir", "Gems to discover") to suspend { series(Query(), acclaimed(150), page = 3) },
+        )
     }
 
     private fun standardRows(category: Category, filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> {
@@ -392,6 +420,8 @@ class HomeExtrasSource @Inject constructor(
     }
 
     private fun topRated(minVotes: Int) = mapOf("sort_by" to "vote_average.desc", "vote_count.gte" to minVotes.toString())
+
+    private fun acclaimed(minVotes: Int) = topRated(minVotes) + ("vote_average.gte" to "7.5")
 
     private fun newest(today: String, movie: Boolean) = if (movie) {
         mapOf("sort_by" to "primary_release_date.desc", "primary_release_date.lte" to today, "vote_count.gte" to "20")

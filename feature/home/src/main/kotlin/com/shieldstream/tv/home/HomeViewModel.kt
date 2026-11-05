@@ -54,7 +54,7 @@ class HomeViewModel @Inject constructor(
     /** Perfil infantil: la portada solo enseña las categorías para niños (las filas ya vienen filtradas). */
     val kidsProfile: Boolean = profiles.active.value.kids
 
-    /** Categorías ocultas en Ajustes (nombres). Aparte del UiState: cambiarlas no recarga las filas. */
+    /** Categorías ocultas en el perfil (nombres). Aparte del UiState: cambiarlas no recarga las filas. */
     val hiddenCategories: StateFlow<Set<String>> = settings.hiddenCategories
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 

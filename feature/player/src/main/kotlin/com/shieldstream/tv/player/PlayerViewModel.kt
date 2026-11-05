@@ -22,12 +22,14 @@ import com.shieldstream.tv.domain.ResolveStreamUseCase
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.domain.SkipSegments
 import com.shieldstream.tv.domain.SkipSegmentsRepository
+import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SubtitleRepository
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.domain.ScrobbleAction
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.media.Media3Factory
+import com.shieldstream.tv.media.PlaybackPolicyProvider
 import androidx.media3.common.PlaybackException
 import com.shieldstream.tv.model.ExternalSubtitle
 import com.shieldstream.tv.model.SubtitleQuery
@@ -40,6 +42,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
@@ -84,8 +87,10 @@ sealed interface ExternalSubsState {
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val media3Factory: Media3Factory,
+    private val playbackPolicies: PlaybackPolicyProvider,
     private val resolveStreamUseCase: ResolveStreamUseCase,
     private val settings: SettingsRepository,
+    profiles: ProfileRepository,
     private val holder: SelectedContentHolder,
     private val watchProgress: WatchProgressRepository,
     private val subtitles: SubtitleRepository,
@@ -112,9 +117,14 @@ class PlayerViewModel @Inject constructor(
     private val mediaSnapshot = holder.media.value
     val title: StateFlow<String> = MutableStateFlow(holder.playLabel.value).asStateFlow()
 
-    /** Ajuste "Búsqueda en el reproductor": miniaturas (true) o saltos de 10 s (false). */
-    val seekThumbnails: StateFlow<Boolean> = settings.seekThumbnails
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    /** Valor efectivo: automático según memoria o la preferencia personalizada. */
+    val seekThumbnails: StateFlow<Boolean> = combine(
+        settings.deviceOptimization,
+        settings.maxBufferSeconds,
+        settings.seekThumbnails,
+    ) { optimization, buffer, thumbnails ->
+        playbackPolicies.resolve(optimization, buffer, thumbnails).seekThumbnails
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, playbackPolicies.automatic().seekThumbnails)
 
     private val progressKey: String? = holder.progressKey.value
 
@@ -143,7 +153,8 @@ class PlayerViewModel @Inject constructor(
     // La bandera 🇪🇸 o el nombre pueden mentir. Con "Castellano primero", si la fuente decía ser en español y sus
     // pistas de audio (con idioma) no lo son, se prueba la siguiente en español de la cola. Si ninguna vale, se
     // vuelve a la que sí se reproducía.
-    private val spanishFirst: StateFlow<Boolean> = settings.spanishFirst.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val spanishOnly = profiles.active.value.spanishOnlySources
+    private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private var spanishChecked = false
     private var spanishSkips = 0
     private var spanishFallback: Int? = null
@@ -648,28 +659,40 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
-     * Una vez por fuente, con sus pistas ya conocidas. Solo si decía ser en español (puntuación > 0): si el usuario
-     * eligió a mano una en inglés, se respeta. Sin idioma en las pistas ("und") no se puede saber: se deja.
+     * Las banderas pueden mentir. "Solo español" exige una pista reproducible identificada como español:
+     * no reproduce audio desconocido ni vuelve a una fuente rechazada si se agotan las alternativas.
      */
     private fun checkSpanishAudio(player: ExoPlayer, tracks: Tracks) {
-        if (spanishChecked || !spanishFirst.value) return
+        if (spanishChecked || !spanishFirst) return
         val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
-            .flatMap { g -> (0 until g.length).map { g.getTrackFormat(it).language?.lowercase() } }
-        if (audio.isEmpty()) return // aún sin pistas
+            .flatMap { g -> (0 until g.length).filter { g.isTrackSupported(it) }.map { g.getTrackFormat(it).language?.lowercase() } }
+        if (audio.isEmpty() && player.playbackState != Player.STATE_READY) return
         spanishChecked = true
         val source = queueSnapshot.getOrNull(queueIndex) ?: return
-        if (source.spanishAudioScore == 0) return
+        if (!spanishOnly && source.spanishAudioScore == 0) return
         val known = audio.filterNotNull().filter { it != "und" && it != "mul" }
-        if (known.isEmpty() || known.any { it.startsWith("es") || it == "spa" }) return
+        if (known.any { it == "es" || it.startsWith("es-") || it == "spa" } || (!spanishOnly && known.isEmpty())) {
+            if (spanishOnly) player.play()
+            return
+        }
         Log.i("PlayerVM", "Sin audio en castellano (${known.distinct()}): ${source.title.take(80)}")
         val next = (queueIndex + 1 until queueSnapshot.size).firstOrNull { queueSnapshot[it].spanishAudioScore > 0 }
         if (next == null || spanishSkips >= MAX_SPANISH_SKIPS) {
-            _notice.value = tr("Esta fuente no trae audio en castellano", "This source has no Spanish audio")
+            if (spanishOnly) {
+                player.stop()
+                resolvedUrl = null
+                _uiState.value = PlayerUiState.Error(
+                    tr("No hay fuentes con audio en español verificado para este perfil", "No sources with verified Spanish audio available for this profile"),
+                )
+            } else {
+                _notice.value = tr("Esta fuente no trae audio en castellano", "This source has no Spanish audio")
+            }
             return
         }
         spanishSkips++
-        if (spanishFallback == null) spanishFallback = queueIndex
+        if (!spanishOnly && spanishFallback == null) spanishFallback = queueIndex
         _notice.value = tr("Sin audio en castellano: probando otra fuente", "No Spanish audio: trying another source")
+        player.pause()
         viewModelScope.launch {
             saveProgress()
             resumePositionMs = player.currentPosition
@@ -787,12 +810,24 @@ class PlayerViewModel @Inject constructor(
     }
 
     private suspend fun createAndPlay(url: String, startPositionMs: Long) {
-        val maxBuffer = settings.maxBufferSeconds.first()
-        val player = media3Factory.createPlayer(maxBuffer)
+        val policy = playbackPolicies.resolve(
+            settings.deviceOptimization.first(),
+            settings.maxBufferSeconds.first(),
+            settings.seekThumbnails.first(),
+        )
+        val player = media3Factory.createPlayer(policy)
+        if (spanishFirst) {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setPreferredAudioLanguages("es", "spa")
+                .build()
+        }
         player.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY && checkErrorSlate(player)) return
+                    if (playbackState == Player.STATE_READY) {
+                        checkSpanishAudio(player, player.currentTracks)
+                        if (checkErrorSlate(player)) return
+                    }
                     // Terminado → visto (tick en Episodios) y la próxima vez empieza desde el principio.
                     if (playbackState == Player.STATE_ENDED) {
                         val key = progressKey ?: return
@@ -828,7 +863,7 @@ class PlayerViewModel @Inject constructor(
                     if (playbackRetries < 1) {
                         playbackRetries++
                         player.prepare()
-                        player.playWhenReady = true
+                        player.playWhenReady = !spanishOnly || spanishChecked
                     } else {
                         _uiState.value = PlayerUiState.Error(
                             tr("La reproducción se ha cortado (${error.errorCodeName}).", "Playback stopped (${error.errorCodeName})."),
@@ -875,9 +910,11 @@ class PlayerViewModel @Inject constructor(
         // Player recreado (volver de Home) con subtítulo externo: hay que volver a elegir la referencia.
         if (_activeExternal.value != null && referenceAvailable) referencePending = true
         player.setMediaItem(buildMediaItem(url), startPositionMs)
-        player.prepare()
-        player.playWhenReady = true
+        // No iniciar audio hasta verificarlo, ni siquiera durante el primer búfer.
+        spanishChecked = false
         _player.value = player
+        player.playWhenReady = !spanishOnly
+        player.prepare()
     }
 
     override fun onCleared() {

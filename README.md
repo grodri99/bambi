@@ -209,6 +209,9 @@ y, sin escribir nada, **lo más visto hoy**.
   Real-Debrid muestra tu usuario y los días de Premium que te quedan.
 - Activar o desactivar cada **buscador de fuentes**.
 - **Búsqueda** con miniaturas o saltos de 10 s, y **búfer** del reproductor ajustable.
+- **Optimización automática del dispositivo**: detecta decodificadores, HDR y memoria para ajustar el búfer y priorizar
+  fuentes compatibles. En equipos con poca memoria reduce el búfer y desactiva las miniaturas; el modo personalizado
+  conserva los ajustes manuales.
 - **Idioma de la app: español o inglés**. Cambia menús, títulos, sinopsis y el audio preferido.
 
 ---

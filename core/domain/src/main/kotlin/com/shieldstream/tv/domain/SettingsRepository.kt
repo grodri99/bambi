@@ -1,6 +1,7 @@
 package com.shieldstream.tv.domain
 
 import com.shieldstream.tv.model.AppLanguage
+import com.shieldstream.tv.model.DeviceOptimization
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -13,7 +14,11 @@ interface SettingsRepository {
     val catalogProvider: Flow<CatalogProvider>
     suspend fun setCatalogProvider(provider: CatalogProvider)
 
-    /** Máximo buffer del reproductor en segundos (20..100). */
+    /** Optimización del dispositivo. En AUTOMATIC no se modifican los valores personalizados guardados. */
+    val deviceOptimization: Flow<DeviceOptimization>
+    suspend fun setDeviceOptimization(optimization: DeviceOptimization)
+
+    /** Máximo buffer personalizado en segundos (20..100); AUTOMATIC usa la política detectada. */
     val maxBufferSeconds: Flow<Int>
     suspend fun setMaxBufferSeconds(seconds: Int)
 
@@ -22,7 +27,7 @@ interface SettingsRepository {
     val lightweightUiEnabled: Boolean
     suspend fun setLightweightUi(enabled: Boolean)
 
-    /** ◀▶ en el reproductor: true = búsqueda con miniaturas; false = saltos directos de 10 s (como antes). */
+    /** Preferencia personalizada para ◀▶; AUTOMATIC decide según la memoria disponible. */
     val seekThumbnails: Flow<Boolean>
     suspend fun setSeekThumbnails(enabled: Boolean)
 
@@ -30,11 +35,11 @@ interface SettingsRepository {
     val language: AppLanguage
     suspend fun setLanguage(language: AppLanguage)
 
-    /** "Castellano primero": las fuentes con audio en español arriba. Por defecto, sí si la app está en español. */
+    /** Perfil activo: priorizar español (siempre activo cuando se exige solo español). */
     val spanishFirst: Flow<Boolean>
     suspend fun setSpanishFirst(enabled: Boolean)
 
-    /** Panel de Fuentes: enseñar solo las que dicen traer audio en español (botón del propio panel). */
+    /** Perfil activo: solo fuentes en español, tanto en el panel como en la reproducción automática. */
     val spanishOnlySources: Flow<Boolean>
     suspend fun setSpanishOnlySources(enabled: Boolean)
 
@@ -46,7 +51,7 @@ interface SettingsRepository {
     val searchQwerty: Flow<Boolean>
     suspend fun setSearchQwerty(enabled: Boolean)
 
-    /** Botones de categoría del Inicio OCULTOS (por nombre de Category). Vacío = se ven todos. */
+    /** Perfil activo: botones de categoría OCULTOS (por nombre de Category). Vacío = se ven todos. */
     val hiddenCategories: Flow<Set<String>>
     suspend fun setHiddenCategories(names: Set<String>)
 

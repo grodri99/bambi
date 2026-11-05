@@ -1,7 +1,7 @@
 package com.shieldstream.tv.media
 
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.PlaybackBufferProfile
+import com.shieldstream.tv.model.PlaybackPolicy
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.media.MediaFormat
@@ -37,14 +37,14 @@ import android.media.MediaCodecInfo.CodecProfileLevel as AndroidProfileLevel
  *  - Fallback de decodificador como último recurso.
  *  - Dolby Vision perfil 5/8 → decoder DV del Shield. Perfil 7 → capa base HEVC (HDR10), ver abajo.
  *  - Audio en español si existe, si no inglés (antes cogía la pista "default", a veces rusa).
- *  - LoadControl agresivo (buffer 50–100 s) para evitar micro-stutters.
+ *  - LoadControl según la política automática del dispositivo o los ajustes manuales.
  */
 @OptIn(UnstableApi::class)
 @Singleton
 class Media3Factory @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    fun createPlayer(maxBufferSeconds: Int): ExoPlayer {
+    fun createPlayer(policy: PlaybackPolicy): ExoPlayer {
         val codecSelector = MediaCodecSelector { mimeType, secure, tunneling ->
             val infos = MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)
             if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) {
@@ -70,17 +70,16 @@ class Media3Factory @Inject constructor(
             )
         }
 
-        val buffer = PlaybackBufferProfile.forSeconds(maxBufferSeconds)
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs */ buffer.minBufferMs,
-                /* maxBufferMs */ buffer.maxBufferMs,
-                /* bufferForPlaybackMs */ buffer.bufferForPlaybackMs,
-                /* bufferForPlaybackAfterRebufferMs */ buffer.bufferForPlaybackAfterRebufferMs,
+                /* minBufferMs */ policy.minBufferSeconds * 1000,
+                /* maxBufferMs */ policy.maxBufferSeconds * 1000,
+                /* bufferForPlaybackMs */ policy.bufferForPlaybackMs,
+                /* bufferForPlaybackAfterRebufferMs */ policy.bufferForPlaybackAfterRebufferMs,
             )
-            .setBackBuffer(/* durationMs */ buffer.backBufferMs, /* retainAfterEnd */ false)
-            // Low buffer presets also cap Java heap usage more tightly on smaller TV boxes.
-            .setTargetBufferBytes(buffer.targetBufferBytes)
+            .setBackBuffer(/* durationMs */ policy.backBufferMs, /* retainAfterEnd */ false)
+            // El tope automático protege el heap; los ajustes manuales conservan los perfiles de la 1.0.8.
+            .setTargetBufferBytes(policy.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 

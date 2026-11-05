@@ -11,6 +11,10 @@ import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.media.PlaybackPolicyProvider
+import com.shieldstream.tv.model.DeviceCapabilities
+import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.MemoryProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,6 +49,13 @@ data class KeyEditor(
     val error: String? = null,
 )
 
+private data class PlaybackSettings(
+    val bufferSeconds: Int,
+    val seekThumbnails: Boolean,
+    val debrid: DebridService,
+    val optimization: DeviceOptimization,
+)
+
 sealed interface SettingsUiState {
     data object Loading : SettingsUiState
     data class Ready(
@@ -54,6 +65,9 @@ sealed interface SettingsUiState {
         val seekThumbnails: Boolean,
         /** Servicio debrid en uso. */
         val debrid: DebridService,
+        val optimization: DeviceOptimization,
+        val capabilities: DeviceCapabilities,
+        val memoryProfile: MemoryProfile,
         val editor: KeyEditor?,
         /** Idioma con el que arrancó la app (cambiarlo la reinicia). */
         val language: AppLanguage = Lang.current,
@@ -64,6 +78,7 @@ sealed interface SettingsUiState {
 class SettingsViewModel @Inject constructor(
     private val apiKeys: ApiKeysRepository,
     private val settings: SettingsRepository,
+    private val playbackPolicies: PlaybackPolicyProvider,
 ) : ViewModel() {
 
     private val statuses = MutableStateFlow<Map<ApiService, ServiceStatus>>(emptyMap())
@@ -73,14 +88,22 @@ class SettingsViewModel @Inject constructor(
         settings.maxBufferSeconds,
         settings.seekThumbnails,
         settings.debridService,
-    ) { buffer, thumbnails, debrid -> Triple(buffer, thumbnails, debrid) }
+        settings.deviceOptimization,
+    ) { buffer, thumbnails, debrid, optimization ->
+        PlaybackSettings(buffer, thumbnails, debrid, optimization)
+    }
 
     val uiState: StateFlow<SettingsUiState> = combine(
         apiKeys.keys,
         statuses,
         playback,
         editor,
-    ) { keys, status, (buffer, thumbnails, debrid), edit ->
+    ) { keys, status, playback, edit ->
+        val policy = playbackPolicies.resolve(
+            playback.optimization,
+            playback.bufferSeconds,
+            playback.seekThumbnails,
+        )
         SettingsUiState.Ready(
             services = ApiService.entries.map { service ->
                 val key = keys[service]
@@ -90,9 +113,12 @@ class SettingsViewModel @Inject constructor(
                     status = if (key.isNullOrBlank()) ServiceStatus.Missing else status[service] ?: ServiceStatus.Checking,
                 )
             },
-            bufferSeconds = buffer,
-            seekThumbnails = thumbnails,
-            debrid = debrid,
+            bufferSeconds = policy.maxBufferSeconds,
+            seekThumbnails = policy.seekThumbnails,
+            debrid = playback.debrid,
+            optimization = playback.optimization,
+            capabilities = playbackPolicies.capabilities,
+            memoryProfile = policy.memoryProfile,
             editor = edit,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Loading)
@@ -185,12 +211,8 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setDebridService(service) }
     }
 
-    /** "Castellano primero" (aparte del UiState principal: no cambia nada más de la pantalla). */
-    val spanishFirst: StateFlow<Boolean> = settings.spanishFirst
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    fun setSpanishFirst(enabled: Boolean) {
-        viewModelScope.launch { settings.setSpanishFirst(enabled) }
+    fun setDeviceOptimization(optimization: DeviceOptimization) {
+        viewModelScope.launch { settings.setDeviceOptimization(optimization) }
     }
 
     /** Series: siguiente episodio automático. */
@@ -201,33 +223,16 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setAutoNextEpisode(enabled) }
     }
 
-    /** Categorías del Inicio ocultas (nombres). */
-    val hiddenCategories: StateFlow<Set<String>> = settings.hiddenCategories
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-
-    /** Muestra u oculta una categoría. Nunca se ocultan todas: la última visible no se deja quitar. */
-    fun toggleCategory(category: com.shieldstream.tv.model.Category) {
-        val hidden = hiddenCategories.value
-        val next = if (category.name in hidden) {
-            hidden - category.name
-        } else {
-            val visibleLeft = com.shieldstream.tv.model.Category.entries.count { it.name !in hidden && it != category }
-            if (visibleLeft == 0) return
-            hidden + category.name
-        }
-        viewModelScope.launch { settings.setHiddenCategories(next) }
-    }
-
-    fun showAllCategories() {
-        viewModelScope.launch { settings.setHiddenCategories(emptySet()) }
-    }
-
     fun setSeekThumbnails(enabled: Boolean) {
-        viewModelScope.launch { settings.setSeekThumbnails(enabled) }
+        viewModelScope.launch {
+            if (settings.deviceOptimization.first() == DeviceOptimization.AUTOMATIC) return@launch
+            settings.setSeekThumbnails(enabled)
+        }
     }
 
     fun changeBuffer(deltaSeconds: Int) {
         viewModelScope.launch {
+            if (settings.deviceOptimization.first() == DeviceOptimization.AUTOMATIC) return@launch
             val now = settings.maxBufferSeconds.first()
             settings.setMaxBufferSeconds(now + deltaSeconds)
         }

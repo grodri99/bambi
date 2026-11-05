@@ -3,6 +3,9 @@ package com.shieldstream.tv.settings
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
+import com.shieldstream.tv.model.DeviceCapabilities
+import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.MemoryProfile
 import com.shieldstream.tv.model.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -109,6 +112,7 @@ fun SettingsScreen(
                     onBuffer = viewModel::changeBuffer,
                     onSeekMode = viewModel::setSeekThumbnails,
                     onDebrid = viewModel::setDebrid,
+                    onDeviceOptimization = viewModel::setDeviceOptimization,
                     onOpenSetup = onOpenSetup,
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
@@ -134,6 +138,7 @@ private fun SettingsList(
     onBuffer: (Int) -> Unit,
     onSeekMode: (Boolean) -> Unit,
     onDebrid: (DebridService) -> Unit,
+    onDeviceOptimization: (DeviceOptimization) -> Unit,
     onOpenSetup: () -> Unit,
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
@@ -223,16 +228,34 @@ private fun SettingsList(
             items(SourceProvider.entries.distinctBy { it.section }) { p ->
                 ProviderCard(p, enabled = SourceProvider.entries.filter { it.section == p.section }.all { it in providers }, onClick = { onToggleProvider(p) })
             }
-            item { SpanishFirstCard() }
             item { SectionTitle(tr("Inicio", "Home")) }
-            item { HomeCategoriesCard() }
             item { LightweightModeCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(tr("Reproducción", "Playback")) }
-            item { SeekModeCard(thumbnails = state.seekThumbnails, onChange = onSeekMode) }
+            item {
+                DeviceOptimizationCard(
+                    optimization = state.optimization,
+                    capabilities = state.capabilities,
+                    memoryProfile = state.memoryProfile,
+                    onChange = onDeviceOptimization,
+                )
+            }
+            item {
+                SeekModeCard(
+                    thumbnails = state.seekThumbnails,
+                    enabled = state.optimization == DeviceOptimization.CUSTOM,
+                    onChange = onSeekMode,
+                )
+            }
             item { AutoNextCard() }
-            item { BufferCard(seconds = state.bufferSeconds, onChange = onBuffer) }
+            item {
+                BufferCard(
+                    seconds = state.bufferSeconds,
+                    enabled = state.optimization == DeviceOptimization.CUSTOM,
+                    onChange = onBuffer,
+                )
+            }
             item { SectionTitle(tr("Acerca de", "About")) }
             item { AboutCard() }
             item { UpdateCard() }
@@ -458,56 +481,6 @@ internal fun DebridSelectorCard(active: DebridService, onChange: (DebridService)
     }
 }
 
-/**
- * Cómo funcionan ◀▶ en el reproductor. OK alterna; ◀ elige "Miniaturas" y ▶ "Saltos de 10 s".
- */
-/**
- * "Castellano primero": en Fuentes y al pulsar Reproducir, las releases con audio en español van delante (tras las
- * que están en caché). Se detecta por la bandera de Torrentio o por el nombre (SPANISH, CASTELLANO, DUAL…).
- */
-@Composable
-private fun SpanishFirstCard(viewModel: SettingsViewModel = hiltViewModel()) {
-    val enabled by viewModel.spanishFirst.collectAsStateWithLifecycle()
-    FocusCard(
-        onClick = { viewModel.setSpanishFirst(!enabled) },
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            when (event.key) {
-                Key.DirectionLeft -> { viewModel.setSpanishFirst(true); true }
-                Key.DirectionRight -> { viewModel.setSpanishFirst(false); true }
-                else -> false
-            }
-        },
-    ) { _ ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    tr("Castellano primero", "Spanish audio first"),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                )
-                Text(
-                    tr(
-                        "Las fuentes con audio en español van delante (también al pulsar Reproducir). Se reconocen por la bandera o por el nombre: SPANISH, CASTELLANO, DUAL…",
-                        "Sources with Spanish audio go first (also when you press Play). Detected by flag or name: SPANISH, CASTELLANO, DUAL…",
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Muted,
-                )
-            }
-            Spacer(Modifier.width(24.dp))
-            Row(
-                Modifier
-                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
-                    .padding(4.dp),
-            ) {
-                SegmentOption(tr("Sí", "On"), selected = enabled)
-                SegmentOption(tr("No", "Off"), selected = !enabled)
-            }
-        }
-    }
-}
-
 /** Reduce image decoding, background changes and focus animations on low-power TV boxes. */
 @Composable
 private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) {
@@ -596,12 +569,88 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
+/** Detección por capacidades; no se guarda un perfil distinto para cada perfil de usuario. */
 @Composable
-private fun SeekModeCard(thumbnails: Boolean, onChange: (Boolean) -> Unit) {
+private fun DeviceOptimizationCard(
+    optimization: DeviceOptimization,
+    capabilities: DeviceCapabilities,
+    memoryProfile: MemoryProfile,
+    onChange: (DeviceOptimization) -> Unit,
+) {
     FocusCard(
-        onClick = { onChange(!thumbnails) },
+        onClick = {
+            onChange(if (optimization == DeviceOptimization.AUTOMATIC) DeviceOptimization.CUSTOM else DeviceOptimization.AUTOMATIC)
+        },
         modifier = Modifier.onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { onChange(DeviceOptimization.AUTOMATIC); true }
+                Key.DirectionRight -> { onChange(DeviceOptimization.CUSTOM); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tr("Optimización del dispositivo", "Device optimization"),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    if (optimization == DeviceOptimization.AUTOMATIC) {
+                        tr(
+                            "Bambi ajusta memoria, búfer, miniaturas y fuentes a los decodificadores y al HDR detectados.",
+                            "Bambi adapts memory, buffering, thumbnails and sources to the detected decoders and HDR support.",
+                        )
+                    } else {
+                        tr(
+                            "Usa tus ajustes manuales y la selección de fuentes compatible con la Shield.",
+                            "Uses your manual settings and Shield-compatible source selection.",
+                        )
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+                val codecs = capabilities.hardwareVideoCodecs
+                    .sortedBy { it.ordinal }
+                    .joinToString(" · ") { it.label }
+                    .ifBlank { tr("ninguno detectado", "none detected") }
+                val hdr = capabilities.supportedHdr
+                    .sortedBy { it.rank }
+                    .joinToString(" · ") { it.label }
+                    .ifBlank { tr("HDR no detectado", "No HDR detected") }
+                val memory = when {
+                    optimization == DeviceOptimization.AUTOMATIC && memoryProfile == MemoryProfile.CONSTRAINED ->
+                        " · " + tr("memoria ajustada", "constrained memory")
+                    else -> ""
+                }
+                Text(
+                    "${capabilities.model} · ${capabilities.heapLimitBytes / (1024 * 1024)} MB$memory\n$codecs\n$hdr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.45f),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(tr("Automática", "Automatic"), selected = optimization == DeviceOptimization.AUTOMATIC)
+                SegmentOption(tr("Personalizada", "Custom"), selected = optimization == DeviceOptimization.CUSTOM)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    FocusCard(
+        onClick = { if (enabled) onChange(!thumbnails) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (!enabled || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when (event.key) {
                 Key.DirectionLeft -> { onChange(true); true }
                 Key.DirectionRight -> { onChange(false); true }
@@ -617,7 +666,9 @@ private fun SeekModeCard(thumbnails: Boolean, onChange: (Boolean) -> Unit) {
                     color = Color.White,
                 )
                 Text(
-                    if (thumbnails) {
+                    if (!enabled) {
+                        tr("Elegido automáticamente para este dispositivo.", "Chosen automatically for this device.")
+                    } else if (thumbnails) {
                         tr("◀ ▶ pausan y muestran miniaturas del punto elegido; OK salta ahí y Atrás vuelve.", "◀ ▶ pause and show thumbnails of the chosen point; OK jumps there and Back returns.")
                     } else {
                         tr("◀ ▶ adelantan o retroceden 10 s al momento, sin pausar.", "◀ ▶ skip forward or back 10 s instantly, without pausing.")
@@ -726,12 +777,12 @@ private fun SegmentOption(text: String, selected: Boolean) {
     )
 }
 
-/** ◀ ▶ cambian el búfer de 10 en 10 (50–100 s) sin salir de la tarjeta. */
+/** En modo manual, ◀ ▶ cambian el búfer de 10 en 10 (20–100 s) sin salir de la tarjeta. */
 @Composable
-private fun BufferCard(seconds: Int, onChange: (Int) -> Unit) {
+private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) {
     FocusCard(
         modifier = Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            if (!enabled || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when (event.key) {
                 Key.DirectionLeft -> {
                     if (seconds > MIN_BUFFER) onChange(-10)
@@ -753,13 +804,16 @@ private fun BufferCard(seconds: Int, onChange: (Int) -> Unit) {
                     color = Color.White,
                 )
                 Text(
-                    if (seconds <= 40) {
-                        tr(
+                    when {
+                        !enabled -> tr(
+                            "Valor elegido automáticamente según la memoria disponible.",
+                            "Chosen automatically from the available memory.",
+                        )
+                        seconds <= 40 -> tr(
                             "Modo ligero: búfer trasero de 5 s, hasta 64 MB y arranque más rápido. ◀ ▶ para elegir los segundos.",
                             "Lightweight: 5 s back buffer, up to 64 MB and faster startup. Use ◀ ▶ to adjust seconds.",
                         )
-                    } else {
-                        tr(
+                        else -> tr(
                             "Segundos de vídeo que se cargan por adelantado. ◀ ▶ para ajustar; más búfer aguanta mejor los cortes.",
                             "Seconds of video buffered ahead. Use ◀ ▶ to adjust; a larger buffer tolerates network interruptions better.",
                         )
@@ -771,7 +825,7 @@ private fun BufferCard(seconds: Int, onChange: (Int) -> Unit) {
             Spacer(Modifier.width(24.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Arrow("◀", enabled = focused && seconds > MIN_BUFFER)
+                    Arrow("◀", enabled = enabled && focused && seconds > MIN_BUFFER)
                     Text(
                         "$seconds s",
                         fontFamily = DisplayFont,
@@ -779,21 +833,25 @@ private fun BufferCard(seconds: Int, onChange: (Int) -> Unit) {
                         color = Color.White,
                         modifier = Modifier.padding(horizontal = 18.dp),
                     )
-                    Arrow("▶", enabled = focused && seconds < MAX_BUFFER)
+                    Arrow("▶", enabled = enabled && focused && seconds < MAX_BUFFER)
                 }
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    (MIN_BUFFER..MAX_BUFFER step 10).forEach { step ->
-                        Box(
-                            Modifier
-                                .width(22.dp)
-                                .height(4.dp)
-                                .background(
-                                    if (step <= seconds) Color.White else Color.White.copy(alpha = 0.18f),
-                                    RoundedCornerShape(2.dp),
-                                ),
-                        )
+                if (enabled) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (MIN_BUFFER..MAX_BUFFER step 10).forEach { step ->
+                            Box(
+                                Modifier
+                                    .width(22.dp)
+                                    .height(4.dp)
+                                    .background(
+                                        if (step <= seconds) Color.White else Color.White.copy(alpha = 0.18f),
+                                        RoundedCornerShape(2.dp),
+                                    ),
+                            )
+                        }
                     }
+                } else {
+                    Text(tr("Automático", "Automatic"), style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             }
         }

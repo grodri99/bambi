@@ -30,6 +30,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
+    implementation(project(":core:media"))
     implementation(project(":core:ui"))
     implementation(libs.zxing.core) // QR de la guía de configuración
 

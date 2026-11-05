@@ -36,8 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.ui.component.tvClickable
@@ -48,57 +46,9 @@ private val PanelFocused = Color(0xFF2A2D3D)
 private val Dim = Color.White.copy(alpha = 0.6f)
 private val Red = Color(0xFFE50914)
 
-/**
- * Ajustes → "Categorías del Inicio": los botones bajo la portada (Dramas, Terror, Españolas…).
- * OK abre la lista para mostrar u ocultar cada una.
- */
+/** Editor de las categorías visibles en el Inicio de un perfil. */
 @Composable
-internal fun HomeCategoriesCard(viewModel: SettingsViewModel = hiltViewModel()) {
-    val hidden by viewModel.hiddenCategories.collectAsStateWithLifecycle()
-    var open by remember { mutableStateOf(false) }
-    var focused by remember { mutableStateOf(false) }
-    val total = Category.entries.size
-    val visible = Category.entries.count { it.name !in hidden }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (focused) PanelFocused else Panel, RoundedCornerShape(14.dp))
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) Color.White else Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(14.dp),
-            )
-            .onFocusChanged { focused = it.isFocused }
-            .tvClickable { open = true }
-            .padding(horizontal = 24.dp, vertical = 18.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(tr("Categorías del Inicio", "Home categories"), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(
-                tr(
-                    "Los botones bajo la portada (Dramas, Terror, Españolas…). Se ven $visible de $total.",
-                    "The buttons under the billboard (Dramas, Horror, Korean…). $visible of $total shown.",
-                ),
-                color = Dim,
-                fontSize = 15.sp,
-            )
-        }
-        Spacer(Modifier.width(16.dp))
-        Text(tr("OK para elegir ›", "OK to choose ›"), color = Dim, fontSize = 16.sp)
-    }
-    if (open) {
-        HomeCategoriesDialog(
-            hidden = hidden,
-            onToggle = viewModel::toggleCategory,
-            onShowAll = viewModel::showAllCategories,
-            onClose = { open = false },
-        )
-    }
-}
-
-@Composable
-private fun HomeCategoriesDialog(
+internal fun HomeCategoriesDialog(
     hidden: Set<String>,
     onToggle: (Category) -> Unit,
     onShowAll: () -> Unit,

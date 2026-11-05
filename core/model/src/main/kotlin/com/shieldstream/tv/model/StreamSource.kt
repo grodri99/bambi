@@ -19,7 +19,9 @@ data class StreamSource(
     val fileName: String? = null,
     /** Idiomas de audio que anuncia Torrentio con banderas (ES, LAT, EN…). Vacío = no indicado. */
     val languages: List<String> = emptyList(),
-    /** AV1: la Shield lo decodifica por CPU (libgav1). Va al final de la cola de reproducción. */
+    /** Codec anunciado por la release, cuando se puede reconocer por su nombre. */
+    val videoCodec: VideoCodec? = null,
+    /** Valor inicial según la Shield; la priorización lo recalcula con los decodificadores del dispositivo. */
     val softwareDecode: Boolean = false,
     /** Debrid vía Torrentio: enlace /resolve/ que se convierte en el enlace directo al reproducir. */
     val resolveUrl: String? = null,
@@ -41,6 +43,9 @@ data class StreamSource(
 
     /** Audio en español: 2 = castellano, 1 = latino, 0 = no consta. Ver [SpanishAudio]. */
     val spanishAudioScore: Int get() = SpanishAudio.score(this)
+
+    /** Misma regla para el panel y para la cola automática. Las pistas reales se verifican al reproducir. */
+    val advertisesSpanishAudio: Boolean get() = spanishAudioScore >= 2
 }
 
 /**

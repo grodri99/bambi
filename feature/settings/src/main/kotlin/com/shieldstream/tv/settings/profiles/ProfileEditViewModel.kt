@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.TraktRepository
+import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.ProfilePin
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,7 +78,33 @@ class ProfileEditViewModel @Inject constructor(
     fun setAvatar(index: Int) = edit { it.copy(profile = it.profile.copy(avatar = index), confirmDelete = false) }
 
     /** Perfil infantil: solo contenido para niños en Inicio, categorías y Buscar. Se aplica al guardar. */
-    fun setKids(kids: Boolean) = edit { it.copy(profile = it.profile.copy(kids = kids), confirmDelete = false) }
+    fun setKids(kids: Boolean) = edit {
+        it.copy(
+            profile = it.profile.copy(
+                kids = kids,
+                spanishFirst = if (kids) true else it.profile.spanishFirst,
+                spanishOnlySources = if (kids) true else it.profile.spanishOnlySources,
+            ),
+            confirmDelete = false,
+        )
+    }
+
+    fun setSpanishFirst(enabled: Boolean) = edit { it.copy(profile = it.profile.copy(spanishFirst = enabled)) }
+
+    fun setSpanishOnly(enabled: Boolean) = edit { it.copy(profile = it.profile.copy(spanishOnlySources = enabled)) }
+
+    /** Categorías del Inicio de este perfil. La última visible no se puede ocultar. */
+    fun toggleCategory(category: Category) {
+        val state = _uiState.value as? ProfileEditUiState.Editing ?: return
+        val hidden = state.profile.hiddenCategories
+        if (category.name !in hidden && Category.entries.count { it.name !in hidden && it != category } == 0) return
+        val next = if (category.name in hidden) hidden - category.name else hidden + category.name
+        edit { it.copy(profile = it.profile.copy(hiddenCategories = next), confirmDelete = false) }
+    }
+
+    fun showAllCategories() = edit {
+        it.copy(profile = it.profile.copy(hiddenCategories = emptySet()), confirmDelete = false)
+    }
 
     /** PIN ya escrito dos veces (ver PinDialog en la pantalla). Se guarda solo su hash, al guardar el perfil. */
     fun setPin(pin: String) = edit { it.copy(profile = it.profile.copy(pinHash = ProfilePin.hash(it.profile.id, pin)), confirmRemovePin = false) }
