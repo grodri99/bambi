@@ -20,6 +20,11 @@ class SourceProviderDefaultsTest {
     }
 
     @Test
+    fun peerflixSupportsNativeDebridConfiguration() {
+        assertTrue(SourceProvider.PEERFLIX.torrentioStyle)
+    }
+
+    @Test
     fun savedDisabledProvidersAreRespected() {
         val enabled = enabledSourceProviders(setOf(SourceProvider.COMET, SourceProvider.NYAA))
         assertFalse(SourceProvider.COMET in enabled)

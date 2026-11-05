@@ -572,8 +572,10 @@ class CatalogRepositoryImpl @Inject constructor(
         if (count <= 1) tr("el addon de Stremio", "the Stremio addon")
         else base.removePrefix("https://").removePrefix("http://").substringBefore('/').substringBefore('.')
 
-    private suspend fun aioStreams(base: String, item: CatalogItem, type: String, streamId: String, label: String = tr("el addon de Stremio", "the Stremio addon")): List<StreamSource> =
-        torrentio.streamsAt("$base/stream/$type/$streamId.json").streams.mapNotNull { s ->
+    private suspend fun aioStreams(base: String, item: CatalogItem, type: String, streamId: String, label: String = tr("el addon de Stremio", "the Stremio addon")): List<StreamSource> {
+        val streams = torrentio.streamsAt("$base/stream/$type/$streamId.json").streams
+        streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, label)) }
+        return streams.mapNotNull { s ->
             // Addon de torrents (sin url, con infoHash): como Torrentio, lo resuelve Real-Debrid.
             val link = s.url?.takeIf { it.startsWith("http") } ?: return@mapNotNull s.toStreamSource(item)
             val hash = s.infoHash ?: "aio%08x".format(link.hashCode())
@@ -583,6 +585,7 @@ class CatalogRepositoryImpl @Inject constructor(
                 isCached = s.name.contains("⚡") || s.name.contains("+]"),
             )
         }
+    }
 
     private suspend fun torrentioStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String): List<StreamSource> {
         val debrid = settings.debridService.first()
@@ -597,6 +600,13 @@ class CatalogRepositoryImpl @Inject constructor(
                 else -> torrentio.streams(type, streamId)
             }
             return streams.streams.mapNotNull { it.toStreamSource(item) }
+        }
+        // Peerflix admite debrid en su propio addon: /alldebrid=CLAVE/stream/...
+        // No usar aquí language=spanish: ese parámetro es específico de Torrentio.
+        if (p == SourceProvider.PEERFLIX) {
+            val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
+                ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
+            return aioStreams("$base/${torrentioConfig(debrid, key)}", item, type, streamId, label = debrid.title)
         }
         // Otros debrids: solo los buscadores con la API de Torrentio saben pedir sus enlaces.
         if (!p.torrentioStyle) return emptyList()
