@@ -1,6 +1,7 @@
 package com.shieldstream.tv.home
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
@@ -29,6 +30,7 @@ sealed interface SearchUiState {
 class SearchViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val settings: SettingsRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     val qwerty: StateFlow<Boolean> = settings.searchQwerty.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -74,7 +76,7 @@ class SearchViewModel @Inject constructor(
                 .onSuccess { items ->
                     _uiState.value = if (items.isEmpty()) SearchUiState.Empty(q) else SearchUiState.Results(q, items)
                 }
-                .onFailure { e -> _uiState.value = SearchUiState.Error(e.message ?: tr("Error en la búsqueda", "Search error")) }
+                .onFailure { e -> _uiState.value = SearchUiState.Error(e.message ?: texts.get(StringsR.string.home_search_error)) }
         }
     }
 }

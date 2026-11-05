@@ -27,5 +27,3 @@ object Lang {
 
     val locale: Locale get() = current.locale
 }
-
-fun tr(es: String, en: String): String = if (Lang.current == AppLanguage.EN) en else es

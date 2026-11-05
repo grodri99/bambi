@@ -12,6 +12,7 @@ import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.ShowEpisodeStatus
 import com.shieldstream.tv.model.WatchProgress
+import com.shieldstream.tv.strings.Texts
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -81,6 +82,7 @@ class EpisodeNotificationWorkerTest {
         releases = releases,
         tracking = tracking,
         trakt = mockk<TraktRepository>(relaxed = true),
+        texts = mockk<Texts>(relaxed = true),
     )
 
     private fun releasesFor(vararg ids: Int) = object : EpisodeReleaseRepository {

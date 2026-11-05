@@ -1,7 +1,10 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.rememberTexts
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +50,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import com.shieldstream.tv.model.ExternalSubtitle
 import com.shieldstream.tv.model.SubtitleLanguages
+import com.shieldstream.tv.strings.localizedSubtitleLanguage
 import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import java.util.Locale
@@ -76,6 +80,7 @@ fun TracksPanel(
     onManualSubtitleSelection: () -> Unit = {},
     onOpenSync: () -> Unit = {},
 ) {
+    val texts = rememberTexts()
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -106,13 +111,15 @@ fun TracksPanel(
             )
         } else {
             val hasSpanish = remember(tracks) { hasEmbeddedSubtitle(tracks, Lang.current.code) }
-            val audio = remember(tracks) { audioOptions(tracks, player) }
+            val externalSubtitleText = texts.get(StringsR.string.player_external_subtitle)
+            val syncSubtitlesText = texts.get(StringsR.string.player_sync_subtitles_3af0a4)
+            val audio = remember(tracks) { audioOptions(tracks, player, texts) }
             val text = remember(tracks, hasSpanish, externalLabel, syncDetail) {
                 buildList {
-                    add(externalOption(hasSpanish) { showExternal = true })
+                    add(externalOption(hasSpanish, texts) { showExternal = true })
                     if (externalLabel != null) {
-                        add(TrackOption("t_ext_active", externalLabel, tr("Subtítulo externo", "External subtitle"), selected = true, onSelect = {}))
-                        add(TrackOption("t_sync", tr("Sincronizar subtítulos ›", "Sync subtitles ›"), syncDetail, selected = false, onSelect = onOpenSync))
+                        add(TrackOption("t_ext_active", externalLabel, externalSubtitleText, selected = true, onSelect = {}))
+                        add(TrackOption("t_sync", syncSubtitlesText, syncDetail, selected = false, onSelect = onOpenSync))
                     }
                     addAll(
                         textOptions(
@@ -121,6 +128,7 @@ fun TracksPanel(
                             externalActive = externalLabel != null,
                             onExternalOff = onExternalOff,
                             onManualSelection = onManualSubtitleSelection,
+                            texts = texts,
                         ),
                     )
                 }
@@ -128,7 +136,7 @@ fun TracksPanel(
             TracksView(audio = audio, text = text)
         }
         Text(
-            text = if (showExternal) tr("Atrás para volver a Audio y subtítulos", "Back to return to Audio & subtitles") else tr("Atrás para volver a la película", "Back to return to the movie"),
+            text = if (showExternal) localizedStringResource(StringsR.string.player_back_to_return_to_audio_subtitles) else localizedStringResource(StringsR.string.player_back_to_return_to_the_movie),
             color = Color.White.copy(alpha = 0.5f),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
@@ -154,14 +162,14 @@ private fun TracksView(audio: List<TrackOption>, text: List<TrackOption>) {
         OptionColumn(
             title = "Audio",
             options = audio,
-            emptyText = tr("Sin pistas de audio", "No audio tracks"),
+            emptyText = localizedStringResource(StringsR.string.player_no_audio_tracks),
             onClick = { it.onSelect() },
             focusIndex = audioFocusIndex,
             focusRequester = initialFocus,
             modifier = Modifier.weight(1f),
         )
         OptionColumn(
-            title = tr("Subtítulos", "Subtitles"),
+            title = localizedStringResource(StringsR.string.player_subtitles),
             options = text,
             emptyText = "",
             onClick = { it.onSelect() },
@@ -194,10 +202,10 @@ private fun ExternalSubtitlesView(
         runCatching { languageFocus.requestFocus() }
     }
 
-    val languageOptions = SubtitleLanguages.all.map { (code, label) ->
+    val languageOptions = SubtitleLanguages.all.map { code ->
         TrackOption(
             key = "lang_$code",
-            title = label,
+            title = localizedSubtitleLanguage(code),
             detail = "",
             selected = code == currentLanguage,
             onSelect = { onSearch(code) },
@@ -211,7 +219,7 @@ private fun ExternalSubtitlesView(
         horizontalArrangement = Arrangement.spacedBy(64.dp),
     ) {
         OptionColumn(
-            title = tr("Idioma", "Language"),
+            title = localizedStringResource(StringsR.string.player_language),
             options = languageOptions,
             emptyText = "",
             onClick = { option -> option.onSelect() },
@@ -221,7 +229,7 @@ private fun ExternalSubtitlesView(
         )
         Column(Modifier.weight(1.4f)) {
             Text(
-                text = tr("Subtítulos externos", "External subtitles"),
+                text = localizedStringResource(StringsR.string.player_external_subtitles),
                 color = Color.White,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             )
@@ -233,20 +241,26 @@ private fun ExternalSubtitlesView(
             Spacer(Modifier.height(16.dp))
             when (state) {
                 ExternalSubsState.Idle, is ExternalSubsState.Attached -> Unit
-                is ExternalSubsState.Searching -> StatusText(tr("Buscando subtítulos en ${SubtitleLanguages.label(state.language).lowercase(UiLocale)}…", "Searching ${SubtitleLanguages.label(state.language)} subtitles…"))
-                is ExternalSubsState.Downloading -> StatusText(tr("Descargando y cargando en el vídeo…", "Downloading and loading into the video…"))
+                is ExternalSubsState.Searching -> StatusText(localizedStringResource(
+                    StringsR.string.player_searching_language,
+                    localizedSubtitleLanguage(state.language).let { if (Lang.isEnglish) it else it.lowercase(UiLocale) },
+                ))
+                is ExternalSubsState.Downloading -> StatusText(localizedStringResource(StringsR.string.player_downloading_and_loading_into_the_video))
                 is ExternalSubsState.Error -> StatusText(state.message)
                 is ExternalSubsState.Results -> if (state.items.isEmpty()) {
-                    StatusText(tr("No se han encontrado subtítulos en ${SubtitleLanguages.label(state.language).lowercase(UiLocale)}", "No ${SubtitleLanguages.label(state.language)} subtitles found"))
+                    StatusText(localizedStringResource(
+                        StringsR.string.player_no_language_subtitles,
+                        localizedSubtitleLanguage(state.language).let { if (Lang.isEnglish) it else it.lowercase(UiLocale) },
+                    ))
                 } else {
                     val options = state.items.mapIndexed { index, sub ->
                         TrackOption(
                             key = "ext_${sub.provider}_${sub.id}",
-                            title = sub.release.ifBlank { tr("${sub.provider} · subtítulo ${index + 1}", "${sub.provider} · subtitle ${index + 1}") },
+                            title = sub.release.ifBlank { localizedStringResource(StringsR.string.player_external_subtitle_title, sub.provider, index + 1) },
                             detail = buildList {
                                 add(sub.provider)
-                                if (sub.hearingImpaired) add(tr("para sordos", "SDH"))
-                                if (sub.matchScore >= 0.5f) add(tr("coincide con tu versión", "matches your release"))
+                                if (sub.hearingImpaired) add(localizedStringResource(StringsR.string.player_sdh))
+                                if (sub.matchScore >= 0.5f) add(localizedStringResource(StringsR.string.player_matches_your_release))
                             }.joinToString(" · "),
                             selected = false,
                             onSelect = { onPick(sub) },
@@ -255,10 +269,7 @@ private fun ExternalSubtitlesView(
                     Column {
                         if (state.evaluating) {
                             StatusText(
-                                tr(
-                                    "Probando ${state.candidateCount} candidatos · ${state.referenceCues} frases de referencia",
-                                    "Testing ${state.candidateCount} candidates · ${state.referenceCues} reference cues",
-                                ),
+                                localizedStringResource(StringsR.string.player_evaluating_candidates, state.candidateCount, state.referenceCues),
                             )
                             Spacer(Modifier.height(8.dp))
                         }
@@ -368,13 +379,13 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 
-private fun externalOption(hasSpanish: Boolean, open: () -> Unit) = TrackOption(
+private fun externalOption(hasSpanish: Boolean, texts: Texts, open: () -> Unit) = TrackOption(
     key = "t_external",
-    title = tr("Subtítulos externos ›", "External subtitles ›"),
+    title = texts.get(StringsR.string.player_external_subtitles_6520c3),
     detail = if (hasSpanish) {
-        tr("Buscar en OpenSubtitles, Podnapisi y SubDL", "Search OpenSubtitles, Podnapisi and SubDL")
+        texts.get(StringsR.string.player_search_opensubtitles_podnapisi_and_subdl)
     } else {
-        tr("Este archivo no trae subtítulos en español: búscalos aquí", "This file has no English subtitles: search for them here")
+        texts.get(StringsR.string.player_this_file_has_no_english_subtitles_search)
     },
     selected = false,
     onSelect = { open() },
@@ -388,7 +399,7 @@ private fun hasEmbeddedSubtitle(tracks: Tracks, language: String): Boolean =
     }
 
 @OptIn(UnstableApi::class)
-private fun audioOptions(tracks: Tracks, player: Player): List<TrackOption> = buildList {
+private fun audioOptions(tracks: Tracks, player: Player, texts: Texts): List<TrackOption> = buildList {
     tracks.groups.forEachIndexed { groupIndex, group ->
         if (group.type != C.TRACK_TYPE_AUDIO) return@forEachIndexed
         for (i in 0 until group.length) {
@@ -398,10 +409,10 @@ private fun audioOptions(tracks: Tracks, player: Player): List<TrackOption> = bu
             add(
                 TrackOption(
                     key = "a_${groupIndex}_$i",
-                    title = language ?: f.label ?: tr("Pista ${size + 1}", "Track ${size + 1}"),
+                    title = language ?: f.label ?: texts.get(StringsR.string.player_track_number, size + 1),
                     detail = listOfNotNull(
                         f.label?.takeIf { it != language },
-                        audioTech(f),
+                        audioTech(f, texts),
                     ).distinct().joinToString(" · "),
                     selected = group.isTrackSelected(i),
                     onSelect = {
@@ -422,6 +433,7 @@ private fun textOptions(
     externalActive: Boolean,
     onExternalOff: () -> Unit,
     onManualSelection: () -> Unit,
+    texts: Texts,
 ): List<TrackOption> {
     val textGroups = tracks.groups.withIndex().filter { it.value.type == C.TRACK_TYPE_TEXT }
     val anySelected = externalActive || textGroups.any { (_, g) -> (0 until g.length).any { g.isTrackSelected(it) } }
@@ -430,7 +442,7 @@ private fun textOptions(
         add(
             TrackOption(
                 key = "t_off",
-                title = tr("Desactivados", "Off"),
+                title = texts.get(StringsR.string.player_off),
                 detail = "",
                 selected = !anySelected,
                 onSelect = {
@@ -453,12 +465,12 @@ private fun textOptions(
                 add(
                     TrackOption(
                         key = "t_${groupIndex}_$i",
-                        title = (language ?: f.label ?: tr("Subtítulo $size", "Subtitle $size")) +
-                            (if (forced) tr(" (forzados)", " (forced)") else "") +
-                            (if (external) tr(" · externo", " · external") else ""),
+                        title = (language ?: f.label ?: texts.get(StringsR.string.player_subtitle_number, size)) +
+                            (if (forced) texts.get(StringsR.string.player_forced) else "") +
+                            (if (external) texts.get(StringsR.string.player_external) else ""),
                         detail = listOfNotNull(
                             f.label?.takeIf { it != language },
-                            subtitleTech(f),
+                            subtitleTech(f, texts),
                         ).distinct().joinToString(" · "),
                         selected = !externalActive && group.isTrackSelected(i),
                         onSelect = {
@@ -483,7 +495,7 @@ private fun languageName(code: String?): String? {
     return name.replaceFirstChar { it.titlecase(UiLocale) }
 }
 
-private fun audioTech(f: Format): String? {
+private fun audioTech(f: Format, texts: Texts): String? {
     val codec = when (f.sampleMimeType) {
         MimeTypes.AUDIO_TRUEHD -> "Dolby TrueHD"
         MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Digital+ Atmos"
@@ -500,7 +512,7 @@ private fun audioTech(f: Format): String? {
     }
     val channels = when (f.channelCount) {
         1 -> "mono"
-        2 -> tr("estéreo", "stereo")
+        2 -> texts.get(StringsR.string.player_stereo)
         6 -> "5.1"
         8 -> "7.1"
         Format.NO_VALUE -> null
@@ -509,11 +521,11 @@ private fun audioTech(f: Format): String? {
     return listOfNotNull(codec, channels).joinToString(" ").ifBlank { null }
 }
 
-private fun subtitleTech(f: Format): String? = when (f.codecs ?: f.sampleMimeType) {
-    MimeTypes.APPLICATION_PGS -> tr("PGS (imagen)", "PGS (image)")
+private fun subtitleTech(f: Format, texts: Texts): String? = when (f.codecs ?: f.sampleMimeType) {
+    MimeTypes.APPLICATION_PGS -> texts.get(StringsR.string.player_pgs_image)
     MimeTypes.APPLICATION_SUBRIP -> "SRT"
     MimeTypes.TEXT_SSA -> "ASS/SSA"
     MimeTypes.TEXT_VTT -> "WebVTT"
-    MimeTypes.APPLICATION_VOBSUB -> tr("VobSub (imagen)", "VobSub (image)")
+    MimeTypes.APPLICATION_VOBSUB -> texts.get(StringsR.string.player_vobsub_image)
     else -> null
 }

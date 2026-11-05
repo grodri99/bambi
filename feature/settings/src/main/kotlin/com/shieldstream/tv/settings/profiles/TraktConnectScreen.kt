@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.settings.QrCode
 import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.TvButton
@@ -59,17 +60,17 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         Text("t", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
                     }
                     Spacer(Modifier.width(18.dp))
-                    Text(tr("Conectar con Trakt", "Connect Trakt"), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                    Text(localizedStringResource(StringsR.string.settings_connect_trakt), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(32.dp))
                 when (val s = state) {
                     TraktConnectUiState.Loading -> {
-                        Text(tr("Pidiendo un código a Trakt…", "Getting a code from Trakt…"), color = ProfileMuted, fontSize = 22.sp)
+                        Text(localizedStringResource(StringsR.string.settings_getting_a_code_from_trakt), color = ProfileMuted, fontSize = 22.sp)
                         Spacer(Modifier.height(24.dp))
-                        TvButton(tr("Cancelar", "Cancel"), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
+                        TvButton(localizedStringResource(StringsR.string.settings_cancel), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
                     }
                     is TraktConnectUiState.ShowCode -> {
-                        Step("1", tr("En el móvil o el ordenador, entra en", "On your phone or computer, go to"))
+                        Step("1", localizedStringResource(StringsR.string.settings_on_your_phone_or_computer_go_to))
                         Text(
                             s.url.removePrefix("https://").removePrefix("www."),
                             color = Color.White,
@@ -78,7 +79,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                             modifier = Modifier.padding(start = 46.dp, top = 4.dp),
                         )
                         Spacer(Modifier.height(24.dp))
-                        Step("2", tr("Inicia sesión y escribe este código:", "Sign in and enter this code:"))
+                        Step("2", localizedStringResource(StringsR.string.settings_sign_in_and_enter_this_code))
                         Spacer(Modifier.height(12.dp))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -104,13 +105,13 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         }
                         Spacer(Modifier.height(24.dp))
                         Text(
-                            tr("Esperando… El código caduca en ", "Waiting… The code expires in ") +
+                            localizedStringResource(StringsR.string.settings_waiting_the_code_expires_in) +
                                 "%d:%02d".format(s.secondsLeft / 60, s.secondsLeft % 60),
                             color = ProfileMuted,
                             fontSize = 18.sp,
                         )
                         Spacer(Modifier.height(24.dp))
-                        TvButton(tr("Cancelar", "Cancel"), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
+                        TvButton(localizedStringResource(StringsR.string.settings_cancel), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
                     }
                     is TraktConnectUiState.Connected -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -122,7 +123,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                             }
                             Spacer(Modifier.width(14.dp))
                             Text(
-                                tr("Conectado como @${s.username}", "Connected as @${s.username}"),
+                                localizedStringResource(StringsR.string.settings_trakt_connected_as, s.username),
                                 color = Color.White,
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold,
@@ -130,32 +131,27 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         }
                         Spacer(Modifier.height(14.dp))
                         Text(
-                            tr(
-                                "Lo que ya habías visto en esta Shield se sube a Trakt, y a partir de ahora \"Seguir viendo\" " +
-                                    "va sincronizado entre tus Shields.",
-                                "What you'd already watched on this Shield is uploaded to Trakt, and from now on \"Continue " +
-                                    "watching\" is synced across your Shields.",
-                            ),
+                            localizedStringResource(StringsR.string.settings_trakt_sync_explanation),
                             color = ProfileMuted,
                             fontSize = 19.sp,
                         )
                         Spacer(Modifier.height(28.dp))
-                        TvButton(tr("Listo", "Done"), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
+                        TvButton(localizedStringResource(StringsR.string.settings_done), onClick = onDone, modifier = Modifier.focusRequester(buttonRequester))
                     }
                     TraktConnectUiState.Expired -> {
-                        Text(tr("El código ha caducado.", "The code has expired."), color = Color.White, fontSize = 24.sp)
+                        Text(localizedStringResource(StringsR.string.settings_the_code_has_expired), color = Color.White, fontSize = 24.sp)
                         Spacer(Modifier.height(24.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            TvButton(tr("Pedir otro código", "Get a new code"), onClick = viewModel::start, modifier = Modifier.focusRequester(buttonRequester))
-                            TvButton(tr("Cancelar", "Cancel"), onClick = onDone)
+                            TvButton(localizedStringResource(StringsR.string.settings_get_a_new_code), onClick = viewModel::start, modifier = Modifier.focusRequester(buttonRequester))
+                            TvButton(localizedStringResource(StringsR.string.settings_cancel), onClick = onDone)
                         }
                     }
                     is TraktConnectUiState.Error -> {
                         Text(s.message, color = Color(0xFFFF5A5F), fontSize = 22.sp)
                         Spacer(Modifier.height(24.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            TvButton(tr("Reintentar", "Retry"), onClick = viewModel::start, modifier = Modifier.focusRequester(buttonRequester))
-                            TvButton(tr("Cancelar", "Cancel"), onClick = onDone)
+                            TvButton(localizedStringResource(StringsR.string.settings_retry), onClick = viewModel::start, modifier = Modifier.focusRequester(buttonRequester))
+                            TvButton(localizedStringResource(StringsR.string.settings_cancel), onClick = onDone)
                         }
                     }
                 }
@@ -175,7 +171,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         QrCode(code.url, Modifier.fillMaxSize())
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text(tr("O escanéalo con el móvil", "Or scan it with your phone"), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(localizedStringResource(StringsR.string.settings_or_scan_it_with_your_phone), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

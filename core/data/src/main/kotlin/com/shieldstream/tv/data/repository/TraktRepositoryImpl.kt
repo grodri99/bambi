@@ -1,5 +1,7 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.content.Context
 import android.util.Log
 import com.shieldstream.tv.data.security.TokenStore
@@ -15,7 +17,6 @@ import com.shieldstream.tv.domain.TraktDeviceCode
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.model.WatchProgress
-import com.shieldstream.tv.model.tr
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,7 @@ class TraktRepositoryImpl @Inject constructor(
     private val myList: MyListRepository,
     private val tokens: TokenStore,
     private val json: Json,
+    private val texts: Texts,
 ) : TraktRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -87,7 +89,7 @@ class TraktRepositoryImpl @Inject constructor(
     }
 
     override suspend fun requestDeviceCode(): Result<TraktDeviceCode> = runCatching {
-        check(isConfigured) { tr("Trakt no está configurado en esta versión de Bambi.", "Trakt isn't set up in this build of Bambi.") }
+        check(isConfigured) { texts.get(StringsR.string.data_trakt_isn_t_set_up_in_this) }
         val response = client.post("/oauth/device/code", buildJsonObject { put("client_id", credentials.clientId) }, null)
         if (!response.ok) throw TraktHttpException(response.code)
         val body = response.body!!.jsonObject
@@ -129,8 +131,8 @@ class TraktRepositoryImpl @Inject constructor(
             429 -> TraktAuthPoll.SlowDown
             410 -> TraktAuthPoll.Expired
             418 -> TraktAuthPoll.Denied
-            404 -> TraktAuthPoll.Failed(tr("Código no válido. Pide uno nuevo.", "Invalid code. Get a new one."))
-            409 -> TraktAuthPoll.Failed(tr("Ese código ya se usó. Pide uno nuevo.", "That code was already used. Get a new one."))
+            404 -> TraktAuthPoll.Failed(texts.get(StringsR.string.data_invalid_code_get_a_new_one))
+            409 -> TraktAuthPoll.Failed(texts.get(StringsR.string.data_that_code_was_already_used_get_a))
             else -> TraktAuthPoll.Failed("Trakt HTTP ${response.code}")
         }
     }

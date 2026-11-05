@@ -1,5 +1,8 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.rememberTexts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -8,7 +11,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextOverflow
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.model.PlaybackVideoInfo
 import android.view.View
 import androidx.activity.compose.BackHandler
@@ -101,6 +103,7 @@ fun PlayerScreen(
     val thumbnailsEnabled by viewModel.seekThumbnails.collectAsStateWithLifecycle()
     val nextUp by viewModel.nextUp.collectAsStateWithLifecycle()
     val skipPrompt by viewModel.skipPrompt.collectAsStateWithLifecycle()
+    val texts = rememberTexts()
     LaunchedEffect(Unit) { viewModel.goNext.collect { onBack() } }
     LaunchedEffect(notice) {
         if (notice != null) {
@@ -379,7 +382,7 @@ fun PlayerScreen(
                     onPickExternal = { sub -> viewModel.downloadExternalSubtitle(sub) },
                     onCloseExternal = { viewModel.resetExternalSubtitles() },
                     externalLabel = activeExternal?.label,
-                    syncDetail = syncStatus.describe().ifBlank { subtitleTiming.describe() },
+                    syncDetail = syncStatus.describe(texts).ifBlank { subtitleTiming.describe(texts) },
                     onExternalOff = { viewModel.disableExternalSubtitle() },
                     onManualSubtitleSelection = viewModel::onManualSubtitleSelection,
                     onOpenSync = {
@@ -396,7 +399,7 @@ fun PlayerScreen(
             (nextUp as? NextUpUiState.Showing)?.let { next ->
                 val target = if (next.secondsLeft <= NEXT_FILL_SECONDS) 1f - next.secondsLeft / NEXT_FILL_SECONDS.toFloat() else 0f
                 val fill by animateFloatAsState(target, animationSpec = tween(500, easing = LinearEasing), label = "nextFill")
-                PlayerPill(tr("Siguiente episodio", "Next episode"), AppIcons.SkipNext, fill, pillModifier)
+                PlayerPill(localizedStringResource(StringsR.string.player_next_episode), AppIcons.SkipNext, fill, pillModifier)
             }
             if (skipVisible) {
                 (skipPrompt as? SkipPromptUiState.Showing)?.let { skip ->
@@ -530,7 +533,7 @@ private fun ControlsOverlay(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = if (playback.isPlaying) AppIcons.Pause else AppIcons.Play,
-                    contentDescription = if (playback.isPlaying) tr("Pausa", "Pause") else tr("Reproducir", "Play"),
+                    contentDescription = if (playback.isPlaying) localizedStringResource(StringsR.string.player_pause) else localizedStringResource(StringsR.string.player_play),
                     tint = Color.White,
                     modifier = Modifier.size(34.dp),
                 )
@@ -543,9 +546,9 @@ private fun ControlsOverlay(
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = when {
-                        scrubMs != null -> tr("OK ir aquí · Atrás volver", "OK jump here · Back return")
-                        thumbnailsEnabled -> tr("OK pausa · ◀ ▶ buscar · ▼ Audio y subtítulos", "OK pause · ◀ ▶ seek · ▼ Audio & subtitles")
-                        else -> tr("OK pausa · ◀ ▶ 10 s · ▼ Audio y subtítulos", "OK pause · ◀ ▶ 10 s · ▼ Audio & subtitles")
+                        scrubMs != null -> localizedStringResource(StringsR.string.player_ok_jump_here_back_return)
+                        thumbnailsEnabled -> localizedStringResource(StringsR.string.player_ok_pause_seek_audio_subtitles)
+                        else -> localizedStringResource(StringsR.string.player_ok_pause_10_s_audio_subtitles)
                     },
                     color = Color.White.copy(alpha = 0.5f),
                     style = MaterialTheme.typography.bodySmall,
@@ -609,7 +612,7 @@ private fun StatusOverlay(title: String, message: String, loading: Boolean) {
         )
         if (!loading) {
             Spacer(Modifier.height(16.dp))
-            Text(tr("Pulsa Atrás para elegir otra fuente", "Press Back to pick another source"), color = Color(0xFFB3B3B3), style = MaterialTheme.typography.bodyMedium)
+            Text(localizedStringResource(StringsR.string.player_press_back_to_pick_another_source), color = Color(0xFFB3B3B3), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

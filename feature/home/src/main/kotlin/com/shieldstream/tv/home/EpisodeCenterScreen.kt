@@ -1,5 +1,7 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,7 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Episode
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.localizedCode
 import com.shieldstream.tv.ui.component.NewEpisodeCard
 import com.shieldstream.tv.ui.component.formatEpisodeDate
 
@@ -37,20 +39,17 @@ fun EpisodeCenterScreen(
     LaunchedEffect(Unit) { viewModel.activate() }
     Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 36.dp, top = 24.dp)) {
         Text(
-            text = tr("Episodios", "Episodes"),
+            text = localizedStringResource(StringsR.string.home_episodes),
             color = Color.White,
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
         )
         Spacer(Modifier.height(16.dp))
         when (val s = state) {
-            EpisodeCenterUiState.Loading -> Text(tr("Buscando episodios…", "Finding episodes…"), color = Color.White.copy(alpha = 0.6f))
+            EpisodeCenterUiState.Loading -> Text(localizedStringResource(StringsR.string.home_finding_episodes), color = Color.White.copy(alpha = 0.6f))
             is EpisodeCenterUiState.Content -> {
                 if (s.available.isEmpty() && s.upcoming.isEmpty()) {
                     Text(
-                        text = tr(
-                            "No hay episodios recientes ni próximos estrenos en tus series. Sigue una serie desde su ficha para añadirla aquí.",
-                            "No recent or upcoming episodes in your shows. Follow a show from its details page to add it here.",
-                        ),
+                        text = localizedStringResource(StringsR.string.home_no_recent_or_upcoming_episodes_in_your),
                         color = Color.White.copy(alpha = 0.65f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -58,7 +57,7 @@ fun EpisodeCenterScreen(
                     LazyColumn(contentPadding = PaddingValues(bottom = 48.dp)) {
                         if (s.available.isNotEmpty()) {
                             item(key = "available_header") {
-                                SectionTitle(tr("Disponibles ahora", "Available now") + " · ${s.newEpisodeCount}")
+                                SectionTitle(localizedStringResource(StringsR.string.home_available_now) + " · ${s.newEpisodeCount}")
                             }
                             item(key = "available_row") {
                                 LazyRow(
@@ -67,7 +66,8 @@ fun EpisodeCenterScreen(
                                 ) {
                                     items(s.available, key = { it.item.key }) { status ->
                                         val episode = status.availableEpisodes.first()
-                                        val label = remember(episode) { episodeLabel(episode) }
+                                        val episodeCode = episode.localizedCode()
+                                        val label = remember(episode, episodeCode) { episodeLabel(episode, episodeCode) }
                                         NewEpisodeCard(
                                             item = status.item,
                                             label = label,
@@ -80,7 +80,7 @@ fun EpisodeCenterScreen(
                             }
                             item(key = "dismiss_hint") {
                                 Text(
-                                    text = tr("Mantén OK para descartar", "Hold OK to dismiss"),
+                                    text = localizedStringResource(StringsR.string.home_hold_ok_to_dismiss),
                                     color = Color.White.copy(alpha = 0.45f),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
@@ -89,7 +89,7 @@ fun EpisodeCenterScreen(
                         if (s.upcoming.isNotEmpty()) {
                             item(key = "upcoming_header") {
                                 Spacer(Modifier.height(20.dp))
-                                SectionTitle(tr("Próximos 30 días", "Next 30 days"))
+                                SectionTitle(localizedStringResource(StringsR.string.home_next_30_days))
                             }
                             item(key = "upcoming_row") {
                                 LazyRow(
@@ -98,7 +98,8 @@ fun EpisodeCenterScreen(
                                 ) {
                                     items(s.upcoming, key = { it.item.key }) { status ->
                                         val episode = status.upcomingEpisode!!
-                                        val label = remember(episode) { episodeLabel(episode) }
+                                        val episodeCode = episode.localizedCode()
+                                        val label = remember(episode, episodeCode) { episodeLabel(episode, episodeCode) }
                                         NewEpisodeCard(
                                             item = status.item,
                                             label = label,
@@ -121,5 +122,5 @@ private fun SectionTitle(text: String) {
     Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
 }
 
-private fun episodeLabel(episode: Episode): String =
-    listOf(episode.code, formatEpisodeDate(episode.airDate)).filter { it.isNotBlank() }.joinToString(" · ")
+private fun episodeLabel(episode: Episode, episodeCode: String): String =
+    listOf(episodeCode, formatEpisodeDate(episode.airDate)).filter { it.isNotBlank() }.joinToString(" · ")

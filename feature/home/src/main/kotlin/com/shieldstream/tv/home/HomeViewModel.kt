@@ -1,6 +1,7 @@
 package com.shieldstream.tv.home
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
@@ -59,6 +60,7 @@ class HomeViewModel @Inject constructor(
     settings: SettingsRepository,
     myList: MyListRepository,
     profiles: com.shieldstream.tv.domain.ProfileRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     val kidsProfile: Boolean = profiles.active.value.kids
@@ -161,7 +163,7 @@ class HomeViewModel @Inject constructor(
         if (loaded.isEmpty()) return null
         return CatalogRow(
             id = CONTINUE_ROW_ID,
-            title = tr("Seguir viendo", "Continue watching"),
+            title = texts.get(StringsR.string.home_continue_watching),
             items = loaded.map { it.second },
             style = RowStyle.CONTINUE,
             progress = loaded.associate { (entry, item) ->
@@ -189,7 +191,7 @@ class HomeViewModel @Inject constructor(
         val entries = loaded.sortedByDescending { it.second.airDate }.take(NewEpisodes.MAX_ITEMS)
         return CatalogRow(
             id = NEW_EPISODES_ROW_ID,
-            title = tr("Nuevos episodios", "New episodes"),
+            title = texts.get(StringsR.string.home_new_episodes),
             items = entries.map { it.first },
             style = RowStyle.NEW_EPISODES,
             newEpisodes = entries.associate { (item, episode, _) -> item.key to episode },
@@ -203,12 +205,16 @@ class HomeViewModel @Inject constructor(
             withTimeoutOrNull(5_000) { runCatching { catalogRepository.getItem(e.type, e.id) }.getOrNull() }
         }.filterNotNull()
         if (items.isEmpty()) return null
-        return CatalogRow(id = MY_LIST_ROW_ID, title = tr("Mi lista", "My list"), items = items)
+        return CatalogRow(id = MY_LIST_ROW_ID, title = texts.get(StringsR.string.home_my_list_f0348a), items = items)
     }
 
     private fun labelFor(entry: ContinueEntry): String {
         val remaining = formatRemaining(entry.progress.remainingMs)
-        return if (entry.type == MediaType.TV) tr("T${entry.season}:E${entry.episode} · $remaining", "S${entry.season}:E${entry.episode} · $remaining") else tr("Quedan $remaining", "$remaining left")
+        return if (entry.type == MediaType.TV) {
+            texts.get(StringsR.string.home_continue_episode_remaining, entry.season.toString(), entry.episode.toString(), remaining)
+        } else {
+            texts.get(StringsR.string.home_remaining, remaining)
+        }
     }
 
     private fun formatRemaining(ms: Long): String {
@@ -251,14 +257,14 @@ class HomeViewModel @Inject constructor(
             runCatching { catalogRepository.getHome(filter) }
                 .onSuccess { rows ->
                     _uiState.value = if (rows.isEmpty()) {
-                        HomeUiState.Error(tr("No se pudo cargar el catálogo. Revisa la conexión.", "Couldn't load the catalog. Check your connection."))
+                        HomeUiState.Error(texts.get(StringsR.string.home_couldn_t_load_the_catalog_check_your))
                     } else {
                         HomeUiState.Content(rows, featured.await())
                     }
                     if (filter == HomeFilter.ALL) prefetchOtherTabs()
                 }
                 .onFailure { e ->
-                    _uiState.value = HomeUiState.Error(e.message ?: tr("Error cargando el catálogo", "Error loading the catalog"))
+                    _uiState.value = HomeUiState.Error(e.message ?: texts.get(StringsR.string.home_error_loading_the_catalog))
                 }
         }
     }

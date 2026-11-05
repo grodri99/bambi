@@ -1,6 +1,5 @@
 package com.shieldstream.tv.domain
 
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.model.RdTorrentFile
 import com.shieldstream.tv.model.RdTorrentInfo
 import com.shieldstream.tv.model.StreamSource
@@ -11,9 +10,25 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
+interface ResolveStreamTexts {
+    fun debridService(): String
+    fun requestingLink(service: String): String
+    fun lookingInLibrary(): String
+    fun unrestrictingLink(): String
+    fun addingToRealDebrid(): String
+    fun couldNotReadMagnet(): String
+    fun noVideoFiles(): String
+    fun checkingCache(): String
+    fun sourceNotCached(): String
+    fun noLinks(): String
+    fun resolutionError(): String
+    fun torrentStatus(status: String): String
+}
+
 class ResolveStreamUseCase(
     private val realDebrid: RealDebridRepository,
     private val torrentio: TorrentioLinkResolver,
+    private val texts: ResolveStreamTexts,
 ) {
     operator fun invoke(source: StreamSource): Flow<ResolveState> = flow {
         source.directUrl?.let {
@@ -22,8 +37,8 @@ class ResolveStreamUseCase(
         }
 
         source.resolveUrl?.let { url ->
-            val service = source.debrid ?: tr("el servicio debrid", "the debrid service")
-            emit(ResolveState.Progress(tr("Pidiendo el enlace a $service…", "Requesting the link from $service…")))
+            val service = source.debrid ?: texts.debridService()
+            emit(ResolveState.Progress(texts.requestingLink(service)))
             when (val link = torrentio.resolve(url, service)) {
                 is DebridLink.Ready -> emit(ResolveState.Ready(link.url))
                 is DebridLink.Problem -> emit(ResolveState.Failed(link.message, notCached = link.notCached))
@@ -31,45 +46,45 @@ class ResolveStreamUseCase(
             return@flow
         }
 
-        emit(ResolveState.Progress(tr("Buscando en tu librería de Real-Debrid…", "Looking in your Real-Debrid library…")))
+        emit(ResolveState.Progress(texts.lookingInLibrary()))
         val existingId = realDebrid.findDownloaded(source.infoHash)
         if (existingId != null) {
             val info = realDebrid.torrentInfo(existingId)
             val link = pickFile(info.files, source)?.let { info.linkFor(it) }
             if (link != null) {
-                emit(ResolveState.Progress(tr("Desbloqueando enlace…", "Unrestricting link…")))
+                emit(ResolveState.Progress(texts.unrestrictingLink()))
                 emit(ResolveState.Ready(realDebrid.unrestrict(link)))
                 return@flow
             }
         }
 
-        emit(ResolveState.Progress(tr("Añadiendo a Real-Debrid…", "Adding to Real-Debrid…")))
+        emit(ResolveState.Progress(texts.addingToRealDebrid()))
         val torrentId = realDebrid.addMagnet(source.magnet)
         var keep = false
         try {
             val converted = poll(torrentId, MAGNET_TIMEOUT_MS) {
                 it.status == RdTorrentInfo.STATUS_WAITING_SELECTION ||
                     it.status == RdTorrentInfo.STATUS_DOWNLOADED
-            } ?: error(tr("Real-Debrid no pudo leer el magnet", "Real-Debrid couldn't read the magnet"))
+            } ?: error(texts.couldNotReadMagnet())
 
             if (converted.status == RdTorrentInfo.STATUS_WAITING_SELECTION) {
                 val target = pickFile(converted.files, source)
-                    ?: error(tr("El torrent no contiene archivos de vídeo", "The torrent has no video files"))
+                    ?: error(texts.noVideoFiles())
                 realDebrid.selectFiles(torrentId, listOf(target.id))
             }
 
-            emit(ResolveState.Progress(tr("Comprobando caché de Real-Debrid…", "Checking Real-Debrid cache…")))
+            emit(ResolveState.Progress(texts.checkingCache()))
             val ready = poll(torrentId, CACHE_TIMEOUT_MS) { it.status == RdTorrentInfo.STATUS_DOWNLOADED }
             if (ready == null) {
-                emit(ResolveState.Failed(tr("Esta fuente no está en la caché de Real-Debrid. Prueba otra.", "This source isn't cached on Real-Debrid. Try another."), notCached = true))
+                emit(ResolveState.Failed(texts.sourceNotCached(), notCached = true))
                 return@flow
             }
 
             val link = pickFile(ready.files, source)?.let { ready.linkFor(it) }
                 ?: ready.links.firstOrNull()
-                ?: error(tr("Real-Debrid no devolvió enlaces", "Real-Debrid returned no links"))
+                ?: error(texts.noLinks())
 
-            emit(ResolveState.Progress(tr("Desbloqueando enlace…", "Unrestricting link…")))
+            emit(ResolveState.Progress(texts.unrestrictingLink()))
             val url = realDebrid.unrestrict(link)
             keep = true
             emit(ResolveState.Ready(url))
@@ -79,7 +94,7 @@ class ResolveStreamUseCase(
     }.catch { e ->
         emit(
             ResolveState.Failed(
-                e.message ?: tr("Error resolviendo la fuente", "Error resolving the source"),
+                e.message ?: texts.resolutionError(),
                 blocked = e is TorrentBlockedException,
             ),
         )
@@ -116,7 +131,7 @@ class ResolveStreamUseCase(
             if (attempt > 0) delay(POLL_INTERVAL_MS)
             val info = realDebrid.torrentInfo(torrentId)
             if (info.status in RdTorrentInfo.STATUS_FAILED) {
-                error(tr("Real-Debrid marcó el torrent como '${info.status}'", "Real-Debrid marked the torrent as '${info.status}'"))
+                error(texts.torrentStatus(info.status))
             }
             if (done(info)) return info
         }

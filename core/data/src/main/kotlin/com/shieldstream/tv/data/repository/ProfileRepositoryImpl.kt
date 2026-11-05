@@ -1,5 +1,7 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.content.Context
 import android.os.Build
 import com.shieldstream.tv.data.security.TokenStore
@@ -10,7 +12,6 @@ import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.ProfileAvatars
 import com.shieldstream.tv.model.SubtitlePreference
-import com.shieldstream.tv.model.tr
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ import javax.inject.Singleton
 class ProfileRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tokens: TokenStore,
+    private val texts: Texts,
 ) : ProfileRepository {
 
     private val prefs = context.getSharedPreferences("profiles", Context.MODE_PRIVATE)
@@ -47,7 +49,7 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override fun save(profile: Profile): Profile {
         val clean = profile.copy(
-            name = profile.name.trim().take(MAX_NAME).ifEmpty { tr("Perfil", "Profile") },
+            name = profile.name.trim().take(MAX_NAME).ifEmpty { texts.get(StringsR.string.data_profile) },
             avatar = ProfileAvatars.safe(profile.avatar),
         )
         val list = _profiles.value
@@ -103,7 +105,7 @@ class ProfileRepositoryImpl @Inject constructor(
             return stored
         }
         val first = listOf(Profile(
-            Profile.DEFAULT_ID, tr("Principal", "Main"), avatar = 0,
+            Profile.DEFAULT_ID, texts.get(StringsR.string.data_main), avatar = 0,
             spanishFirst = spanishFirst, spanishOnlySources = spanishOnly,
             hiddenCategories = hiddenCategories,
         ))

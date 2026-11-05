@@ -21,6 +21,7 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.Season
 import com.shieldstream.tv.model.StreamSource
+import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -101,6 +102,7 @@ class DetailsViewModelTest {
             tracking = mockk<EpisodeTrackingRepository>(relaxed = true) {
                 every { followedShowIds } returns MutableStateFlow(emptySet())
             },
+            texts = mockk<Texts>(relaxed = true),
         )
         testScheduler.advanceUntilIdle()
         viewModel.playEpisode(seasonOne)

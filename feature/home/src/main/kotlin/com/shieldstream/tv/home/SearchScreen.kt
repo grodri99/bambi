@@ -1,6 +1,7 @@
 package com.shieldstream.tv.home
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.text.BasicTextField
@@ -159,7 +160,7 @@ fun SearchScreen(
                     )
                     if (query.isEmpty()) {
                         Text(
-                            text = tr("Buscar", "Search"),
+                            text = localizedStringResource(StringsR.string.home_search),
                             color = Color.White.copy(alpha = 0.45f),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
@@ -183,10 +184,10 @@ fun SearchScreen(
 
         Column(Modifier.weight(1f).fillMaxHeight().padding(top = 40.dp, end = 24.dp)) {
             val header = when (val s = state) {
-                SearchUiState.Loading -> tr("Buscando…", "Searching…")
-                is SearchUiState.Suggestions -> tr("Lo más visto hoy", "Most watched today")
-                is SearchUiState.Results -> tr("Resultados para «${s.query}»", "Results for “${s.query}”")
-                is SearchUiState.Empty -> tr("Sin resultados para «${s.query}»", "No results for “${s.query}”")
+                SearchUiState.Loading -> localizedStringResource(StringsR.string.home_searching)
+                is SearchUiState.Suggestions -> localizedStringResource(StringsR.string.home_most_watched_today)
+                is SearchUiState.Results -> localizedStringResource(StringsR.string.home_search_results_for, s.query)
+                is SearchUiState.Empty -> localizedStringResource(StringsR.string.home_no_results_for, s.query)
                 is SearchUiState.Error -> s.message
             }
             Text(
@@ -255,13 +256,13 @@ private fun OnScreenKeyboard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             KeyButton(width = fullWidth - 42.dp - 88.dp - 8.dp, onClick = { onChar(' ') }) {
-                Text(tr("Espacio", "Space"), style = MaterialTheme.typography.bodyMedium, color = it)
+                Text(localizedStringResource(StringsR.string.home_space), style = MaterialTheme.typography.bodyMedium, color = it)
             }
             KeyButton(width = 42.dp, onClick = onBackspace) {
-                Icon(AppIcons.Backspace, contentDescription = tr("Borrar", "Clear"), tint = it, modifier = Modifier.size(20.dp))
+                Icon(AppIcons.Backspace, contentDescription = localizedStringResource(StringsR.string.home_clear), tint = it, modifier = Modifier.size(20.dp))
             }
             KeyButton(width = 88.dp, onClick = onClear) {
-                Text(tr("Borrar", "Clear"), style = MaterialTheme.typography.bodyMedium, color = it)
+                Text(localizedStringResource(StringsR.string.home_clear), style = MaterialTheme.typography.bodyMedium, color = it)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -276,7 +277,7 @@ private fun OnScreenKeyboard(
                 Text(if (qwerty) "ABC" else "QWERTY", style = MaterialTheme.typography.bodyMedium, color = it)
             }
             KeyButton(width = fullWidth - 88.dp - 4.dp, onClick = onSystemKeyboard) {
-                Text(tr("Teclado del sistema", "System keyboard"), style = MaterialTheme.typography.bodyMedium, color = it, maxLines = 1)
+                Text(localizedStringResource(StringsR.string.home_system_keyboard), style = MaterialTheme.typography.bodyMedium, color = it, maxLines = 1)
             }
         }
     }

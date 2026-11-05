@@ -1,5 +1,7 @@
 package com.shieldstream.tv.data.update
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -10,7 +12,6 @@ import com.shieldstream.tv.domain.AppUpdate
 import com.shieldstream.tv.domain.AppVersion
 import com.shieldstream.tv.domain.UpdateRepository
 import com.shieldstream.tv.domain.UpdateState
-import com.shieldstream.tv.model.tr
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ class UpdateRepositoryImpl @Inject constructor(
     base: OkHttpClient,
     private val json: Json,
     private val version: AppVersion,
+    private val texts: Texts,
 ) : UpdateRepository {
 
     private val client = base.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
@@ -97,7 +99,7 @@ class UpdateRepositoryImpl @Inject constructor(
                 .onFailure {
                     Log.w(TAG, "No se pudo comprobar: ${it.message}")
                     _state.value = if (manual) {
-                        UpdateState.Failed(tr("No se pudo comprobar si hay versión nueva.", "Couldn't check for a new version."), null)
+                        UpdateState.Failed(texts.get(StringsR.string.data_couldn_t_check_for_a_new_version), null)
                     } else {
                         UpdateState.Idle
                     }
@@ -125,7 +127,7 @@ class UpdateRepositoryImpl @Inject constructor(
             }.onFailure {
                 Log.w(TAG, "Actualización fallida: ${it.message}")
                 _state.value = UpdateState.Failed(
-                    tr("No se pudo descargar la actualización. Inténtalo otra vez.", "Couldn't download the update. Try again."),
+                    texts.get(StringsR.string.data_couldn_t_download_the_update_try_again),
                     update,
                 )
             }

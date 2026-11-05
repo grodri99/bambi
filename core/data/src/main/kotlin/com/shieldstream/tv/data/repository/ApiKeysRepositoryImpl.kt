@@ -1,6 +1,7 @@
 package com.shieldstream.tv.data.repository
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.data.subtitles.SubtitleHttp
 import com.shieldstream.tv.domain.ApiKeysRepository
@@ -34,6 +35,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
     private val realDebrid: RealDebridApi,
     private val http: SubtitleHttp,
     private val torrentioApi: TorrentioApi,
+    private val texts: Texts,
 ) : ApiKeysRepository {
 
     private val _keys = MutableStateFlow(read())
@@ -55,10 +57,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
                 ApiService.TMDB -> {
                     if (key.startsWith("eyJ") && key.length > 60) {
                         KeyCheck.Invalid(
-                            tr(
-                                "Eso es el «token de lectura» (v4). Bambi usa la «Clave de la API» (v3): 32 letras y números, en la misma página de TMDB (Ajustes → API).",
-                                "That's the \"read access token\" (v4). Bambi uses the \"API Key\" (v3): 32 letters and numbers, on the same TMDB page (Settings → API).",
-                            ),
+                            texts.get(StringsR.string.data_that_s_the_read_access_token_v4),
                         )
                     } else {
                         tmdb.trendingAll(key)
@@ -77,35 +76,35 @@ class ApiKeysRepositoryImpl @Inject constructor(
         val user = realDebrid.user("Bearer $token")
         val days = user.premium / 86_400
         val detail = if (user.type == "premium" && user.premium > 0) {
-            tr("${user.username} · Premium: quedan $days días", "${user.username} · Premium: $days days left")
+            texts.get(StringsR.string.data_premium_days_left, user.username, days)
         } else {
-            tr("${user.username} · sin Premium", "${user.username} · no Premium")
+            texts.get(StringsR.string.data_no_premium, user.username)
         }
         return KeyCheck.Valid(detail)
     }
 
     private suspend fun checkViaTorrentio(service: ApiService, key: String): KeyCheck {
-        val debrid = DebridService.of(service) ?: return KeyCheck.Invalid(tr("Servicio desconocido", "Unknown service"))
+        val debrid = DebridService.of(service) ?: return KeyCheck.Invalid(texts.get(StringsR.string.data_unknown_service))
         val streams = torrentioApi.streamsWithConfig(torrentioConfig(debrid, key), "movie", "tt0137523").streams
-        streams.firstOrNull { it.isDebridError() }?.let { return KeyCheck.Invalid(debridErrorMessage(it.title, debrid.title)) }
+        streams.firstOrNull { it.isDebridError() }?.let { return KeyCheck.Invalid(debridErrorMessage(it.title, debrid.title, texts)) }
         if (streams.none { it.url?.contains("/resolve/") == true }) {
-            return KeyCheck.Invalid(tr("Torrentio no devolvió enlaces de ${debrid.title}. Prueba más tarde.", "Torrentio returned no ${debrid.title} links. Try again later."))
+            return KeyCheck.Invalid(texts.get(StringsR.string.data_torrentio_no_links, debrid.title))
         }
-        return KeyCheck.Valid(tr("Conectado (vía Torrentio)", "Connected (via Torrentio)"))
+        return KeyCheck.Valid(texts.get(StringsR.string.data_connected_via_torrentio))
     }
 
     private suspend fun checkAioStreams(url: String): KeyCheck {
         val bases = aioStreamBases(url)
         if (bases.isEmpty()) {
-            return KeyCheck.Invalid(tr("Pega la URL del manifiesto (termina en /manifest.json). Varios: separados por espacios.", "Paste the manifest URL (ends in /manifest.json). Several: separated by spaces."))
+            return KeyCheck.Invalid(texts.get(StringsR.string.data_paste_the_manifest_url_ends_in_manifest))
         }
         val counts = bases.map { base -> runCatching { torrentioApi.streamsAt("$base/stream/movie/tt0111161.json").streams.size }.getOrNull() }
         val failed = counts.count { it == null }
-        if (failed == bases.size) return KeyCheck.Invalid(tr("Ningún addon responde", "No addon is responding"))
+        if (failed == bases.size) return KeyCheck.Invalid(texts.get(StringsR.string.data_no_addon_is_responding))
         val total = counts.filterNotNull().sum()
         return KeyCheck.Valid(
-            if (bases.size == 1) tr("Conectado · $total fuentes de prueba", "Connected · $total test sources")
-            else tr("${bases.size - failed} de ${bases.size} addons · $total fuentes de prueba", "${bases.size - failed} of ${bases.size} addons · $total test sources"),
+            if (bases.size == 1) texts.get(StringsR.string.data_test_sources, total)
+            else texts.get(StringsR.string.data_addons_test_sources, bases.size - failed, bases.size, total),
         )
     }
 
@@ -116,14 +115,14 @@ class ApiKeysRepositoryImpl @Inject constructor(
             .header("User-Agent", "Bambi")
             .build()
         http.client.newCall(request).execute().use { response ->
-            if (response.code == 401 || response.code == 403) return KeyCheck.Invalid(tr("Clave no válida", "Invalid key"))
-            if (!response.isSuccessful) return KeyCheck.Invalid(tr("SubDL respondió con error ${response.code}", "SubDL responded with error ${response.code}"))
+            if (response.code == 401 || response.code == 403) return KeyCheck.Invalid(texts.get(StringsR.string.data_invalid_key))
+            if (!response.isSuccessful) return KeyCheck.Invalid(texts.get(StringsR.string.data_subdl_http_error, response.code))
             val body = response.body?.string().orEmpty()
             val json = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
             val status = json?.get("status")?.jsonPrimitive?.booleanOrNull
             if (status == false) {
                 val message = json["error"]?.jsonPrimitive?.contentOrNull ?: json["message"]?.jsonPrimitive?.contentOrNull
-                return KeyCheck.Invalid(message ?: tr("Clave no válida", "Invalid key"))
+                return KeyCheck.Invalid(message ?: texts.get(StringsR.string.data_invalid_key))
             }
             return KeyCheck.Valid()
         }
@@ -133,10 +132,10 @@ class ApiKeysRepositoryImpl @Inject constructor(
         val code = Regex("""HTTP (\d{3})""").find(e.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()
         return KeyCheck.Invalid(
             when {
-                code == 401 || code == 403 -> tr("Clave no válida", "Invalid key")
-                code != null -> tr("El servicio respondió con error $code", "The service responded with error $code")
-                e is IOException -> tr("No se pudo conectar. Revisa la conexión.", "Couldn't connect. Check your connection.")
-                else -> e.message ?: tr("No se pudo comprobar", "Couldn't verify")
+                code == 401 || code == 403 -> texts.get(StringsR.string.data_invalid_key)
+                code != null -> texts.get(StringsR.string.data_service_http_error, code)
+                e is IOException -> texts.get(StringsR.string.data_couldn_t_connect_check_your_connection)
+                else -> e.message ?: texts.get(StringsR.string.data_couldn_t_verify)
             },
         )
     }

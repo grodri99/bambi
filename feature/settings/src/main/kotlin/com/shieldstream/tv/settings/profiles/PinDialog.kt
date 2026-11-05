@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.shieldstream.tv.model.ProfilePin
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay

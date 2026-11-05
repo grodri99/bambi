@@ -20,7 +20,9 @@ import com.shieldstream.tv.domain.EpisodeReleaseRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.model.WatchProgress
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.episodeCode
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -32,6 +34,7 @@ class EpisodeNotificationWorker @AssistedInject constructor(
     private val releases: EpisodeReleaseRepository,
     private val tracking: EpisodeTrackingRepository,
     private val trakt: TraktRepository,
+    private val texts: Texts,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -64,9 +67,9 @@ class EpisodeNotificationWorker @AssistedInject constructor(
                 val status = entries.first().first
                 val latest = entries.maxBy { it.second.airDate.orEmpty() }.second
                 val text = if (entries.size == 1) {
-                    "${latest.code} · ${latest.title}"
+                    "${texts.episodeCode(latest)} · ${latest.title}"
                 } else {
-                    tr("${entries.size} episodios nuevos · Último: ${latest.code}", "${entries.size} new episodes · Latest: ${latest.code}")
+                    texts.get(StringsR.string.app_new_episodes_notification, entries.size, texts.episodeCode(latest))
                 }
                 val intent = Intent(applicationContext, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -100,7 +103,7 @@ class EpisodeNotificationWorker @AssistedInject constructor(
         if (Build.VERSION.SDK_INT < 26) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            tr("Nuevos episodios", "New episodes"),
+            texts.get(StringsR.string.app_new_episodes),
             NotificationManager.IMPORTANCE_DEFAULT,
         )
         NotificationManagerCompat.from(applicationContext).createNotificationChannel(channel)

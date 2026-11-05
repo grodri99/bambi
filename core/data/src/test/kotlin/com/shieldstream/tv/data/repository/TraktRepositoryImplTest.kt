@@ -9,6 +9,7 @@ import com.shieldstream.tv.domain.ScrobbleAction
 import com.shieldstream.tv.domain.TraktCredentials
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.model.Profile
+import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -144,6 +145,7 @@ class TraktRepositoryImplTest {
             myList = myList,
             tokens = tokens,
             json = json,
+            texts = mockk<Texts>(relaxed = true),
         )
         return fixture
     }

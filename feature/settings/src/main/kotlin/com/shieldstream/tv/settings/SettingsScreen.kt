@@ -1,5 +1,12 @@
 package com.shieldstream.tv.settings
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.keyNameResource
+import com.shieldstream.tv.strings.sectionResource
+import com.shieldstream.tv.strings.titleResource
+import com.shieldstream.tv.strings.usedForResource
+import com.shieldstream.tv.strings.whereToGetResource
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -12,7 +19,6 @@ import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.DeviceCapabilities
 import com.shieldstream.tv.model.DeviceOptimization
 import com.shieldstream.tv.model.MemoryProfile
-import com.shieldstream.tv.model.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -155,6 +161,7 @@ private fun SettingsList(
     }
     val debridUi = state.services.first { it.service == state.debrid.apiService }
     val otherServices = state.services.filter { !it.service.isDebrid }
+    val providerSections = SourceProvider.entries.map { it to localizedStringResource(it.sectionResource) }
     ProvideMinimalScroll(margin = 56.dp) {
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 120.dp, vertical = 40.dp),
@@ -163,15 +170,15 @@ private fun SettingsList(
         ) {
             item {
                 Column(Modifier.padding(bottom = 8.dp)) {
-                    Text(tr("AJUSTES", "SETTINGS"), fontFamily = DisplayFont, fontSize = 52.sp, color = Color.White)
+                    Text(localizedStringResource(StringsR.string.settings_settings), fontFamily = DisplayFont, fontSize = 52.sp, color = Color.White)
                     Text(
-                        tr("Claves de los servicios, reproducción y versión de la app", "Service keys, playback and app version"),
+                        localizedStringResource(StringsR.string.settings_service_keys_playback_and_app_version),
                         style = MaterialTheme.typography.bodyLarge,
                         color = Muted,
                     )
                 }
             }
-            item { SectionTitle(tr("Servicio debrid", "Debrid service")) }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_debrid_service)) }
             item {
                 DebridSelectorCard(
                     active = state.debrid,
@@ -192,18 +199,16 @@ private fun SettingsList(
             item {
                 Text(
                     if (state.debrid.viaTorrentio) {
-                        tr("${state.debrid.title} funciona a través de Torrentio y Peerflix, como en Stremio: tu clave se envía a ", "${state.debrid.title} works through Torrentio and Peerflix, like in Stremio: your key is sent to ") +
-                            tr("esos addons para que consulten la caché y pidan los enlaces. Real-Debrid, en cambio, se conecta ", "those addons so they can check the cache and request links. Real-Debrid, on the other hand, connects ") +
-                            tr("directamente.", "directly.")
+                        localizedStringResource(StringsR.string.settings_torrentio_debrid_explanation, state.debrid.title)
                     } else {
-                        tr("Real-Debrid se conecta directamente desde la Shield: la clave no sale de tu casa.", "Real-Debrid connects directly from the Shield: your key never leaves your home.")
+                        localizedStringResource(StringsR.string.settings_real_debrid_connects_directly_from_the_shield)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp),
                 )
             }
-            item { SectionTitle(tr("Otros servicios", "Other services")) }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_other_services)) }
             items(otherServices, key = { it.service.name }) { ui ->
                 ServiceCard(
                     ui = ui,
@@ -216,21 +221,22 @@ private fun SettingsList(
             }
             item {
                 Text(
-                    tr("Torrentio (fuentes), OpenSubtitles y Podnapisi (subtítulos) no necesitan clave.", "Torrentio (sources), OpenSubtitles and Podnapisi (subtitles) don't need a key."),
+                    localizedStringResource(StringsR.string.settings_torrentio_sources_opensubtitles_and_podnapisi_subtitles_don),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp),
                 )
             }
-            item { SectionTitle(tr("Buscadores de fuentes", "Source finders")) }
-            items(SourceProvider.entries.distinctBy { it.section }) { p ->
-                ProviderCard(p, enabled = SourceProvider.entries.filter { it.section == p.section }.all { it in providers }, onClick = { onToggleProvider(p) })
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_source_finders)) }
+            items(providerSections.distinctBy { it.second }) { (provider, section) ->
+                val enabled = providerSections.filter { it.second == section }.all { it.first in providers }
+                ProviderCard(provider, enabled = enabled, onClick = { onToggleProvider(provider) })
             }
-            item { SectionTitle(tr("Inicio", "Home")) }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_home)) }
             item { LightweightModeCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
-            item { SectionTitle(tr("Reproducción", "Playback")) }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
             item {
                 DeviceOptimizationCard(
                     optimization = state.optimization,
@@ -255,7 +261,7 @@ private fun SettingsList(
                     onChange = onBuffer,
                 )
             }
-            item { SectionTitle(tr("Acerca de", "About")) }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_about)) }
             item { AboutCard() }
             item { UpdateCard() }
             item { SetupGuideCard(onClick = onOpenSetup) }
@@ -307,25 +313,25 @@ private fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier =
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        ui.service.title,
+                        localizedStringResource(ui.service.titleResource),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         when {
-                            ui.service.isDebrid -> tr("En uso", "In use")
-                            ui.service.required -> tr("Necesaria", "Required")
-                            else -> tr("Opcional", "Optional")
+                            ui.service.isDebrid -> localizedStringResource(StringsR.string.settings_in_use)
+                            ui.service.required -> localizedStringResource(StringsR.string.settings_required)
+                            else -> localizedStringResource(StringsR.string.settings_optional)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = Muted,
                     )
                 }
-                Text(ui.service.usedFor, style = MaterialTheme.typography.bodyMedium, color = Muted)
+                Text(localizedStringResource(ui.service.usedForResource), style = MaterialTheme.typography.bodyMedium, color = Muted)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    ui.maskedKey ?: tr("Sin clave", "No key"),
+                    ui.maskedKey ?: localizedStringResource(StringsR.string.settings_no_key),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.45f),
@@ -336,7 +342,7 @@ private fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier =
                 StatusPill(ui.status)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (ui.maskedKey == null) tr("OK para añadir ›", "OK to add ›") else tr("OK para cambiar ›", "OK to change ›"),
+                    if (ui.maskedKey == null) localizedStringResource(StringsR.string.settings_ok_to_add) else localizedStringResource(StringsR.string.settings_ok_to_change),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (focused) Color.White else Color.Transparent,
                 )
@@ -369,9 +375,9 @@ private fun ServiceLogo(service: ApiService) {
 @Composable
 private fun StatusPill(status: ServiceStatus) {
     val (color, text) = when (status) {
-        ServiceStatus.Missing -> Amber to tr("Sin configurar", "Not set up")
-        ServiceStatus.Checking -> Muted to tr("Comprobando…", "Checking…")
-        is ServiceStatus.Ok -> Green to (status.detail ?: tr("Conectado", "Connected"))
+        ServiceStatus.Missing -> Amber to localizedStringResource(StringsR.string.settings_not_set_up)
+        ServiceStatus.Checking -> Muted to localizedStringResource(StringsR.string.settings_checking)
+        is ServiceStatus.Ok -> Green to (status.detail ?: localizedStringResource(StringsR.string.settings_connected))
         is ServiceStatus.Bad -> Red to status.message
     }
     Row(
@@ -399,18 +405,18 @@ private fun SetupGuideCard(onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Guía de configuración", "Setup guide"),
+                    localizedStringResource(StringsR.string.settings_setup_guide),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    tr("Repite paso a paso la configuración del primer arranque (catálogo, debrid y subtítulos).", "Repeat the first-run setup step by step (catalog, debrid and subtitles)."),
+                    localizedStringResource(StringsR.string.settings_repeat_the_first_run_setup_step_by),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
             }
             Text(
-                tr("OK para abrir ›", "OK to open ›"),
+                localizedStringResource(StringsR.string.settings_ok_to_open),
                 style = MaterialTheme.typography.labelLarge,
                 color = if (focused) Color.White else Color.Transparent,
             )
@@ -437,12 +443,12 @@ internal fun DebridSelectorCard(active: DebridService, onChange: (DebridService)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Servicio en uso", "Service in use"),
+                    localizedStringResource(StringsR.string.settings_service_in_use),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    if (active.viaTorrentio) tr("Fuentes y enlaces a través de Torrentio.", "Sources and links through Torrentio.") else tr("Conexión directa con Real-Debrid.", "Direct connection to Real-Debrid."),
+                    if (active.viaTorrentio) localizedStringResource(StringsR.string.settings_sources_and_links_through_torrentio) else localizedStringResource(StringsR.string.settings_direct_connection_to_real_debrid),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
@@ -496,15 +502,12 @@ private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Interfaz ligera", "Lightweight UI"),
+                    localizedStringResource(StringsR.string.settings_lightweight_ui),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    tr(
-                        "Fondos más pequeños, sin rotación automática ni animaciones de foco. Para TV boxes de baja potencia.",
-                        "Smaller backdrops, no automatic rotation or focus animations. For low-power TV boxes.",
-                    ),
+                    localizedStringResource(StringsR.string.settings_smaller_backdrops_no_automatic_rotation_or_focus),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
@@ -515,8 +518,8 @@ private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) 
                     .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
-                SegmentOption(tr("Sí", "On"), selected = enabled)
-                SegmentOption(tr("No", "Off"), selected = !enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }
         }
     }
@@ -539,15 +542,12 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Siguiente episodio automático", "Autoplay next episode"),
+                    localizedStringResource(StringsR.string.settings_autoplay_next_episode),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    tr(
-                        "Series: en los créditos sale \"Siguiente episodio\" (OK lo pone ya) y, al terminar el episodio, empieza el siguiente.",
-                        "Shows: during the credits \"Next episode\" appears (OK plays it now) and, when the episode ends, the next one starts.",
-                    ),
+                    localizedStringResource(StringsR.string.settings_shows_during_the_credits_next_episode_appears),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
@@ -558,8 +558,8 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
                     .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
-                SegmentOption(tr("Sí", "On"), selected = enabled)
-                SegmentOption(tr("No", "Off"), selected = !enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }
         }
     }
@@ -593,23 +593,20 @@ private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewMode
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Avisos de nuevos episodios", "New episode notifications"),
+                    localizedStringResource(StringsR.string.settings_new_episode_notifications),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    tr(
-                        "Solo series seguidas. Comprueba estrenos cada 12 horas con conexión; no avisa de episodios vistos o descartados.",
-                        "Followed shows only. Checks for releases every 12 hours when online; watched and dismissed episodes are skipped.",
-                    ),
+                    localizedStringResource(StringsR.string.settings_followed_shows_only_checks_for_releases_every),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
             }
             Spacer(Modifier.width(24.dp))
             Row(Modifier.background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50)).padding(4.dp)) {
-                SegmentOption(tr("Sí", "On"), selected = enabled)
-                SegmentOption(tr("No", "Off"), selected = !enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }
         }
     }
@@ -638,21 +635,15 @@ private fun DeviceOptimizationCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Optimización del dispositivo", "Device optimization"),
+                    localizedStringResource(StringsR.string.settings_device_optimization),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
                     if (optimization == DeviceOptimization.AUTOMATIC) {
-                        tr(
-                            "Bambi ajusta memoria, búfer, miniaturas y fuentes a los decodificadores y al HDR detectados.",
-                            "Bambi adapts memory, buffering, thumbnails and sources to the detected decoders and HDR support.",
-                        )
+                        localizedStringResource(StringsR.string.settings_bambi_adapts_memory_buffering_thumbnails_and_sources)
                     } else {
-                        tr(
-                            "Usa tus ajustes manuales y la selección de fuentes compatible con la Shield.",
-                            "Uses your manual settings and Shield-compatible source selection.",
-                        )
+                        localizedStringResource(StringsR.string.settings_uses_your_manual_settings_and_shield_compatible)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
@@ -660,14 +651,14 @@ private fun DeviceOptimizationCard(
                 val codecs = capabilities.hardwareVideoCodecs
                     .sortedBy { it.ordinal }
                     .joinToString(" · ") { it.label }
-                    .ifBlank { tr("ninguno detectado", "none detected") }
+                    .ifBlank { localizedStringResource(StringsR.string.settings_none_detected) }
                 val hdr = capabilities.supportedHdr
                     .sortedBy { it.rank }
                     .joinToString(" · ") { it.label }
-                    .ifBlank { tr("HDR no detectado", "No HDR detected") }
+                    .ifBlank { localizedStringResource(StringsR.string.settings_no_hdr_detected) }
                 val memory = when {
                     optimization == DeviceOptimization.AUTOMATIC && memoryProfile == MemoryProfile.CONSTRAINED ->
-                        " · " + tr("memoria ajustada", "constrained memory")
+                        " · " + localizedStringResource(StringsR.string.settings_constrained_memory)
                     else -> ""
                 }
                 Text(
@@ -683,8 +674,8 @@ private fun DeviceOptimizationCard(
                     .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
-                SegmentOption(tr("Automática", "Automatic"), selected = optimization == DeviceOptimization.AUTOMATIC)
-                SegmentOption(tr("Personalizada", "Custom"), selected = optimization == DeviceOptimization.CUSTOM)
+                SegmentOption(localizedStringResource(StringsR.string.settings_automatic), selected = optimization == DeviceOptimization.AUTOMATIC)
+                SegmentOption(localizedStringResource(StringsR.string.settings_custom), selected = optimization == DeviceOptimization.CUSTOM)
             }
         }
     }
@@ -706,17 +697,17 @@ private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boole
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Búsqueda en el reproductor", "Seeking in the player"),
+                    localizedStringResource(StringsR.string.settings_seeking_in_the_player),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
                     if (!enabled) {
-                        tr("Elegido automáticamente para este dispositivo.", "Chosen automatically for this device.")
+                        localizedStringResource(StringsR.string.settings_chosen_automatically_for_this_device)
                     } else if (thumbnails) {
-                        tr("◀ ▶ pausan y muestran miniaturas del punto elegido; OK salta ahí y Atrás vuelve.", "◀ ▶ pause and show thumbnails of the chosen point; OK jumps there and Back returns.")
+                        localizedStringResource(StringsR.string.settings_pause_and_show_thumbnails_of_the_chosen)
                     } else {
-                        tr("◀ ▶ adelantan o retroceden 10 s al momento, sin pausar.", "◀ ▶ skip forward or back 10 s instantly, without pausing.")
+                        localizedStringResource(StringsR.string.settings_skip_forward_or_back_10_s_instantly)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
@@ -728,8 +719,8 @@ private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boole
                     .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
-                SegmentOption(tr("Miniaturas", "Thumbnails"), selected = thumbnails)
-                SegmentOption(tr("Saltos de 10 s", "10 s skips"), selected = !thumbnails)
+                SegmentOption(localizedStringResource(StringsR.string.settings_thumbnails), selected = thumbnails)
+                SegmentOption(localizedStringResource(StringsR.string.settings_10_s_skips), selected = !thumbnails)
             }
         }
     }
@@ -754,7 +745,7 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Idioma de la app", "App language"),
+                    localizedStringResource(StringsR.string.settings_app_language),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
@@ -762,7 +753,7 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
                     if (changing) {
                         if (pending == AppLanguage.EN) "OK to switch to English: the app will restart." else "OK para cambiar a español: la app se reiniciará."
                     } else {
-                        tr("Menús, títulos y sinopsis, y audio preferido. ◀ ▶ para elegir.", "Menus, titles and synopses, and preferred audio. ◀ ▶ to choose.")
+                        localizedStringResource(StringsR.string.settings_menus_titles_and_synopses_and_preferred_audio)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (changing) Amber else Muted,
@@ -785,23 +776,24 @@ private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: ()
     FocusCard(onClick = onClick) { _ ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(provider.section, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                Text(localizedStringResource(provider.sectionResource), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
                 Text(providerNote(provider), style = MaterialTheme.typography.bodyMedium, color = Muted)
             }
             Spacer(Modifier.width(24.dp))
-            SegmentOption(if (enabled) tr("Activado", "On") else tr("Desactivado", "Off"), selected = enabled)
+            SegmentOption(if (enabled) localizedStringResource(StringsR.string.settings_on_5f22c1) else localizedStringResource(StringsR.string.settings_off_25e189), selected = enabled)
         }
     }
 }
 
+@Composable
 private fun providerNote(p: SourceProvider): String = when (p) {
-    SourceProvider.TORRENTIO -> tr("El buscador principal, como en Stremio.", "The main finder, like in Stremio.")
-    SourceProvider.PEERFLIX -> tr("Torrents en castellano de webs españolas (DonTorrent, MejorTorrent, Wolfmax4k…) y algunos en inglés. Solo con Real-Debrid.", "Spanish torrents from Spanish sites (DonTorrent, MejorTorrent, Wolfmax4k…) plus some in English. Real-Debrid only.")
-    SourceProvider.KNABEN -> tr("Buscadores propios de Bambi, juntos: The Pirate Bay, Knaben (1337x, Nyaa…) y Nyaa (anime). Solo con Real-Debrid.", "Bambi's own finders together: The Pirate Bay, Knaben (1337x, Nyaa…) and Nyaa (anime). Real-Debrid only.")
-    SourceProvider.THEPIRATEBAY -> tr("Buscadores propios de Bambi, juntos: The Pirate Bay, Knaben (1337x, Nyaa…) y Nyaa (anime). Solo con Real-Debrid.", "Bambi's own finders together: The Pirate Bay, Knaben (1337x, Nyaa…) and Nyaa (anime). Real-Debrid only.")
-    SourceProvider.NYAA -> tr("Buscador propio de anime (CocoScrapers). Solo con Real-Debrid.", "Own anime finder (CocoScrapers). Real-Debrid only.")
-    SourceProvider.COMET -> tr("Comet con tu token de Real-Debrid (se envía a comet.elfhosted.com, como en Umbrella).", "Comet with your Real-Debrid token (sent to comet.elfhosted.com, like Umbrella).")
-    SourceProvider.AIOSTREAMS -> tr("Cualquier addon de Stremio (AIOStreams, Comet, MediaFusion…). Pega la URL de su manifiesto en Otros servicios → Addon de Stremio.", "Any Stremio addon (AIOStreams, Comet, MediaFusion…). Paste its manifest URL in Other services → Stremio addon.")
+    SourceProvider.TORRENTIO -> localizedStringResource(StringsR.string.settings_the_main_finder_like_in_stremio)
+    SourceProvider.PEERFLIX -> localizedStringResource(StringsR.string.settings_spanish_torrents_from_spanish_sites_dontorrent_mejortorrent)
+    SourceProvider.KNABEN -> localizedStringResource(StringsR.string.settings_bambi_s_own_finders_together_the_pirate)
+    SourceProvider.THEPIRATEBAY -> localizedStringResource(StringsR.string.settings_bambi_s_own_finders_together_the_pirate)
+    SourceProvider.NYAA -> localizedStringResource(StringsR.string.settings_own_anime_finder_cocoscrapers_real_debrid_only)
+    SourceProvider.COMET -> localizedStringResource(StringsR.string.settings_comet_with_your_real_debrid_token_sent)
+    SourceProvider.AIOSTREAMS -> localizedStringResource(StringsR.string.settings_any_stremio_addon_aiostreams_comet_mediafusion_paste)
 }
 
 @Composable
@@ -837,24 +829,15 @@ private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    tr("Búfer del reproductor", "Player buffer"),
+                    localizedStringResource(StringsR.string.settings_player_buffer),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
                     when {
-                        !enabled -> tr(
-                            "Valor elegido automáticamente según la memoria disponible.",
-                            "Chosen automatically from the available memory.",
-                        )
-                        seconds <= 40 -> tr(
-                            "Modo ligero: búfer trasero de 5 s, hasta 64 MB y arranque más rápido. ◀ ▶ para elegir los segundos.",
-                            "Lightweight: 5 s back buffer, up to 64 MB and faster startup. Use ◀ ▶ to adjust seconds.",
-                        )
-                        else -> tr(
-                            "Segundos de vídeo que se cargan por adelantado. ◀ ▶ para ajustar; más búfer aguanta mejor los cortes.",
-                            "Seconds of video buffered ahead. Use ◀ ▶ to adjust; a larger buffer tolerates network interruptions better.",
-                        )
+                        !enabled -> localizedStringResource(StringsR.string.settings_chosen_automatically_from_the_available_memory)
+                        seconds <= 40 -> localizedStringResource(StringsR.string.settings_lightweight_5_s_back_buffer_up_to)
+                        else -> localizedStringResource(StringsR.string.settings_seconds_of_video_buffered_ahead_use_to)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
@@ -889,7 +872,7 @@ private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) 
                         }
                     }
                 } else {
-                    Text(tr("Automático", "Automatic"), style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text(localizedStringResource(StringsR.string.settings_automatic_8e7638), style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             }
         }
@@ -915,17 +898,17 @@ private fun AboutCard() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (testing) tr("Bambi (pruebas)", "Bambi (testing)") else "Bambi",
+                    if (testing) localizedStringResource(StringsR.string.settings_bambi_testing) else "Bambi",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
-                    tr("Catálogo de TMDB · fuentes de Torrentio · reproducción con Real-Debrid", "Catalog by TMDB · sources from Torrentio · playback via Real-Debrid"),
+                    localizedStringResource(StringsR.string.settings_catalog_by_tmdb_sources_from_torrentio_playback),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                 )
             }
-            Text(tr("Versión $version", "Version $version"), style = MaterialTheme.typography.titleMedium, color = Muted)
+            Text(localizedStringResource(StringsR.string.settings_version, version), style = MaterialTheme.typography.titleMedium, color = Muted)
         }
     }
 }
@@ -965,12 +948,16 @@ private fun KeyEditorDialog(
                 Spacer(Modifier.width(16.dp))
                 Column {
                     Text(
-                        editor.service.title,
+                        localizedStringResource(editor.service.titleResource),
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
                     )
                     Text(
-                        tr("${editor.service.keyName} · consíguela en ${editor.service.whereToGet}", "${editor.service.keyName} · get it at ${editor.service.whereToGet}"),
+                        localizedStringResource(
+                            StringsR.string.settings_get_key_at,
+                            localizedStringResource(editor.service.keyNameResource),
+                            localizedStringResource(editor.service.whereToGetResource),
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Muted,
                     )
@@ -1024,7 +1011,7 @@ private fun KeyEditorDialog(
                     ) {
                         if (input.isEmpty()) {
                             Text(
-                                if (fieldFocused) tr("Pulsa OK para escribir la clave nueva", "Press OK to type the new key") else tr("Clave nueva", "New key"),
+                                if (fieldFocused) localizedStringResource(StringsR.string.settings_press_ok_to_type_the_new_key) else localizedStringResource(StringsR.string.settings_new_key),
                                 fontSize = 18.sp,
                                 color = Color.White.copy(alpha = 0.35f),
                             )
@@ -1036,9 +1023,9 @@ private fun KeyEditorDialog(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = when {
-                    editor.busy -> tr("Comprobando con ${editor.service.title}…", "Checking with ${editor.service.title}…")
+                    editor.busy -> localizedStringResource(StringsR.string.settings_checking_with_service, localizedStringResource(editor.service.titleResource))
                     editor.error != null -> editor.error
-                    else -> tr("Se comprueba con ${editor.service.title} antes de guardarla.", "It's checked with ${editor.service.title} before saving.")
+                    else -> localizedStringResource(StringsR.string.settings_key_checked_before_saving, localizedStringResource(editor.service.titleResource))
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = when {
@@ -1050,15 +1037,15 @@ private fun KeyEditorDialog(
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TvButton(
-                    text = tr("Comprobar y guardar", "Check and save"),
+                    text = localizedStringResource(StringsR.string.settings_check_and_save),
                     onClick = { onSave(input) },
                     enabled = !editor.busy,
                     modifier = Modifier.focusRequester(saveRequester),
                 )
                 if (!editor.service.required && editor.hasKey) {
-                    TvButton(text = tr("Quitar clave", "Remove key"), onClick = onRemove, enabled = !editor.busy)
+                    TvButton(text = localizedStringResource(StringsR.string.settings_remove_key), onClick = onRemove, enabled = !editor.busy)
                 }
-                TvButton(text = tr("Cancelar", "Cancel"), onClick = onClose, enabled = !editor.busy)
+                TvButton(text = localizedStringResource(StringsR.string.settings_cancel), onClick = onClose, enabled = !editor.busy)
             }
         }
     }

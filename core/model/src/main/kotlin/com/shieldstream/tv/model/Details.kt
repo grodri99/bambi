@@ -26,9 +26,7 @@ data class Episode(
     val stillUrl: String?,
     val runtimeMinutes: Int?,
     val airDate: String? = null,
-) {
-    val code: String get() = tr("T$season:E$number", "S$season:E$number")
-}
+)
 
 enum class HomeFilter { ALL, MOVIES, TV }
 

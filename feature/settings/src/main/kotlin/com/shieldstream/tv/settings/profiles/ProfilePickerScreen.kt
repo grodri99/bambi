@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,7 +43,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.ProfileManagement
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.ProfileAvatar
@@ -113,7 +114,7 @@ fun ProfilePickerScreen(
             modifier = Modifier.align(Alignment.Center),
         ) {
             Text(
-                if (manage) tr("Administrar perfiles", "Manage profiles") else tr("¿Quién está viendo?", "Who's watching?"),
+                if (manage) localizedStringResource(StringsR.string.settings_manage_profiles) else localizedStringResource(StringsR.string.settings_who_s_watching),
                 color = Color.White,
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Bold,
@@ -144,7 +145,7 @@ fun ProfilePickerScreen(
             }
             Spacer(Modifier.height(56.dp))
             TvButton(
-                text = if (manage) tr("Listo", "Done") else tr("Administrar perfiles", "Manage profiles"),
+                text = if (manage) localizedStringResource(StringsR.string.settings_done) else localizedStringResource(StringsR.string.settings_manage_profiles),
                 icon = if (manage) AppIcons.Check else AppIcons.Edit,
                 onClick = {
                     if (manage) manage = false else requestManagement(ManagementAction.MANAGE)
@@ -153,14 +154,12 @@ fun ProfilePickerScreen(
         }
     }
 
+    val wrongPinMessage = localizedStringResource(StringsR.string.settings_wrong_pin)
     managementAction?.let { action ->
         val profile = managementPinProfile ?: return@let
         PinDialog(
-            title = tr("PIN de administración", "Management PIN"),
-            subtitle = tr(
-                "Escribe el PIN de ${profile.name} para añadir o editar perfiles",
-                "Enter ${profile.name}'s PIN to add or edit profiles",
-            ),
+            title = localizedStringResource(StringsR.string.settings_management_pin),
+            subtitle = localizedStringResource(StringsR.string.settings_management_pin_for, profile.name),
             error = managementPinError,
             onPin = { pin ->
                 if (com.shieldstream.tv.model.ProfilePin.matches(profile, pin)) {
@@ -172,7 +171,7 @@ fun ProfilePickerScreen(
                         ManagementAction.ADD -> onAdd()
                     }
                 } else {
-                    managementPinError = tr("PIN incorrecto", "Wrong PIN")
+                    managementPinError = wrongPinMessage
                 }
             },
             onDismiss = {
@@ -184,8 +183,8 @@ fun ProfilePickerScreen(
 
     pinFor?.let { (profile, forEdit) ->
         PinDialog(
-            title = tr("PIN de ${profile.name}", "${profile.name}'s PIN"),
-            subtitle = tr("Escribe el PIN de 4 cifras para entrar", "Enter the 4-digit PIN"),
+            title = localizedStringResource(StringsR.string.settings_profile_pin, profile.name),
+            subtitle = localizedStringResource(StringsR.string.settings_enter_the_4_digit_pin),
             error = pinError,
             onPin = { pin ->
                 if (com.shieldstream.tv.model.ProfilePin.matches(profile, pin)) {
@@ -198,7 +197,7 @@ fun ProfilePickerScreen(
                         onSelected()
                     }
                 } else {
-                    pinError = tr("PIN incorrecto", "Wrong PIN")
+                    pinError = wrongPinMessage
                 }
             },
             onDismiss = {
@@ -261,10 +260,10 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
                     Text("Trakt ✓", color = TraktRed.copy(alpha = if (focused) 1f else 0.7f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 if (profile.kids) {
-                    Text(tr("Infantil", "Kids"), color = Color(0xFF56CCF2).copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(localizedStringResource(StringsR.string.settings_kids), color = Color(0xFF56CCF2).copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 if (profile.locked) {
-                    Icon(AppIcons.Lock, contentDescription = tr("Con PIN", "PIN protected"), tint = ProfileMuted, modifier = Modifier.size(14.dp))
+                    Icon(AppIcons.Lock, contentDescription = localizedStringResource(StringsR.string.settings_pin_protected), tint = ProfileMuted, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -302,7 +301,7 @@ private fun AddTile(onClick: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            tr("Añadir perfil", "Add profile"),
+            localizedStringResource(StringsR.string.settings_add_profile),
             color = if (focused) Color.White else ProfileMuted,
             fontSize = 20.sp,
             fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,

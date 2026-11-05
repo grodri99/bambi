@@ -1,6 +1,8 @@
 package com.shieldstream.tv.ui.component
 
-import com.shieldstream.tv.model.tr
+import androidx.annotation.StringRes
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.R as StringsR
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
@@ -43,13 +45,23 @@ import androidx.compose.ui.unit.dp
 val RailCollapsedWidth: Dp = 72.dp
 private val RailExpandedWidth: Dp = 250.dp
 
-enum class RailDestination(val label: String, val icon: ImageVector) {
-    SEARCH(tr("Buscar", "Search"), AppIcons.Search),
-    HOME(tr("Inicio", "Home"), AppIcons.Home),
-    TV(tr("Series", "TV Shows"), AppIcons.Tv),
-    MOVIES(tr("Películas", "Movies"), AppIcons.Movie),
-    SETTINGS(tr("Ajustes", "Settings"), AppIcons.Settings),
+enum class RailDestination(val icon: ImageVector) {
+    SEARCH(AppIcons.Search),
+    HOME(AppIcons.Home),
+    TV(AppIcons.Tv),
+    MOVIES(AppIcons.Movie),
+    SETTINGS(AppIcons.Settings),
 }
+
+@get:StringRes
+private val RailDestination.labelResource: Int
+    get() = when (this) {
+        RailDestination.SEARCH -> StringsR.string.common_search
+        RailDestination.HOME -> StringsR.string.common_home
+        RailDestination.TV -> StringsR.string.common_tv_shows
+        RailDestination.MOVIES -> StringsR.string.common_movies
+        RailDestination.SETTINGS -> StringsR.string.common_settings
+    }
 
 @Composable
 fun NavRail(
@@ -107,6 +119,7 @@ private fun RailItem(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val label = localizedStringResource(destination.labelResource)
     val tint = when {
         focused -> Color.Black
         selected -> Color.White
@@ -124,13 +137,13 @@ private fun RailItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            Icon(destination.icon, contentDescription = destination.label, tint = tint, modifier = Modifier.size(24.dp))
+            Icon(destination.icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
         }
         AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.width(18.dp))
                 Text(
-                    text = destination.label,
+                    text = label,
                     color = tint,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,

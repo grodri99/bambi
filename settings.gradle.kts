@@ -24,6 +24,7 @@ rootProject.name = "ShieldStream"
 
 include(":app")
 include(":core:model")
+include(":core:strings")
 include(":core:network")
 include(":core:data")
 include(":core:domain")

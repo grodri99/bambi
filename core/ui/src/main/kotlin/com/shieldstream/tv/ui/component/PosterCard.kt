@@ -40,7 +40,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R
+import com.shieldstream.tv.strings.localizedPluralResource
+import com.shieldstream.tv.strings.localizedStringResource
 
 val PosterWidth: Dp = 124.dp
 private val CardShape = RoundedCornerShape(6.dp)
@@ -95,7 +97,7 @@ fun PosterCard(
         overlay()
         if (newEpisodeCount > 0) {
             Text(
-                text = if (newEpisodeCount == 1) tr("NUEVO", "NEW") else tr("$newEpisodeCount NUEVOS", "$newEpisodeCount NEW"),
+                text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
                 color = Color.White,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
@@ -204,10 +206,10 @@ fun NewEpisodeCard(
                 .padding(8.dp),
         ) {
             Text(
-                text = when (count) {
-                    0 -> tr("PRÓXIMAMENTE", "COMING SOON")
-                    1 -> tr("NUEVO EPISODIO", "NEW EPISODE")
-                    else -> tr("$count EPISODIOS NUEVOS", "$count NEW EPISODES")
+                text = if (count == 0) {
+                    localizedStringResource(R.string.coming_soon)
+                } else {
+                    localizedPluralResource(R.plurals.new_episode_count, count, count)
                 },
                 color = Color.White,
                 fontSize = 9.sp,
@@ -246,7 +248,6 @@ fun Top10Card(
             fontWeight = FontWeight.Black,
             letterSpacing = (-12).sp,
         )
-        // Relleno oscuro + contorno gris superpuestos.
         Text(
             text = rank.toString(),
             style = numberStyle.copy(color = Color(0xFF0E0E10)),

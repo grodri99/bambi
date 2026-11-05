@@ -1,9 +1,12 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.sectionResource
+import com.shieldstream.tv.strings.titleResource
 import kotlinx.coroutines.withTimeout
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import android.net.Uri
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -61,6 +64,7 @@ class CatalogRepositoryImpl @Inject constructor(
     private val store: TokenStore,
     private val settings: SettingsRepository,
     private val profiles: com.shieldstream.tv.domain.ProfileRepository,
+    private val texts: Texts,
 ) : CatalogRepository {
 
     private val kids: Boolean get() = profiles.active.value.kids
@@ -98,7 +102,7 @@ class CatalogRepositoryImpl @Inject constructor(
         else cachedHome("home_${filter.name}") { loadHome(rowsFor(filter)) }
 
     private suspend fun loadHome(specs: List<RowSpec>): List<CatalogRow> = coroutineScope {
-        if (key.isBlank()) throw IllegalStateException(MISSING_TMDB_KEY)
+        if (key.isBlank()) throw IllegalStateException(texts.get(StringsR.string.data_tmdb_key_missing_add_it_in_settings))
         specs
             .map { spec ->
                 async {
@@ -116,40 +120,40 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private fun rowsFor(filter: HomeFilter): List<RowSpec> = when (filter) {
         HomeFilter.ALL -> listOf(
-            RowSpec("trending", tr("Tendencias hoy", "Trending today")) { tmdb.trendingAll(key).results.mapNotNull { it.toCatalogItemOrNull() } },
-            RowSpec("top10_movies", tr("Top 10 películas hoy", "Top 10 movies today"), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("popular_movies", tr("Películas populares", "Popular movies")) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("popular_tv", tr("Series populares", "Popular TV shows")) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
-            RowSpec("top10_tv", tr("Top 10 series hoy", "Top 10 TV shows today"), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
-            RowSpec("now_playing", tr("Estrenos en cines", "Now in theaters")) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("action", tr("Acción", "Action")) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
-            RowSpec("scifi", tr("Ciencia ficción", "Sci-fi")) { tmdb.discoverMovies(key, "878").results.map { it.toCatalogItem() } },
-            RowSpec("comedy", tr("Comedias", "Comedies")) { tmdb.discoverMovies(key, "35").results.map { it.toCatalogItem() } },
-            RowSpec("top_movies", tr("Películas aclamadas", "Acclaimed movies")) { tmdb.topRatedMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("top_tv", tr("Series aclamadas", "Acclaimed TV shows")) { tmdb.topRatedTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("trending", texts.get(StringsR.string.data_trending_today)) { tmdb.trendingAll(key).results.mapNotNull { it.toCatalogItemOrNull() } },
+            RowSpec("top10_movies", texts.get(StringsR.string.data_top_10_movies_today), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("popular_movies", texts.get(StringsR.string.data_popular_movies)) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("popular_tv", texts.get(StringsR.string.data_popular_tv_shows)) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("top10_tv", texts.get(StringsR.string.data_top_10_tv_shows_today), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("now_playing", texts.get(StringsR.string.data_now_in_theaters)) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("action", texts.get(StringsR.string.data_action)) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
+            RowSpec("scifi", texts.get(StringsR.string.data_sci_fi)) { tmdb.discoverMovies(key, "878").results.map { it.toCatalogItem() } },
+            RowSpec("comedy", texts.get(StringsR.string.data_comedies)) { tmdb.discoverMovies(key, "35").results.map { it.toCatalogItem() } },
+            RowSpec("top_movies", texts.get(StringsR.string.data_acclaimed_movies)) { tmdb.topRatedMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("top_tv", texts.get(StringsR.string.data_acclaimed_tv_shows)) { tmdb.topRatedTv(key).results.map { it.toCatalogItem() } },
         )
         HomeFilter.MOVIES -> listOf(
-            RowSpec("m_top10", tr("Top 10 películas hoy", "Top 10 movies today"), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("m_popular", tr("Populares", "Popular")) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("m_now", tr("Estrenos en cines", "Now in theaters")) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
-            RowSpec("m_action", tr("Acción", "Action")) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
-            RowSpec("m_scifi", tr("Ciencia ficción", "Sci-fi")) { tmdb.discoverMovies(key, "878").results.map { it.toCatalogItem() } },
+            RowSpec("m_top10", texts.get(StringsR.string.data_top_10_movies_today), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("m_popular", texts.get(StringsR.string.data_popular)) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("m_now", texts.get(StringsR.string.data_now_in_theaters)) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("m_action", texts.get(StringsR.string.data_action)) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
+            RowSpec("m_scifi", texts.get(StringsR.string.data_sci_fi)) { tmdb.discoverMovies(key, "878").results.map { it.toCatalogItem() } },
             RowSpec("m_thriller", "Thriller") { tmdb.discoverMovies(key, "53").results.map { it.toCatalogItem() } },
-            RowSpec("m_horror", tr("Terror", "Horror")) { tmdb.discoverMovies(key, "27").results.map { it.toCatalogItem() } },
-            RowSpec("m_comedy", tr("Comedias", "Comedies")) { tmdb.discoverMovies(key, "35").results.map { it.toCatalogItem() } },
-            RowSpec("m_animation", tr("Animación", "Animation")) { tmdb.discoverMovies(key, "16").results.map { it.toCatalogItem() } },
-            RowSpec("m_top", tr("Aclamadas por la crítica", "Critically acclaimed")) { tmdb.topRatedMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("m_horror", texts.get(StringsR.string.data_horror)) { tmdb.discoverMovies(key, "27").results.map { it.toCatalogItem() } },
+            RowSpec("m_comedy", texts.get(StringsR.string.data_comedies)) { tmdb.discoverMovies(key, "35").results.map { it.toCatalogItem() } },
+            RowSpec("m_animation", texts.get(StringsR.string.data_animation)) { tmdb.discoverMovies(key, "16").results.map { it.toCatalogItem() } },
+            RowSpec("m_top", texts.get(StringsR.string.data_critically_acclaimed)) { tmdb.topRatedMovies(key).results.map { it.toCatalogItem() } },
         )
         HomeFilter.TV -> listOf(
-            RowSpec("t_top10", tr("Top 10 series hoy", "Top 10 TV shows today"), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
-            RowSpec("t_popular", tr("Populares", "Popular")) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("t_top10", texts.get(StringsR.string.data_top_10_tv_shows_today), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("t_popular", texts.get(StringsR.string.data_popular)) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
             RowSpec("t_drama", "Dramas") { tmdb.discoverTv(key, "18").results.map { it.toCatalogItem() } },
-            RowSpec("t_crime", tr("Crimen", "Crime")) { tmdb.discoverTv(key, "80").results.map { it.toCatalogItem() } },
-            RowSpec("t_scifi", tr("Ciencia ficción y fantasía", "Sci-fi & fantasy")) { tmdb.discoverTv(key, "10765").results.map { it.toCatalogItem() } },
-            RowSpec("t_action", tr("Acción y aventura", "Action & adventure")) { tmdb.discoverTv(key, "10759").results.map { it.toCatalogItem() } },
-            RowSpec("t_comedy", tr("Comedias", "Comedies")) { tmdb.discoverTv(key, "35").results.map { it.toCatalogItem() } },
-            RowSpec("t_animation", tr("Animación", "Animation")) { tmdb.discoverTv(key, "16").results.map { it.toCatalogItem() } },
-            RowSpec("t_top", tr("Aclamadas por la crítica", "Critically acclaimed")) { tmdb.topRatedTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("t_crime", texts.get(StringsR.string.data_crime)) { tmdb.discoverTv(key, "80").results.map { it.toCatalogItem() } },
+            RowSpec("t_scifi", texts.get(StringsR.string.data_sci_fi_fantasy)) { tmdb.discoverTv(key, "10765").results.map { it.toCatalogItem() } },
+            RowSpec("t_action", texts.get(StringsR.string.data_action_adventure)) { tmdb.discoverTv(key, "10759").results.map { it.toCatalogItem() } },
+            RowSpec("t_comedy", texts.get(StringsR.string.data_comedies)) { tmdb.discoverTv(key, "35").results.map { it.toCatalogItem() } },
+            RowSpec("t_animation", texts.get(StringsR.string.data_animation)) { tmdb.discoverTv(key, "16").results.map { it.toCatalogItem() } },
+            RowSpec("t_top", texts.get(StringsR.string.data_critically_acclaimed)) { tmdb.topRatedTv(key).results.map { it.toCatalogItem() } },
         )
     }
 
@@ -184,16 +188,16 @@ class CatalogRepositoryImpl @Inject constructor(
     private fun kidsRowsFor(filter: HomeFilter): List<RowSpec> {
         val topRated = mapOf("sort_by" to "vote_average.desc", "vote_count.gte" to "300")
         val movies = listOf(
-            RowSpec("k_movies", tr("Películas infantiles", "Kids movies")) { kidsMovies(mapOf()) },
-            RowSpec("k_animation", tr("Animación", "Animation")) { kidsMovies(mapOf(), genres = "16") },
-            RowSpec("k_family", tr("Para toda la familia", "For the whole family")) { kidsMovies(mapOf("certification.lte" to "G"), genres = "10751") },
-            RowSpec("k_top_movies", tr("Las mejor valoradas", "Top rated")) { kidsMovies(topRated) },
-            RowSpec("k_more_movies", tr("Más películas", "More movies")) { kidsMovies(mapOf("page" to "2")) },
+            RowSpec("k_movies", texts.get(StringsR.string.data_kids_movies)) { kidsMovies(mapOf()) },
+            RowSpec("k_animation", texts.get(StringsR.string.data_animation)) { kidsMovies(mapOf(), genres = "16") },
+            RowSpec("k_family", texts.get(StringsR.string.data_for_the_whole_family)) { kidsMovies(mapOf("certification.lte" to "G"), genres = "10751") },
+            RowSpec("k_top_movies", texts.get(StringsR.string.data_top_rated)) { kidsMovies(topRated) },
+            RowSpec("k_more_movies", texts.get(StringsR.string.data_more_movies)) { kidsMovies(mapOf("page" to "2")) },
         )
         val shows = listOf(
-            RowSpec("k_tv", tr("Series infantiles", "Kids shows")) { kidsTv(mapOf()) },
-            RowSpec("k_cartoons", tr("Dibujos animados", "Cartoons")) { kidsTv(mapOf(), genres = "10762,16") },
-            RowSpec("k_more_tv", tr("Más series", "More shows")) { kidsTv(mapOf("page" to "2")) },
+            RowSpec("k_tv", texts.get(StringsR.string.data_kids_shows)) { kidsTv(mapOf()) },
+            RowSpec("k_cartoons", texts.get(StringsR.string.data_cartoons)) { kidsTv(mapOf(), genres = "10762,16") },
+            RowSpec("k_more_tv", texts.get(StringsR.string.data_more_shows)) { kidsTv(mapOf("page" to "2")) },
         )
         return when (filter) {
             HomeFilter.ALL -> listOf(movies[0], shows[0], movies[1], shows[1], movies[2], movies[3], shows[2])
@@ -219,7 +223,7 @@ class CatalogRepositoryImpl @Inject constructor(
                 tagline = d.tagline?.takeIf { it.isNotBlank() },
                 seasons = d.seasons
                     .filter { it.season_number > 0 && it.episode_count > 0 }
-                    .map { Season(it.season_number, it.name.ifBlank { tr("Temporada ${it.season_number}", "Season ${it.season_number}") }, it.episode_count) },
+                    .map { Season(it.season_number, it.name.ifBlank { texts.get(StringsR.string.data_season_name, it.season_number) }, it.episode_count) },
                 latestEpisode = d.last_episode_to_air?.toEpisode(),
                 nextEpisode = d.next_episode_to_air?.toEpisode(),
             )
@@ -334,7 +338,7 @@ class CatalogRepositoryImpl @Inject constructor(
         return Episode(
             season = seasonNumber,
             number = episode_number,
-            title = name.ifBlank { tr("Episodio $episode_number", "Episode $episode_number") },
+            title = name.ifBlank { texts.get(StringsR.string.data_episode_name, episode_number) },
             overview = overview,
             stillUrl = still_path?.let { "$IMG/w300$it" },
             runtimeMinutes = runtime,
@@ -343,9 +347,9 @@ class CatalogRepositoryImpl @Inject constructor(
     }
 
     override fun getStreams(item: CatalogItem, episode: Episode?): Flow<StreamResults> = channelFlow {
-        val imdbId = item.imdbId ?: resolveImdb(item) ?: error(tr("No se encontró el id de IMDb de «${item.title}»", "Couldn't find the IMDb id for “${item.title}”"))
+        val imdbId = item.imdbId ?: resolveImdb(item) ?: error(texts.get(StringsR.string.data_imdb_id_missing, item.title))
         val (type, streamId) = if (item.type == MediaType.TV) {
-            val ep = episode ?: error(tr("Elige un episodio", "Pick an episode"))
+            val ep = episode ?: error(texts.get(StringsR.string.data_pick_an_episode))
             "series" to "$imdbId:${ep.season}:${ep.number}"
         } else {
             "movie" to imdbId
@@ -357,16 +361,16 @@ class CatalogRepositoryImpl @Inject constructor(
         val lock = Mutex()
         fun snapshot(): StreamResults {
             val sources = providers.flatMap { p ->
-                done[p]?.getOrNull().orEmpty().map { it.copy(id = "${p.name}:${it.id}", provider = p.section) }
+                done[p]?.getOrNull().orEmpty().map { it.copy(id = "${p.name}:${it.id}", provider = texts.get(p.sectionResource)) }
             }.distinctBy { it.provider + ":" + if (it.resolveUrl == null) it.infoHash.lowercase() else it.id }
-            val sections = providers.groupBy { it.section }
+            val sections = providers.groupBy { texts.get(it.sectionResource) }
             val withSources = sources.map { it.provider }.toSet()
             val pending = sections.filter { (_, ps) -> ps.any { it !in done } }.keys
             val unavailable = sections.mapNotNull { (section, ps) ->
                 when {
                     section in pending || section in withSources -> null
-                    ps.all { done[it]?.isFailure == true } -> section to tr("No responde ahora mismo", "Not responding right now")
-                    else -> section to tr("Sin fuentes para esto", "No sources for this")
+                    ps.all { done[it]?.isFailure == true } -> section to texts.get(StringsR.string.data_not_responding_right_now)
+                    else -> section to texts.get(StringsR.string.data_no_sources_for_this)
                 }
             }.toMap()
             return StreamResults(sources, unavailable, pending)
@@ -376,7 +380,7 @@ class CatalogRepositoryImpl @Inject constructor(
             providers.map { p ->
                 launch {
                     val r = runCatching { withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId) } }
-                    r.exceptionOrNull()?.let { Log.w("Catalog", "${p.title} falló: ${it.message}") }
+                    r.exceptionOrNull()?.let { Log.w("Catalog", "${texts.get(p.titleResource)} falló: ${it.message}") }
                     lock.withLock {
                         done[p] = r
                         send(snapshot())
@@ -388,8 +392,8 @@ class CatalogRepositoryImpl @Inject constructor(
             val failed = done.filter { it.value.isFailure }
             failed.values.firstNotNullOfOrNull { r -> r.exceptionOrNull()?.takeIf { it is IllegalStateException && it !is kotlinx.coroutines.CancellationException } }?.let { throw it }
             if (failed.isNotEmpty()) {
-                val names = failed.keys.joinToString { it.title }
-                error(tr("$names no responde ahora mismo. Prueba en un rato.", "$names isn't responding right now. Try again later."))
+                val names = failed.keys.joinToString { texts.get(it.titleResource) }
+                error(texts.get(StringsR.string.data_provider_unavailable, names))
             }
         }
     }
@@ -501,7 +505,7 @@ class CatalogRepositoryImpl @Inject constructor(
                 }
             }
         }
-        Log.w("Catalog", "${p.title}: ${found.size} aceptadas de $seen (consultas: $allQueries)")
+        Log.w("Catalog", "${texts.get(p.titleResource)}: ${found.size} aceptadas de $seen (consultas: $allQueries)")
         return found.distinctBy { it.infoHash }.mapNotNull { it.toStreamSource(item) }
             .map { if (season != null) it.copy(season = season, episode = episode) else it }
             .sortedByDescending { it.seeders ?: 0 }
@@ -559,17 +563,17 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private fun scraperDto(p: SourceProvider, name: String, hash: String, size: Long, seeders: Int) = TorrentioStreamDto(
         name = "Bambi\n$name",
-        title = "$name\n👤 $seeders 💾 ${"%.2f".format(java.util.Locale.US, size / 1_073_741_824.0)} GB ⚙️ ${p.title}",
+        title = "$name\n👤 $seeders 💾 ${"%.2f".format(java.util.Locale.US, size / 1_073_741_824.0)} GB ⚙️ ${texts.get(p.titleResource)}",
         infoHash = hash.lowercase(),
     )
 
     private fun addonLabel(base: String, count: Int): String =
-        if (count <= 1) tr("el addon de Stremio", "the Stremio addon")
+        if (count <= 1) texts.get(StringsR.string.data_the_stremio_addon)
         else base.removePrefix("https://").removePrefix("http://").substringBefore('/').substringBefore('.')
 
-    private suspend fun aioStreams(base: String, item: CatalogItem, type: String, streamId: String, label: String = tr("el addon de Stremio", "the Stremio addon")): List<StreamSource> {
+    private suspend fun aioStreams(base: String, item: CatalogItem, type: String, streamId: String, label: String = texts.get(StringsR.string.data_the_stremio_addon)): List<StreamSource> {
         val streams = torrentio.streamsAt("$base/stream/$type/$streamId.json").streams
-        streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, label)) }
+        streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, label, texts)) }
         return streams.mapNotNull { s ->
             val link = s.url?.takeIf { it.startsWith("http") } ?: return@mapNotNull s.toStreamSource(item)
             val hash = s.infoHash ?: "aio%08x".format(link.hashCode())
@@ -595,18 +599,18 @@ class CatalogRepositoryImpl @Inject constructor(
         }
         if (p == SourceProvider.PEERFLIX) {
             val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
-                ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
+                ?: error(texts.get(StringsR.string.data_debrid_key_missing, debrid.title))
             return aioStreams("$base/${torrentioConfig(debrid, key)}", item, type, streamId, label = debrid.title)
         }
         if (!p.torrentioStyle) return emptyList()
         val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
-            ?: error(tr("Falta la clave de ${debrid.title}. Añádela en Ajustes (rueda arriba a la derecha).", "${debrid.title} key missing. Add it in Settings (gear, top right)."))
+            ?: error(texts.get(StringsR.string.data_debrid_key_missing, debrid.title))
         val config = listOfNotNull(language, torrentioConfig(debrid, key)).joinToString("|")
         val streams = if (p == SourceProvider.TORRENTIO) torrentio.streamsWithConfig(config, type, streamId).streams
         else torrentio.streamsAt("$base/$config/stream/$type/$streamId.json").streams
         val sources = streams.mapNotNull { it.toDebridSource(item, debrid) }
         if (sources.isEmpty()) {
-            streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, debrid.title)) }
+            streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, debrid.title, texts)) }
         }
         return sources
     }
@@ -790,5 +794,3 @@ class CatalogRepositoryImpl @Inject constructor(
 private const val HOME_CACHE_MS = 30 * 60 * 1000L
 
 private const val AIRING_CACHE_MS = 6 * 60 * 60 * 1000L
-
-val MISSING_TMDB_KEY: String get() = tr("Falta la clave de TMDB. Añádela en Ajustes (rueda arriba a la derecha).", "TMDB key missing. Add it in Settings (gear, top right).")

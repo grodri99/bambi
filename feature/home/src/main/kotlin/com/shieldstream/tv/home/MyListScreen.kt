@@ -1,5 +1,7 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.CatalogItem
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.ui.component.PosterCard
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
@@ -71,7 +72,7 @@ fun MyListScreen(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                tr("Mi lista", "My list"),
+                localizedStringResource(StringsR.string.home_my_list),
                 color = Color.White,
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             )
@@ -82,45 +83,45 @@ fun MyListScreen(
                 MyListUiState.Loading -> MyListFilter.ALL
             }
             listOf(
-                MyListFilter.ALL to tr("Todo", "All"),
-                MyListFilter.TV to tr("Series", "TV Shows"),
-                MyListFilter.MOVIES to tr("Películas", "Movies"),
+                MyListFilter.ALL to localizedStringResource(StringsR.string.home_all),
+                MyListFilter.TV to localizedStringResource(StringsR.string.home_tv_shows),
+                MyListFilter.MOVIES to localizedStringResource(StringsR.string.home_movies),
             ).forEach { (f, label) ->
                 FilterChip(label = label, selected = f == current, onClick = { viewModel.setFilter(f) })
                 Spacer(Modifier.width(8.dp))
             }
             Spacer(Modifier.weight(1f))
             if (state is MyListUiState.Content) {
-                Text(tr("Mantén OK para quitar", "Hold OK to remove"), color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+                Text(localizedStringResource(StringsR.string.home_hold_ok_to_remove), color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
             }
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             listOf(
-                MyListSort.NEW_FIRST to tr("Nuevos primero", "New first"),
-                MyListSort.RECENT to tr("Recientes", "Recent"),
-                MyListSort.TITLE to tr("A–Z", "A–Z"),
+                MyListSort.NEW_FIRST to localizedStringResource(StringsR.string.home_new_first),
+                MyListSort.RECENT to localizedStringResource(StringsR.string.home_recent),
+                MyListSort.TITLE to localizedStringResource(StringsR.string.home_a_z),
             ).forEach { (value, label) ->
                 FilterChip(label = label, selected = value == currentSort, onClick = { viewModel.setSort(value) })
                 Spacer(Modifier.width(8.dp))
             }
             Spacer(Modifier.weight(1f))
             FilterChip(
-                label = tr("Ocultar completadas", "Hide completed"),
+                label = localizedStringResource(StringsR.string.home_hide_completed),
                 selected = hidingCompleted,
                 onClick = viewModel::toggleHideCompleted,
             )
         }
         Spacer(Modifier.height(12.dp))
         when (val s = state) {
-            MyListUiState.Loading -> Text(tr("Cargando…", "Loading…"), color = Color.White.copy(alpha = 0.6f))
+            MyListUiState.Loading -> Text(localizedStringResource(StringsR.string.home_loading), color = Color.White.copy(alpha = 0.6f))
             is MyListUiState.Empty -> Text(
                 if (s.filter == MyListFilter.ALL) {
-                    tr("Tu lista está vacía. Añade películas y series con el botón «Mi lista» de su ficha.", "Your list is empty. Add movies and shows with the “My list” button on their page.")
+                    localizedStringResource(StringsR.string.home_your_list_is_empty_add_movies_and)
                 } else if (s.hideCompleted) {
-                    tr("No quedan series sin completar con estos filtros.", "No unfinished shows match these filters.")
+                    localizedStringResource(StringsR.string.home_no_unfinished_shows_match_these_filters)
                 } else {
-                    tr("No hay nada de este tipo en tu lista.", "Nothing of this kind in your list.")
+                    localizedStringResource(StringsR.string.home_nothing_of_this_kind_in_your_list)
                 },
                 color = Color.White.copy(alpha = 0.6f),
                 style = MaterialTheme.typography.titleMedium,

@@ -29,6 +29,7 @@ import com.shieldstream.tv.model.Profile
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.SubtitlePreference
+import com.shieldstream.tv.strings.Texts
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -169,6 +170,7 @@ class PlayerViewModelTest {
                 subtitles = mockk<SubtitleRepository>(relaxed = true),
                 trakt = mockk<TraktRepository>(relaxed = true),
                 skipSegmentsRepository = mockk<SkipSegmentsRepository>(relaxed = true),
+                texts = mockk<Texts>(relaxed = true),
             ),
         )
     }

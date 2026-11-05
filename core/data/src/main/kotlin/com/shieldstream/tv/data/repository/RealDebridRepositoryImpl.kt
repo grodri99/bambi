@@ -1,6 +1,7 @@
 package com.shieldstream.tv.data.repository
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.os.SystemClock
 import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.SettingsRepository
@@ -18,6 +19,7 @@ import javax.inject.Singleton
 class RealDebridRepositoryImpl @Inject constructor(
     private val api: RealDebridApi,
     private val settings: SettingsRepository,
+    private val texts: Texts,
 ) : RealDebridRepository {
 
     private val libraryMutex = Mutex()
@@ -29,7 +31,7 @@ class RealDebridRepositoryImpl @Inject constructor(
     private var libraryFetchedAt = 0L
 
     private suspend fun token(): String =
-        settings.token.first() ?: error(tr("Token de Real-Debrid no configurado", "Real-Debrid token not set"))
+        settings.token.first() ?: error(texts.get(StringsR.string.data_real_debrid_token_not_set))
 
     override suspend fun validateToken(token: String): Boolean = runCatching {
         api.user("Bearer $token").premium >= 1L
@@ -56,7 +58,7 @@ class RealDebridRepositoryImpl @Inject constructor(
         val hash = BTIH.find(magnet)?.groupValues?.get(1)?.lowercase()
         if (hash != null && hash in blockedHashes) {
             throw com.shieldstream.tv.domain.TorrentBlockedException(
-                tr("Real-Debrid ha bloqueado este torrent por derechos de autor.", "Real-Debrid has blocked this torrent for copyright reasons."),
+                texts.get(StringsR.string.data_real_debrid_has_blocked_this_torrent_for),
             )
         }
         val t = token()
@@ -78,20 +80,24 @@ class RealDebridRepositoryImpl @Inject constructor(
             if (code == 35) {
                 hash?.let { blockedHashes += it }
                 throw com.shieldstream.tv.domain.TorrentBlockedException(
-                    tr("Real-Debrid ha bloqueado este torrent por derechos de autor.", "Real-Debrid has blocked this torrent for copyright reasons."),
+                    texts.get(StringsR.string.data_real_debrid_has_blocked_this_torrent_for),
                 )
             }
             error(
                 when (code) {
-                    35 -> tr("Real-Debrid ha bloqueado este torrent por derechos de autor.", "Real-Debrid has blocked this torrent for copyright reasons.")
-                    21 -> tr("Tienes demasiadas descargas activas en Real-Debrid.", "Too many active downloads on Real-Debrid.")
-                    34 -> tr("Real-Debrid pide esperar un momento (demasiadas peticiones).", "Real-Debrid asks to wait a moment (too many requests).")
-                    8, 9 -> tr("Token de Real-Debrid no válido o sin permisos.", "Invalid Real-Debrid token or missing permissions.")
-                    else -> tr("Real-Debrid rechazó el torrent (HTTP ${e.code()}${code?.let { ", código $it" } ?: ""}).", "Real-Debrid rejected the torrent (HTTP ${e.code()}${code?.let { ", code $it" } ?: ""}).")
+                    35 -> texts.get(StringsR.string.data_real_debrid_has_blocked_this_torrent_for)
+                    21 -> texts.get(StringsR.string.data_too_many_active_downloads_on_real_debrid)
+                    34 -> texts.get(StringsR.string.data_real_debrid_asks_to_wait_a_moment)
+                    8, 9 -> texts.get(StringsR.string.data_invalid_real_debrid_token_or_missing_permissions)
+                    else -> texts.get(
+                        StringsR.string.data_rd_torrent_rejected,
+                        e.code(),
+                        code?.let { texts.get(StringsR.string.data_error_code_suffix, it) }.orEmpty(),
+                    )
                 },
             )
         }
-        require(resp.id.isNotBlank()) { tr("Real-Debrid no devolvió id de torrent", "Real-Debrid returned no torrent id") }
+        require(resp.id.isNotBlank()) { texts.get(StringsR.string.data_real_debrid_returned_no_torrent_id) }
         invalidateLibrary()
         return resp.id
     }
@@ -119,7 +125,7 @@ class RealDebridRepositoryImpl @Inject constructor(
     override suspend fun selectFiles(torrentId: String, fileIds: List<Int>) {
         val t = token()
         val resp = api.selectFiles("Bearer $t", torrentId, fileIds.joinToString(","))
-        check(resp.isSuccessful) { tr("Real-Debrid rechazó la selección de archivos (HTTP ${resp.code()})", "Real-Debrid rejected the file selection (HTTP ${resp.code()})") }
+        check(resp.isSuccessful) { texts.get(StringsR.string.data_rd_file_selection_rejected, resp.code()) }
     }
 
     override suspend fun deleteTorrent(torrentId: String) {
@@ -130,7 +136,7 @@ class RealDebridRepositoryImpl @Inject constructor(
     override suspend fun unrestrict(link: String): String {
         val t = token()
         val resp = api.unrestrict("Bearer $t", link)
-        require(resp.download.isNotBlank()) { tr("No se pudo desbloquear el enlace", "Couldn't unrestrict the link") }
+        require(resp.download.isNotBlank()) { texts.get(StringsR.string.data_couldn_t_unrestrict_the_link) }
         return resp.download
     }
 

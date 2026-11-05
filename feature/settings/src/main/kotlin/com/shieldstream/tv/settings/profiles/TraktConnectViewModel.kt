@@ -1,11 +1,12 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.TraktAuthPoll
 import com.shieldstream.tv.domain.TraktRepository
-import com.shieldstream.tv.model.tr
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,6 +32,7 @@ sealed interface TraktConnectUiState {
 class TraktConnectViewModel @Inject constructor(
     savedState: SavedStateHandle,
     private val trakt: TraktRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     private val profileId: String = checkNotNull(savedState.get<String>("id"))
@@ -50,7 +52,7 @@ class TraktConnectViewModel @Inject constructor(
         job = viewModelScope.launch {
             val code = trakt.requestDeviceCode().getOrElse {
                 _uiState.value = TraktConnectUiState.Error(
-                    it.message ?: tr("No se pudo contactar con Trakt.", "Couldn't reach Trakt."),
+                    it.message ?: texts.get(StringsR.string.settings_couldn_t_reach_trakt),
                 )
                 return@launch
             }
@@ -78,7 +80,7 @@ class TraktConnectViewModel @Inject constructor(
                         }
                         TraktAuthPoll.Denied -> {
                             _uiState.value = TraktConnectUiState.Error(
-                                tr("Has rechazado el acceso en Trakt.", "You declined access on Trakt."),
+                                texts.get(StringsR.string.settings_you_declined_access_on_trakt),
                             )
                             return@launch
                         }

@@ -2,10 +2,12 @@ package com.shieldstream.tv.settings
 
 import androidx.compose.ui.platform.LocalContext
 import com.shieldstream.tv.ui.component.restartApp
-import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.SubtitlePreference
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.keyNameResource
+import com.shieldstream.tv.strings.titleResource
+import com.shieldstream.tv.strings.R.string as SR
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -125,12 +127,12 @@ fun SetupScreen(
                 SetupStep.TMDB -> KeyStep(
                     state = s,
                     service = ApiService.TMDB,
-                    title = tr("Catálogo", "Catalog"),
-                    intro = tr("Bambi saca de TMDB las portadas, sinopsis, temporadas y edades recomendadas. La clave es gratis.", "Bambi gets artwork, synopses, seasons and age ratings from TMDB. The key is free."),
+                    title = localizedStringResource(SR.setup_catalog),
+                    intro = localizedStringResource(SR.setup_tmdb_intro),
                     steps = listOf(
-                        tr("Crea una cuenta gratis en themoviedb.org (o entra con la tuya).", "Create a free account at themoviedb.org (or sign in)."),
-                        tr("En tu perfil: Ajustes → API → solicita una clave de uso personal.", "In your profile: Settings → API → request a key for personal use."),
-                        tr("Copia la «Clave de la API» (32 letras y números, no el token largo) y escríbela aquí.", "Copy the “API Key” (32 letters and numbers, not the long token) and type it here."),
+                        localizedStringResource(SR.setup_tmdb_step_account),
+                        localizedStringResource(SR.setup_tmdb_step_api),
+                        localizedStringResource(SR.setup_tmdb_step_copy),
                     ),
                     required = true,
                     onSubmit = { viewModel.submitKey(ApiService.TMDB, it) },
@@ -140,9 +142,9 @@ fun SetupScreen(
                 SetupStep.DEBRID -> KeyStep(
                     state = s,
                     service = s.debrid.apiService,
-                    title = tr("Servicio debrid", "Debrid service"),
-                    intro = tr("El debrid es el que reproduce las películas a toda velocidad. Elige el tuyo con ◀ ▶ y pon su clave.", "The debrid service is what plays movies at full speed. Choose yours with ◀ ▶ and enter its key.") +
-                        if (s.debrid.viaTorrentio) tr(" Va a través de Torrentio, como en Stremio.", " It works through Torrentio, like in Stremio.") else "",
+                    title = localizedStringResource(SR.setup_debrid_service),
+                    intro = localizedStringResource(SR.setup_debrid_intro) +
+                        if (s.debrid.viaTorrentio) localizedStringResource(SR.setup_debrid_torrentio) else "",
                     steps = debridSteps(s.debrid),
                     required = true,
                     onSubmit = { viewModel.submitKey(s.debrid.apiService, it) },
@@ -153,13 +155,12 @@ fun SetupScreen(
                 SetupStep.SUBDL -> KeyStep(
                     state = s,
                     service = ApiService.SUBDL,
-                    title = tr("Subtítulos extra", "Extra subtitles"),
-                    intro = tr("Opcional. Con una clave de SubDL aparecen más subtítulos externos. OpenSubtitles y Podnapisi ", "Optional. With a SubDL key you get more external subtitles. OpenSubtitles and Podnapisi ") +
-                        tr("ya funcionan sin clave.", "already work without a key."),
+                    title = localizedStringResource(SR.setup_extra_subtitles),
+                    intro = localizedStringResource(SR.setup_subdl_intro),
                     steps = listOf(
-                        tr("Crea una cuenta gratis en subdl.com.", "Create a free account at subdl.com."),
-                        tr("Entra en tu panel → API y genera una clave.", "Go to your panel → API and generate a key."),
-                        tr("Cópiala y escríbela aquí. Si no la quieres, pulsa «Saltar».", "Copy it and type it here. If you don't want it, press “Skip”."),
+                        localizedStringResource(SR.setup_subdl_step_account),
+                        localizedStringResource(SR.setup_subdl_step_api),
+                        localizedStringResource(SR.setup_subdl_step_copy),
                     ),
                     required = false,
                     onSubmit = { viewModel.submitKey(ApiService.SUBDL, it) },
@@ -175,36 +176,37 @@ fun SetupScreen(
     }
 }
 
+@Composable
 private fun debridSteps(debrid: DebridService): List<String> = when (debrid) {
     DebridService.REAL_DEBRID -> listOf(
-        tr("Entra en real-debrid.com con tu cuenta (necesita Premium).", "Sign in at real-debrid.com (Premium required)."),
-        tr("Abre la página del token: real-debrid.com/apitoken", "Open the token page: real-debrid.com/apitoken"),
-        tr("Copia el token y escríbelo aquí.", "Copy the token and type it here."),
+        localizedStringResource(SR.setup_rd_step_account),
+        localizedStringResource(SR.setup_rd_step_token),
+        localizedStringResource(SR.setup_rd_step_copy),
     )
     DebridService.TORBOX -> listOf(
-        tr("Entra en torbox.app con tu cuenta.", "Sign in at torbox.app."),
-        tr("Abre Settings y busca tu API key.", "Open Settings and find your API key."),
-        tr("Cópiala y escríbela aquí.", "Copy it and type it here."),
+        localizedStringResource(SR.setup_torbox_step_account),
+        localizedStringResource(SR.setup_torbox_step_settings),
+        localizedStringResource(SR.setup_copy_key),
     )
     DebridService.PREMIUMIZE -> listOf(
-        tr("Entra en premiumize.me con tu cuenta.", "Sign in at premiumize.me."),
-        tr("Abre «Account» y busca la API Key.", "Open “Account” and find the API Key."),
-        tr("Cópiala y escríbela aquí.", "Copy it and type it here."),
+        localizedStringResource(SR.setup_premiumize_step_account),
+        localizedStringResource(SR.setup_premiumize_step_settings),
+        localizedStringResource(SR.setup_copy_key),
     )
     DebridService.ALLDEBRID -> listOf(
-        tr("Entra en alldebrid.com con tu cuenta.", "Sign in at alldebrid.com."),
-        tr("Abre la página de claves de API (alldebrid.com/apikeys) y crea una.", "Open the API keys page (alldebrid.com/apikeys) and create one."),
-        tr("Cópiala y escríbela aquí.", "Copy it and type it here."),
+        localizedStringResource(SR.setup_alldebrid_step_account),
+        localizedStringResource(SR.setup_alldebrid_step_settings),
+        localizedStringResource(SR.setup_copy_key),
     )
     DebridService.DEBRID_LINK -> listOf(
-        tr("Entra en debrid-link.com con tu cuenta.", "Sign in at debrid-link.com."),
-        tr("Abre la página de la clave de API (debrid-link.com/webapp/apikey).", "Open the API key page (debrid-link.com/webapp/apikey)."),
-        tr("Cópiala y escríbela aquí.", "Copy it and type it here."),
+        localizedStringResource(SR.setup_debrid_link_step_account),
+        localizedStringResource(SR.setup_debrid_link_step_settings),
+        localizedStringResource(SR.setup_copy_key),
     )
     DebridService.OFFCLOUD -> listOf(
-        tr("Entra en offcloud.com con tu cuenta.", "Sign in at offcloud.com."),
-        tr("Abre «Account» y busca tu API key.", "Open “Account” and find your API key."),
-        tr("Cópiala y escríbela aquí.", "Copy it and type it here."),
+        localizedStringResource(SR.setup_offcloud_step_account),
+        localizedStringResource(SR.setup_offcloud_step_settings),
+        localizedStringResource(SR.setup_copy_key),
     )
 }
 
@@ -218,7 +220,7 @@ private fun SetupHeader(step: SetupStep) {
         Image(painterResource(R.drawable.bambi_wordmark), contentDescription = "Bambi", modifier = Modifier.height(13.dp))
         Spacer(Modifier.weight(1f))
         step.number?.let { n ->
-            Text(tr("PASO $n DE 4", "STEP $n OF 4"), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)
+            Text(localizedStringResource(SR.setup_step_counter, n), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)
             Spacer(Modifier.width(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 (1..4).forEach { i ->
@@ -250,24 +252,24 @@ private fun ColumnScope.WelcomeStep(onStart: () -> Unit, onLater: () -> Unit) {
     ) {
         Image(painterResource(R.drawable.bambi_logo), contentDescription = null, modifier = Modifier.size(120.dp))
         Spacer(Modifier.height(16.dp))
-        Text(tr("Vamos a dejar Bambi listo", "Let's get Bambi ready"), fontFamily = DisplayFont, fontSize = 44.sp, color = Color.White)
+        Text(localizedStringResource(SR.setup_welcome_title), fontFamily = DisplayFont, fontSize = 44.sp, color = Color.White)
         Text(
-            tr("Son 4 pasos y solo se hace una vez. Ten a mano el móvil o el ordenador para sacar las claves.", "It takes 4 steps and you only do it once. Keep your phone or computer handy to get the keys."),
+            localizedStringResource(SR.setup_welcome_body),
             style = MaterialTheme.typography.bodyLarge,
             color = Muted,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            WelcomeTile("1", tr("Catálogo", "Catalog"), tr("Portadas y sinopsis (TMDB)", "Artwork and synopses (TMDB)"))
+            WelcomeTile("1", localizedStringResource(SR.setup_catalog), localizedStringResource(SR.setup_catalog_artwork))
             WelcomeTile("2", "Debrid", "Real-Debrid, TorBox…")
-            WelcomeTile("3", tr("Subtítulos extra", "Extra subtitles"), tr("Opcional (SubDL)", "Optional (SubDL)"))
-            WelcomeTile("4", tr("Preferencias", "Preferences"), tr("Idioma, audio y subtítulos", "Language, audio & subtitles"))
+            WelcomeTile("3", localizedStringResource(SR.setup_extra_subtitles), localizedStringResource(SR.setup_optional_subdl))
+            WelcomeTile("4", localizedStringResource(SR.setup_preferences), localizedStringResource(SR.setup_language_audio_subtitles))
         }
         Spacer(Modifier.height(28.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TvButton(text = tr("Empezar", "Start"), onClick = onStart, modifier = Modifier.focusRequester(startRequester))
-            TvButton(text = tr("Más tarde", "Later"), onClick = onLater)
+            TvButton(text = localizedStringResource(SR.setup_start), onClick = onStart, modifier = Modifier.focusRequester(startRequester))
+            TvButton(text = localizedStringResource(SR.setup_later), onClick = onLater)
         }
     }
 }
@@ -315,14 +317,14 @@ private fun ColumnScope.PlaybackPreferencesStep(
         runCatching { firstRequester.requestFocus() }
     }
     Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-        Text(tr("AUDIO Y SUBTÍTULOS", "AUDIO & SUBTITLES"), fontFamily = DisplayFont, fontSize = 38.sp, color = Color.White)
+        Text(localizedStringResource(SR.setup_audio_subtitles_title), fontFamily = DisplayFont, fontSize = 38.sp, color = Color.White)
         Text(
-            tr("Se guardan en el perfil activo y puedes cambiarlas después.", "Saved to the active profile; you can change them later."),
+            localizedStringResource(SR.setup_preferences_saved),
             style = MaterialTheme.typography.bodyMedium,
             color = Muted,
         )
         Spacer(Modifier.height(18.dp))
-        Text(tr("Idioma de la interfaz", "Interface language"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text(localizedStringResource(SR.setup_interface_language), style = MaterialTheme.typography.titleMedium, color = Color.White)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SetupChoice(
@@ -341,52 +343,52 @@ private fun ColumnScope.PlaybackPreferencesStep(
             )
         }
         Spacer(Modifier.height(18.dp))
-        Text(tr("Audio preferido", "Preferred audio"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text(localizedStringResource(SR.setup_preferred_audio), style = MaterialTheme.typography.titleMedium, color = Color.White)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SetupChoice(
-                title = tr("Original", "Original"),
-                description = tr("Sin forzar el idioma", "No forced language"),
+                title = localizedStringResource(SR.setup_original),
+                description = localizedStringResource(SR.setup_no_forced_language),
                 selected = audio == SetupAudioPreference.ORIGINAL,
                 onClick = { onAudio(SetupAudioPreference.ORIGINAL) },
                 modifier = Modifier.weight(1f),
             )
             SetupChoice(
-                title = tr("Español", "Spanish"),
-                description = tr("Priorizar si está disponible", "Prefer when available"),
+                title = localizedStringResource(SR.setup_spanish),
+                description = localizedStringResource(SR.setup_prefer_available),
                 selected = audio == SetupAudioPreference.SPANISH,
                 onClick = { onAudio(SetupAudioPreference.SPANISH) },
                 modifier = Modifier.weight(1f),
             )
             SetupChoice(
-                title = tr("Solo español", "Spanish only"),
-                description = tr("Descarta otros audios", "Reject other audio"),
+                title = localizedStringResource(SR.setup_spanish_only),
+                description = localizedStringResource(SR.setup_reject_other_audio),
                 selected = audio == SetupAudioPreference.SPANISH_ONLY,
                 onClick = { onAudio(SetupAudioPreference.SPANISH_ONLY) },
                 modifier = Modifier.weight(1f),
             )
         }
         Spacer(Modifier.height(18.dp))
-        Text(tr("Subtítulos automáticos", "Automatic subtitles"), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text(localizedStringResource(SR.setup_automatic_subtitles), style = MaterialTheme.typography.titleMedium, color = Color.White)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SetupChoice(
-                title = tr("Desactivados", "Off"),
-                description = tr("Elección manual", "Manual selection"),
+                title = localizedStringResource(SR.setup_off),
+                description = localizedStringResource(SR.setup_manual_selection),
                 selected = subtitles == SubtitlePreference.OFF,
                 onClick = { onSubtitles(SubtitlePreference.OFF) },
                 modifier = Modifier.weight(1f),
             )
             SetupChoice(
-                title = tr("Español", "Spanish"),
-                description = tr("Integrados o externos", "Embedded or external"),
+                title = localizedStringResource(SR.setup_spanish),
+                description = localizedStringResource(SR.setup_embedded_external),
                 selected = subtitles == SubtitlePreference.SPANISH,
                 onClick = { onSubtitles(SubtitlePreference.SPANISH) },
                 modifier = Modifier.weight(1f),
             )
             SetupChoice(
-                title = tr("Inglés", "English"),
-                description = tr("Integrados o externos", "Embedded or external"),
+                title = localizedStringResource(SR.setup_english),
+                description = localizedStringResource(SR.setup_embedded_external),
                 selected = subtitles == SubtitlePreference.ENGLISH,
                 onClick = { onSubtitles(SubtitlePreference.ENGLISH) },
                 modifier = Modifier.weight(1f),
@@ -394,12 +396,12 @@ private fun ColumnScope.PlaybackPreferencesStep(
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            tr("Si el archivo no trae subtítulos en ese idioma, Bambi buscará subtítulos externos.", "If the file has no subtitles in that language, Bambi will search for external subtitles."),
+            localizedStringResource(SR.setup_external_subtitles_explanation),
             style = MaterialTheme.typography.bodySmall,
             color = Muted,
         )
         Spacer(Modifier.height(20.dp))
-        TvButton(text = tr("Siguiente", "Next"), onClick = onNext)
+        TvButton(text = localizedStringResource(SR.setup_next), onClick = onNext)
     }
 }
 
@@ -500,7 +502,11 @@ private fun ColumnScope.KeyStep(
                         onTyping()
                     },
                     enabled = !state.checking,
-                    placeholder = tr("${service.keyName} de ${service.title}", "${service.title} ${service.keyName}"),
+                    placeholder = localizedStringResource(
+                        SR.setup_key_placeholder,
+                        localizedStringResource(service.keyNameResource),
+                        localizedStringResource(service.titleResource),
+                    ),
                     onDone = { onSubmit(input) },
                     modifier = Modifier
                         .focusRequester(fieldRequester)
@@ -512,17 +518,17 @@ private fun ColumnScope.KeyStep(
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TvButton(
-                        text = if (state.checking) tr("Comprobando…", "Checking…") else tr("Comprobar y guardar", "Check and save"),
+                        text = if (state.checking) localizedStringResource(SR.setup_checking) else localizedStringResource(SR.setup_check_save),
                         onClick = { onSubmit(input) },
                         enabled = !state.checking,
                         modifier = Modifier.focusRequester(primaryRequester),
                     )
                     when {
-                        has -> TvButton(text = tr("Dejar la que hay", "Keep the current one"), onClick = {
+                        has -> TvButton(text = localizedStringResource(SR.setup_keep_current), onClick = {
                             editing = false
                             focusRequest++
                         })
-                        !required -> TvButton(text = tr("Saltar", "Skip"), onClick = onNext, modifier = Modifier.focusRequester(skipRequester))
+                        !required -> TvButton(text = localizedStringResource(SR.setup_skip), onClick = onNext, modifier = Modifier.focusRequester(skipRequester))
                     }
                 }
             } else {
@@ -530,13 +536,13 @@ private fun ColumnScope.KeyStep(
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TvButton(
-                        text = tr("Siguiente", "Next"),
+                        text = localizedStringResource(SR.setup_next),
                         onClick = onNext,
                         modifier = Modifier
                             .focusRequester(primaryRequester)
                             .focusProperties { if (selector != null) up = selectorRequester },
                     )
-                    TvButton(text = tr("Cambiar clave", "Change key"), onClick = {
+                    TvButton(text = localizedStringResource(SR.setup_change_key), onClick = {
                         input = ""
                         editing = true
                         focusRequest++
@@ -553,9 +559,9 @@ private fun ColumnScope.KeyStep(
 private fun StatusLine(state: SetupUiState.Ready, service: ApiService) {
     val error = state.error
     val (text, color) = when {
-        state.checking -> tr("Comprobando con ${service.title}…", "Checking with ${service.title}…") to Muted
+        state.checking -> localizedStringResource(SR.setup_checking_with, localizedStringResource(service.titleResource)) to Muted
         error != null -> error to Red
-        else -> tr("Pulsa OK sobre el recuadro para escribir. Se comprueba con ${service.title} antes de guardarla.", "Press OK on the box to type. It's checked with ${service.title} before saving.") to Muted
+        else -> localizedStringResource(SR.setup_key_validation_explanation, localizedStringResource(service.titleResource)) to Muted
     }
     Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
 }
@@ -576,12 +582,12 @@ private fun ConfiguredRow(service: ApiService, maskedKey: String?, detail: Strin
         Spacer(Modifier.width(14.dp))
         Column {
             Text(
-                tr("${service.title} configurado", "${service.title} set up"),
+                localizedStringResource(SR.setup_service_configured, localizedStringResource(service.titleResource)),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
             )
             Text(
-                listOfNotNull(detail, maskedKey?.let { tr("clave ····${it.takeLast(4)}", "key ····${it.takeLast(4)}") }).joinToString("  ·  "),
+                listOfNotNull(detail, maskedKey?.let { localizedStringResource(SR.setup_masked_key, it.takeLast(4)) }).joinToString("  ·  "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Muted,
             )
@@ -653,7 +659,7 @@ private fun KeyField(
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        if (focused) tr("Pulsa OK para escribir", "Press OK to type") else placeholder,
+                        if (focused) localizedStringResource(SR.setup_press_ok_type) else placeholder,
                         fontSize = 18.sp,
                         color = Color.White.copy(alpha = 0.35f),
                     )
@@ -682,7 +688,7 @@ private fun QrPanel(url: String) {
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            tr("Escanéalo con la cámara del móvil", "Scan it with your phone's camera"),
+            localizedStringResource(SR.setup_scan_qr),
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
             textAlign = TextAlign.Center,
@@ -738,9 +744,9 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
             Text("✓", color = Color.Black, fontSize = 44.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(16.dp))
-        Text(tr("¡Todo listo!", "All set!"), fontFamily = DisplayFont, fontSize = 48.sp, color = Color.White)
+        Text(localizedStringResource(SR.setup_all_set), fontFamily = DisplayFont, fontSize = 48.sp, color = Color.White)
         Text(
-            tr("Puedes cambiar claves y preferencias cuando quieras en Ajustes.", "You can change keys and preferences whenever you like in Settings."),
+            localizedStringResource(SR.setup_done_body),
             style = MaterialTheme.typography.bodyLarge,
             color = Muted,
         )
@@ -749,28 +755,30 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.width(560.dp),
         ) {
-            PreferenceSummaryRow(tr("Idioma", "Language"), state.language.label)
-            PreferenceSummaryRow(tr("Audio", "Audio"), audioLabel(state.audio))
-            PreferenceSummaryRow(tr("Subtítulos", "Subtitles"), subtitleLabel(state.subtitles))
-            SummaryRow(tr("Catálogo · TMDB", "Catalog · TMDB"), state.has(ApiService.TMDB), required = true)
+            PreferenceSummaryRow(localizedStringResource(SR.setup_language), state.language.label)
+            PreferenceSummaryRow(localizedStringResource(SR.setup_audio), audioLabel(state.audio))
+            PreferenceSummaryRow(localizedStringResource(SR.setup_subtitles), subtitleLabel(state.subtitles))
+            SummaryRow(localizedStringResource(SR.setup_catalog_tmdb), state.has(ApiService.TMDB), required = true)
             SummaryRow("Debrid · ${state.debrid.title}", state.has(state.debrid.apiService), required = true)
-            SummaryRow(tr("Subtítulos extra · SubDL", "Extra subtitles · SubDL"), state.has(ApiService.SUBDL), required = false)
+            SummaryRow(localizedStringResource(SR.setup_extra_subtitles_subdl), state.has(ApiService.SUBDL), required = false)
         }
         Spacer(Modifier.height(26.dp))
-        TvButton(text = tr("Empezar a ver", "Start watching"), onClick = onFinish, modifier = Modifier.focusRequester(requester))
+        TvButton(text = localizedStringResource(SR.setup_start_watching), onClick = onFinish, modifier = Modifier.focusRequester(requester))
     }
 }
 
+@Composable
 private fun audioLabel(audio: SetupAudioPreference): String = when (audio) {
-    SetupAudioPreference.ORIGINAL -> tr("Original", "Original")
-    SetupAudioPreference.SPANISH -> tr("Español primero", "Spanish first")
-    SetupAudioPreference.SPANISH_ONLY -> tr("Solo español", "Spanish only")
+    SetupAudioPreference.ORIGINAL -> localizedStringResource(SR.setup_original)
+    SetupAudioPreference.SPANISH -> localizedStringResource(SR.setup_spanish_first)
+    SetupAudioPreference.SPANISH_ONLY -> localizedStringResource(SR.setup_spanish_only)
 }
 
+@Composable
 private fun subtitleLabel(preference: SubtitlePreference): String = when (preference) {
-    SubtitlePreference.OFF -> tr("Desactivados", "Off")
-    SubtitlePreference.SPANISH -> tr("Español", "Spanish")
-    SubtitlePreference.ENGLISH -> tr("Inglés", "English")
+    SubtitlePreference.OFF -> localizedStringResource(SR.setup_off)
+    SubtitlePreference.SPANISH -> localizedStringResource(SR.setup_spanish)
+    SubtitlePreference.ENGLISH -> localizedStringResource(SR.setup_english)
 }
 
 @Composable
@@ -790,9 +798,9 @@ private fun PreferenceSummaryRow(label: String, value: String) {
 @Composable
 private fun SummaryRow(label: String, ok: Boolean, required: Boolean) {
     val (mark, color, note) = when {
-        ok -> Triple("✓", Green, tr("Configurado", "Set up"))
-        required -> Triple("!", Red, tr("Falta: sin esto no funcionará", "Missing: it won't work without this"))
-        else -> Triple("–", Muted, tr("Sin configurar (opcional)", "Not set up (optional)"))
+        ok -> Triple("✓", Green, localizedStringResource(SR.setup_set_up))
+        required -> Triple("!", Red, localizedStringResource(SR.setup_missing_required))
+        else -> Triple("–", Muted, localizedStringResource(SR.setup_not_set_optional))
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_new_episodes">New episodes</string>
+    <string name="app_new_episodes_notification">%1$d new episodes · Latest: %2$s</string>
+</resources>

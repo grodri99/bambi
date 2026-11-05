@@ -1,7 +1,8 @@
 package com.shieldstream.tv.details
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.domain.SourceProvider
-import com.shieldstream.tv.model.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -69,6 +70,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.Episode
+import com.shieldstream.tv.strings.localizedCode
+import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
@@ -272,14 +275,15 @@ private fun InfoBlock(
             Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
         }
         details.nextEpisode?.let { next ->
-            val release = remember(next) {
-                listOf(next.code, next.title, formatEpisodeDate(next.airDate, includeYear = true))
+            val nextCode = next.localizedCode()
+            val release = remember(next, nextCode) {
+                listOf(nextCode, next.title, formatEpisodeDate(next.airDate, includeYear = true))
                     .filter { it.isNotBlank() }
                     .joinToString(" · ")
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = tr("Próximamente: $release", "Coming soon: $release"),
+                text = localizedStringResource(StringsR.string.details_coming_soon, release),
                 color = Color.White,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 2,
@@ -303,11 +307,11 @@ private fun InfoBlock(
         ) {
             val progress = state.mainProgress
             val resumable = progress?.isResumable == true
-            val episodeCode = state.selectedEpisode?.takeIf { state.isSeries }?.let { " ${it.code}" }.orEmpty()
+            val episodeCode = state.selectedEpisode?.takeIf { state.isSeries }?.let { " ${it.localizedCode()}" }.orEmpty()
             val playLabel = when {
-                state.pendingPlay -> tr("Preparando…", "Preparing…")
-                resumable -> tr("Reanudar$episodeCode", "Resume$episodeCode")
-                else -> tr("Reproducir$episodeCode", "Play$episodeCode")
+                state.pendingPlay -> localizedStringResource(StringsR.string.details_preparing)
+                resumable -> localizedStringResource(StringsR.string.details_resume_episode, episodeCode)
+                else -> localizedStringResource(StringsR.string.details_play_episode, episodeCode)
             }
             TvButton(
                 text = playLabel,
@@ -318,13 +322,13 @@ private fun InfoBlock(
             )
             if (resumable && !state.pendingPlay) {
                 TvButton(
-                    text = tr("Desde el principio", "From the beginning"),
+                    text = localizedStringResource(StringsR.string.details_from_the_beginning),
                     onClick = onPlayFromStart,
                     enabled = interactive,
                 )
             }
             TvButton(
-                text = tr("Fuentes", "Sources"),
+                text = localizedStringResource(StringsR.string.details_sources),
                 icon = AppIcons.List,
                 onClick = onOpenSources,
                 enabled = interactive,
@@ -333,11 +337,11 @@ private fun InfoBlock(
                 val season = state.selectedSeason
                 val eps = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
                 if (season != null && eps.isNotEmpty()) {
-                    if (eps.all { state.progressOf(it)?.isWatched == true }) tr("T$season vista", "S$season watched")
-                    else tr("Marcar T$season vista", "Mark S$season watched")
+                    if (eps.all { state.progressOf(it)?.isWatched == true }) localizedStringResource(StringsR.string.details_season_watched, season)
+                    else localizedStringResource(StringsR.string.details_mark_season_watched, season)
                 } else null
             } else {
-                if (state.mainProgress?.isWatched == true) tr("Vista", "Watched") else tr("Marcar vista", "Mark watched")
+                if (state.mainProgress?.isWatched == true) localizedStringResource(StringsR.string.details_watched) else localizedStringResource(StringsR.string.details_mark_watched)
             }
             if (watchedLabel != null && !state.pendingPlay) {
                 val done = if (state.isSeries) {
@@ -356,14 +360,14 @@ private fun InfoBlock(
             }
             if (!state.pendingPlay) {
                 TvButton(
-                    text = if (state.inMyList) tr("En mi lista", "In my list") else tr("Mi lista", "My list"),
+                    text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
                     icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
                     onClick = onToggleMyList,
                     enabled = interactive,
                 )
                 if (state.isSeries) {
                     TvButton(
-                        text = if (state.following) tr("Siguiendo", "Following") else tr("Seguir", "Follow"),
+                        text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
                         icon = if (state.following) AppIcons.Check else AppIcons.Add,
                         onClick = onToggleFollowing,
                         enabled = interactive,
@@ -378,9 +382,9 @@ private fun InfoBlock(
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text = buildString {
-                        state.selectedEpisode?.takeIf { state.isSeries }?.let { append(it.code).append(" · ") }
+                        state.selectedEpisode?.takeIf { state.isSeries }?.let { append(it.localizedCode()).append(" · ") }
                         val left = formatRuntime(((p.remainingMs + 59_999) / 60_000).toInt())
-                        append(tr("Quedan $left", "$left left"))
+                        append(localizedStringResource(StringsR.string.details_remaining, left))
                     },
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
@@ -398,7 +402,7 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         item.rating?.takeIf { it > 0f }?.let {
             Text(
-                text = tr("${(it * 10).toInt()}% valoración", "${(it * 10).toInt()}% rating"),
+                text = localizedStringResource(StringsR.string.details_rating, (it * 10).toInt()),
                 color = Green,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             )
@@ -410,7 +414,7 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
         }
         val duration = when {
             state.isSeries && details.seasons.isNotEmpty() ->
-                if (details.seasons.size == 1) tr("1 temporada", "1 season") else tr("${details.seasons.size} temporadas", "${details.seasons.size} seasons")
+                if (details.seasons.size == 1) localizedStringResource(StringsR.string.details_1_season) else localizedStringResource(StringsR.string.details_season_count, details.seasons.size)
             else -> details.runtimeMinutes?.let { formatRuntime(it) }
         }
         duration?.let {
@@ -442,23 +446,23 @@ private fun Badge(text: String) {
 @Composable
 private fun SourcesStatus(state: DetailsUiState.Content) {
     val text = state.message ?: when (val s = state.sources) {
-        SourcesState.Idle -> if (state.isSeries) tr("Elige un episodio o pulsa Reproducir · mantén OK en un episodio para marcarlo visto", "Pick an episode or press Play · hold OK on an episode to mark it watched") else ""
-        SourcesState.Loading -> tr("Buscando fuentes…", "Finding sources…")
+        SourcesState.Idle -> if (state.isSeries) localizedStringResource(StringsR.string.details_pick_an_episode_or_press_play_hold) else ""
+        SourcesState.Loading -> localizedStringResource(StringsR.string.details_finding_sources)
         is SourcesState.Error -> s.message
         is SourcesState.Ready -> {
             val sources = s.sources.filter { !state.spanishOnly || it.advertisesSpanishAudio }
             val cached = sources.count { it.isCached }
-            val scope = state.selectedEpisode?.takeIf { state.isSeries }?.let { tr(" para ${it.code}", " for ${it.code}") }.orEmpty()
+            val scope = state.selectedEpisode?.takeIf { state.isSeries }?.let { localizedStringResource(StringsR.string.details_for_episode, it.localizedCode()) }.orEmpty()
             when {
-                sources.isEmpty() && s.pending.isNotEmpty() -> tr("Buscando fuentes…", "Finding sources…")
-                sources.isEmpty() && state.spanishOnly -> tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
-                sources.isEmpty() -> tr("Sin fuentes$scope", "No sources$scope")
+                sources.isEmpty() && s.pending.isNotEmpty() -> localizedStringResource(StringsR.string.details_finding_sources)
+                sources.isEmpty() && state.spanishOnly -> localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile)
+                sources.isEmpty() -> localizedStringResource(StringsR.string.details_no_sources_for, scope)
                 cached > 0 -> {
                     val service = sources.firstNotNullOfOrNull { it.debrid }
-                    val where = if (service == null) tr("ya en tu Real-Debrid", "already in your Real-Debrid") else tr("en la caché de $service", "cached on $service")
-                    tr("${sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope · $cached $where ⚡", "${sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope · $cached $where ⚡")
+                    val where = if (service == null) localizedStringResource(StringsR.string.details_already_in_your_real_debrid) else localizedStringResource(StringsR.string.details_cached_on, service)
+                    localizedStringResource(StringsR.string.details_sources_summary, sources.distinctBy { it.infoHash.lowercase() }.size, scope, cached, where)
                 }
-                else -> tr("${sources.distinctBy { it.infoHash.lowercase() }.size} fuentes$scope", "${sources.distinctBy { it.infoHash.lowercase() }.size} sources$scope")
+                else -> localizedStringResource(StringsR.string.details_sources_count_for, sources.distinctBy { it.infoHash.lowercase() }.size, scope)
             }
         }
     }
@@ -485,7 +489,7 @@ private fun SeasonsAndEpisodes(
                 ) {
                     items(seasons, key = { it.number }) { season ->
                         SeasonChip(
-                            label = tr("Temporada ${season.number}", "Season ${season.number}"),
+                            label = localizedStringResource(StringsR.string.details_season_number, season.number),
                             selected = season.number == state.selectedSeason,
                             enabled = interactive,
                             onClick = { onSeason(season.number) },
@@ -496,7 +500,7 @@ private fun SeasonsAndEpisodes(
             Spacer(Modifier.height(10.dp))
         } else {
             Text(
-                text = tr("Episodios", "Episodes"),
+                text = localizedStringResource(StringsR.string.details_episodes),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.padding(start = 56.dp, bottom = 10.dp),
@@ -506,7 +510,7 @@ private fun SeasonsAndEpisodes(
         if (loadedEpisodes.isNotEmpty()) {
             val watched = loadedEpisodes.count { state.progressOf(it)?.isWatched == true }
             Text(
-                text = tr("$watched / ${loadedEpisodes.size} episodios vistos", "$watched / ${loadedEpisodes.size} episodes watched"),
+                text = localizedStringResource(StringsR.string.details_watched_count, watched, loadedEpisodes.size),
                 color = Grey,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(start = 56.dp),
@@ -515,7 +519,7 @@ private fun SeasonsAndEpisodes(
         }
 
         when (val eps = state.episodes) {
-            EpisodesState.Loading -> Text(tr("Cargando episodios…", "Loading episodes…"), color = Grey, modifier = Modifier.padding(start = 56.dp))
+            EpisodesState.Loading -> Text(localizedStringResource(StringsR.string.details_loading_episodes), color = Grey, modifier = Modifier.padding(start = 56.dp))
             is EpisodesState.Error -> Text(eps.message, color = Grey, modifier = Modifier.padding(start = 56.dp))
             is EpisodesState.Ready -> ProvidePivotScroll(leading = 56.dp) {
                 LazyRow(
@@ -659,10 +663,10 @@ private fun SourcesPanel(
 ) {
     val firstRequester = remember { FocusRequester() }
     val sources = (state.sources as? SourcesState.Ready)?.sources.orEmpty()
-    val order = SourceProvider.entries.map { it.section }.distinct()
+    val order = SourceProvider.entries.map { localizedStringResource(it.sectionResource) }.distinct()
     val pending = (state.sources as? SourcesState.Ready)?.pending.orEmpty()
     val unavailable = (state.sources as? SourcesState.Ready)?.unavailable.orEmpty() +
-        pending.associateWith { tr("Buscando…", "Searching…") }
+        pending.associateWith { localizedStringResource(StringsR.string.details_searching) }
     val spanishFirst = state.spanishFirst
     val spanishOnly = state.spanishOnly
     val groups = remember(sources, unavailable, spanishFirst, spanishOnly) {
@@ -700,7 +704,7 @@ private fun SourcesPanel(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = tr("Elegir fuente", "Choose a source"),
+                    text = localizedStringResource(StringsR.string.details_choose_a_source),
                     color = Color.White,
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.weight(1f),
@@ -708,17 +712,17 @@ private fun SourcesPanel(
                 SpanishOnlyChip(enabled = spanishOnly, onClick = onToggleSpanishOnly)
             }
             state.selectedEpisode?.takeIf { state.isSeries }?.let {
-                Text("${it.code} · ${it.title}", color = Grey, style = MaterialTheme.typography.bodyMedium)
+                Text("${it.localizedCode()} · ${it.title}", color = Grey, style = MaterialTheme.typography.bodyMedium)
             }
             Spacer(Modifier.height(16.dp))
             when (val s = state.sources) {
-                SourcesState.Idle -> Text(tr("Elige un episodio primero", "Pick an episode first"), color = Grey)
-                SourcesState.Loading -> Text(tr("Buscando fuentes…", "Finding sources…"), color = Grey)
+                SourcesState.Idle -> Text(localizedStringResource(StringsR.string.details_pick_an_episode_first), color = Grey)
+                SourcesState.Loading -> Text(localizedStringResource(StringsR.string.details_finding_sources), color = Grey)
                 is SourcesState.Error -> Text(s.message, color = Grey)
                 is SourcesState.Ready -> if (groups.all { it.second.isEmpty() } && s.pending.isEmpty()) {
                     Text(
-                        if (spanishOnly) tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
-                        else tr("No hay fuentes", "No sources"),
+                        if (spanishOnly) localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile)
+                        else localizedStringResource(StringsR.string.details_no_sources),
                         color = Grey,
                     )
                 } else {
@@ -734,7 +738,7 @@ private fun SourcesPanel(
                                     cached = list.count { it.isCached },
                                     expanded = name in open,
                                     note = unavailable[name].takeIf { list.isEmpty() }
-                                        ?: tr("Ninguna en español", "None in Spanish").takeIf { list.isEmpty() && spanishOnly },
+                                        ?: localizedStringResource(StringsR.string.details_none_in_spanish).takeIf { list.isEmpty() && spanishOnly },
                                     onClick = { if (list.isNotEmpty()) open = if (name in open) open - name else open + name },
                                     modifier = if (index == 0) Modifier.focusRequester(firstRequester) else Modifier,
                                 )
@@ -754,7 +758,7 @@ private fun SourcesPanel(
 private fun SpanishOnlyChip(enabled: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Text(
-        text = if (enabled) "✓ " + tr("Solo en español", "Spanish only") else tr("Solo en español", "Spanish only"),
+        text = if (enabled) "✓ " + localizedStringResource(StringsR.string.details_spanish_only) else localizedStringResource(StringsR.string.details_spanish_only),
         color = if (focused) Color.Black else Color.White,
         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         modifier = Modifier
@@ -788,7 +792,7 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
         Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
         Text(
             note ?: buildString {
-                append(tr("$count fuentes", "$count sources"))
+                append(localizedStringResource(StringsR.string.details_source_count, count))
                 if (cached > 0) append(" · $cached ⚡")
             },
             color = if (focused) Color.Black.copy(alpha = 0.7f) else Grey,
@@ -818,7 +822,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
         }
         val sub = if (focused) Color.Black.copy(alpha = 0.7f) else Grey.copy(alpha = if (blocked) 0.5f else 1f)
         Box(Modifier.width(26.dp)) {
-            if (source.isCached) Icon(AppIcons.Bolt, contentDescription = tr("En tu Real-Debrid", "In your Real-Debrid"), tint = if (focused) Color(0xFF0A8F3C) else Green)
+            if (source.isCached) Icon(AppIcons.Bolt, contentDescription = localizedStringResource(StringsR.string.details_in_your_real_debrid), tint = if (focused) Color(0xFF0A8F3C) else Green)
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -837,7 +841,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
                         }
                         if (blocked) {
                             if (isNotEmpty()) append(" · ")
-                            append(tr("Bloqueada por Real-Debrid", "Blocked by Real-Debrid"))
+                            append(localizedStringResource(StringsR.string.details_blocked_by_real_debrid))
                         }
                     },
                     color = fg,

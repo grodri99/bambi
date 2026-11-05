@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.shieldstream.tv.model.Category
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.localizedTitle
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
@@ -68,13 +70,10 @@ internal fun HomeCategoriesDialog(
                 .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
                 .padding(28.dp),
         ) {
-            Text(tr("Categorías del Inicio", "Home categories"), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(localizedStringResource(StringsR.string.settings_home_categories), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                tr(
-                    "OK muestra u oculta cada una. Atrás para terminar. Siempre queda al menos una.",
-                    "OK shows or hides each one. Back when you're done. At least one always stays.",
-                ),
+                localizedStringResource(StringsR.string.settings_ok_shows_or_hides_each_one_back),
                 color = Dim,
                 fontSize = 16.sp,
             )
@@ -97,8 +96,8 @@ internal fun HomeCategoriesDialog(
             }
             Spacer(Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                DialogButton(tr("Mostrar todas", "Show all"), onShowAll)
-                DialogButton(tr("Listo", "Done"), onClose)
+                DialogButton(localizedStringResource(StringsR.string.settings_show_all), onShowAll)
+                DialogButton(localizedStringResource(StringsR.string.settings_done), onClose)
             }
         }
     }
@@ -132,7 +131,7 @@ private fun CategoryToggle(category: Category, shown: Boolean, onClick: () -> Un
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            category.title,
+            category.localizedTitle(),
             color = if (shown) Color.White else Dim,
             fontSize = 16.sp,
             maxLines = 1,

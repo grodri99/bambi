@@ -1,6 +1,6 @@
 package com.shieldstream.tv.details
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
@@ -22,6 +22,8 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.PlaybackMedia
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.episodeCode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +97,7 @@ class DetailsViewModel @Inject constructor(
     private val trakt: TraktRepository,
     private val myList: MyListRepository,
     private val tracking: EpisodeTrackingRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
@@ -205,7 +208,7 @@ class DetailsViewModel @Inject constructor(
     private fun load() {
         val item = holder.selectedItem.value
         if (item == null) {
-            _uiState.value = DetailsUiState.Error(tr("No hay título seleccionado", "No title selected"))
+            _uiState.value = DetailsUiState.Error(texts.get(StringsR.string.details_no_title_selected))
             return
         }
         viewModelScope.launch {
@@ -226,7 +229,7 @@ class DetailsViewModel @Inject constructor(
                 if (season != null) {
                     selectSeason(season, preferredEpisode = episode, playImmediately = playImmediately)
                 } else {
-                    updateContent { it.copy(episodes = EpisodesState.Error(tr("Sin temporadas disponibles", "No seasons available"))) }
+                    updateContent { it.copy(episodes = EpisodesState.Error(texts.get(StringsR.string.details_no_seasons_available))) }
                 }
             } else {
                 if (playImmediately) play() else loadSources(episode = null)
@@ -358,9 +361,9 @@ class DetailsViewModel @Inject constructor(
         val eps = (c.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
         val index = eps.indexOfFirst { it.season == episode.season && it.number == episode.number }
         val show = c.details.item.id
-        eps.getOrNull(index + 1)?.takeIf { index >= 0 }?.let { return NextEpisode(show, it.season, it.number, "${it.code} · ${it.title}") }
+        eps.getOrNull(index + 1)?.takeIf { index >= 0 }?.let { return NextEpisode(show, it.season, it.number, "${texts.episodeCode(it)} · ${it.title}") }
         val nextSeason = c.details.seasons.map { it.number }.filter { it > episode.season }.minOrNull() ?: return null
-        return NextEpisode(show, nextSeason, 1, tr("T$nextSeason:E1", "S$nextSeason:E1"))
+        return NextEpisode(show, nextSeason, 1, texts.get(StringsR.string.details_next_episode_label, nextSeason))
     }
 
     fun onScreenHidden() {
@@ -401,7 +404,7 @@ class DetailsViewModel @Inject constructor(
                 .catch { e ->
                     updateContent {
                         it.copy(
-                            sources = SourcesState.Error(tr("No se pudieron cargar las fuentes: ${e.message ?: e.javaClass.simpleName}", "Couldn't load sources: ${e.message ?: e.javaClass.simpleName}")),
+                            sources = SourcesState.Error(texts.get(StringsR.string.details_sources_load_error, e.message ?: e.javaClass.simpleName)),
                             pendingPlay = false,
                         )
                     }
@@ -428,14 +431,14 @@ class DetailsViewModel @Inject constructor(
         if (queue.isEmpty()) {
             updateContent {
                 it.copy(message = if (c.spanishOnly)
-                    tr("No hay fuentes en español para este perfil", "No Spanish sources available for this profile")
-                else tr("No hay fuentes disponibles para esto ahora mismo", "No sources available for this right now"))
+                    texts.get(StringsR.string.details_no_spanish_sources_available_for_this_profile_7dd7b1)
+                else texts.get(StringsR.string.details_no_sources_available_for_this_right_now))
             }
             return
         }
         val item = c.details.item
         val episode = c.selectedEpisode?.takeIf { c.isSeries }
-        val label = episode?.let { "${item.title} · ${it.code} · ${it.title}" } ?: item.title
+        val label = episode?.let { "${item.title} · ${texts.episodeCode(it)} · ${it.title}" } ?: item.title
         val key = if (episode != null) {
             WatchProgress.episodeKey(item.id, episode.season, episode.number)
         } else {

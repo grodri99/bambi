@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ProfileAvatars
 import com.shieldstream.tv.model.SubtitlePreference
-import com.shieldstream.tv.model.tr
 import com.shieldstream.tv.settings.HomeCategoriesDialog
 import com.shieldstream.tv.ui.component.ProfileAvatar
 import com.shieldstream.tv.ui.component.TvButton
@@ -97,7 +98,7 @@ fun ProfileEditScreen(
                 .padding(horizontal = 72.dp, vertical = 24.dp),
         ) {
             Text(
-                if (editing.isNew) tr("Añadir perfil", "Add profile") else tr("Editar perfil", "Edit profile"),
+                if (editing.isNew) localizedStringResource(StringsR.string.settings_add_profile) else localizedStringResource(StringsR.string.settings_edit_profile),
                 color = Color.White,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
@@ -113,7 +114,7 @@ fun ProfileEditScreen(
                         modifier = Modifier.focusRequester(nameRequester),
                     )
                     Spacer(Modifier.height(20.dp))
-                    Text(tr("Color", "Color"), color = ProfileMuted, fontSize = 16.sp)
+                    Text(localizedStringResource(StringsR.string.settings_color), color = ProfileMuted, fontSize = 16.sp)
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         ProfileAvatars.colors.indices.forEach { index ->
@@ -133,30 +134,30 @@ fun ProfileEditScreen(
                         onFocusLost = viewModel::cancelConfirmations,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text(tr("Audio de este perfil", "Audio for this profile"), color = ProfileMuted, fontSize = 16.sp)
+                    Text(localizedStringResource(StringsR.string.settings_audio_for_this_profile), color = ProfileMuted, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OptionChip(
-                            text = if (profile.spanishOnlySources) tr("Solo en español: Sí", "Spanish only: On") else tr("Solo en español: No", "Spanish only: Off"),
+                            text = if (profile.spanishOnlySources) localizedStringResource(StringsR.string.settings_spanish_only_on) else localizedStringResource(StringsR.string.settings_spanish_only_off),
                             highlighted = profile.spanishOnlySources,
                             onClick = { viewModel.setSpanishOnly(!profile.spanishOnlySources) },
                         )
                         OptionChip(
-                            text = if (profile.spanishFirst || profile.spanishOnlySources) tr("Español primero: Sí", "Spanish first: On") else tr("Español primero: No", "Spanish first: Off"),
+                            text = if (profile.spanishFirst || profile.spanishOnlySources) localizedStringResource(StringsR.string.settings_spanish_first_on) else localizedStringResource(StringsR.string.settings_spanish_first_off),
                             highlighted = profile.spanishFirst || profile.spanishOnlySources,
                             onClick = { if (!profile.spanishOnlySources) viewModel.setSpanishFirst(!profile.spanishFirst) },
                         )
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text(tr("Subtítulos por defecto", "Default subtitles"), color = ProfileMuted, fontSize = 16.sp)
+                    Text(localizedStringResource(StringsR.string.settings_default_subtitles), color = ProfileMuted, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         SubtitlePreference.entries.forEach { preference ->
                             OptionChip(
                                 text = when (preference) {
-                                    SubtitlePreference.OFF -> tr("Desactivados", "Off")
-                                    SubtitlePreference.SPANISH -> tr("Español", "Spanish")
-                                    SubtitlePreference.ENGLISH -> tr("Inglés", "English")
+                                    SubtitlePreference.OFF -> localizedStringResource(StringsR.string.settings_off)
+                                    SubtitlePreference.SPANISH -> localizedStringResource(StringsR.string.settings_spanish)
+                                    SubtitlePreference.ENGLISH -> localizedStringResource(StringsR.string.settings_english)
                                 },
                                 highlighted = profile.subtitlePreference == preference,
                                 onClick = { viewModel.setSubtitlePreference(preference) },
@@ -164,10 +165,7 @@ fun ProfileEditScreen(
                         }
                     }
                     Text(
-                        tr(
-                            "Si el archivo no trae el idioma elegido, Bambi busca y selecciona subtítulos externos.",
-                            "If the file has no subtitles in the chosen language, Bambi finds and selects external subtitles.",
-                        ),
+                        localizedStringResource(StringsR.string.settings_if_the_file_has_no_subtitles_in),
                         color = ProfileMuted,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(top = 6.dp),
@@ -175,16 +173,16 @@ fun ProfileEditScreen(
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OptionChip(
-                            text = if (profile.kids) tr("Perfil infantil: Sí", "Kids profile: On") else tr("Perfil infantil: No", "Kids profile: Off"),
+                            text = if (profile.kids) localizedStringResource(StringsR.string.settings_kids_profile_on) else localizedStringResource(StringsR.string.settings_kids_profile_off),
                             highlighted = profile.kids,
                             onClick = { viewModel.setKids(!profile.kids) },
                             modifier = Modifier.focusProperties { down = saveRequester },
                         )
                         OptionChip(
                             text = when {
-                                !profile.locked -> tr("Poner PIN", "Set PIN")
-                                editing.confirmRemovePin -> tr("Pulsa otra vez para quitar el PIN", "Press again to remove the PIN")
-                                else -> tr("PIN puesto · OK para quitarlo", "PIN set · OK to remove")
+                                !profile.locked -> localizedStringResource(StringsR.string.settings_set_pin)
+                                editing.confirmRemovePin -> localizedStringResource(StringsR.string.settings_press_again_to_remove_the_pin)
+                                else -> localizedStringResource(StringsR.string.settings_pin_set_ok_to_remove)
                             },
                             highlighted = profile.locked,
                             onClick = {
@@ -200,9 +198,10 @@ fun ProfileEditScreen(
                             modifier = Modifier.focusProperties { down = saveRequester },
                         )
                         OptionChip(
-                            text = tr(
-                                "Categorías: ${Category.entries.count { it.name !in profile.hiddenCategories }}/${Category.entries.size}",
-                                "Categories: ${Category.entries.count { it.name !in profile.hiddenCategories }}/${Category.entries.size}",
+                            text = localizedStringResource(
+                                StringsR.string.settings_profile_categories,
+                                Category.entries.count { it.name !in profile.hiddenCategories },
+                                Category.entries.size,
                             ),
                             highlighted = profile.hiddenCategories.isNotEmpty(),
                             onClick = { choosingCategories = true },
@@ -217,7 +216,7 @@ fun ProfileEditScreen(
                 modifier = Modifier.padding(start = 186.dp),
             ) {
                 TvButton(
-                    text = tr("Guardar", "Save"),
+                    text = localizedStringResource(StringsR.string.settings_save),
                     onClick = {
                         viewModel.save()
                         onDone()
@@ -227,23 +226,25 @@ fun ProfileEditScreen(
                 if (editing.canDelete) {
                     TvButton(
                         text = if (editing.confirmDelete) {
-                            tr("Pulsa otra vez para eliminar", "Press again to delete")
+                            localizedStringResource(StringsR.string.settings_press_again_to_delete)
                         } else {
-                            tr("Eliminar perfil", "Delete profile")
+                            localizedStringResource(StringsR.string.settings_delete_profile)
                         },
                         onClick = { if (viewModel.delete()) onDone() },
                         modifier = Modifier.onFocusChanged { if (!it.isFocused) viewModel.cancelConfirmations() },
                     )
                 }
-                TvButton(text = tr("Cancelar", "Cancel"), onClick = onDone)
+                TvButton(text = localizedStringResource(StringsR.string.settings_cancel), onClick = onDone)
             }
         }
     }
 
     if (creatingPin) {
+        val profileName = profile.name.ifBlank { localizedStringResource(StringsR.string.settings_this_profile) }
+        val pinMismatchMessage = localizedStringResource(StringsR.string.settings_they_don_t_match_enter_the_new)
         PinDialog(
-            title = if (firstPin == null) tr("Nuevo PIN", "New PIN") else tr("Repite el PIN", "Repeat the PIN"),
-            subtitle = tr("4 cifras para entrar en ${profile.name.ifBlank { "este perfil" }}", "4 digits to open ${profile.name.ifBlank { "this profile" }}"),
+            title = if (firstPin == null) localizedStringResource(StringsR.string.settings_new_pin) else localizedStringResource(StringsR.string.settings_repeat_the_pin),
+            subtitle = localizedStringResource(StringsR.string.settings_pin_digits_for, profileName),
             error = pinError,
             onPin = { pin ->
                 val first = firstPin
@@ -259,7 +260,7 @@ fun ProfileEditScreen(
                     }
                     else -> {
                         firstPin = null
-                        pinError = tr("No coinciden: escribe el PIN nuevo otra vez", "They don't match: enter the new PIN again")
+                        pinError = pinMismatchMessage
                     }
                 }
             },
@@ -337,7 +338,7 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        if (focused) tr("Pulsa OK para escribir el nombre", "Press OK to type the name") else tr("Nombre", "Name"),
+                        if (focused) localizedStringResource(StringsR.string.settings_press_ok_to_type_the_name) else localizedStringResource(StringsR.string.settings_name),
                         fontSize = 22.sp,
                         color = Color.White.copy(alpha = 0.35f),
                     )
@@ -380,14 +381,14 @@ private fun TraktCard(
     var focused by remember { mutableStateOf(false) }
     val user = state.profile.traktUser
     val (title, subtitle) = when {
-        !state.traktAvailable -> tr("Trakt no disponible", "Trakt not available") to
-            tr("Esta versión de Bambi no tiene traktClientId.", "This build of Bambi has no traktClientId.")
-        user != null && state.confirmDisconnect -> tr("¿Desconectar Trakt?", "Disconnect Trakt?") to
-            tr("Pulsa OK otra vez para desconectar @$user", "Press OK again to disconnect @$user")
-        user != null -> tr("Trakt: conectado como @$user", "Trakt: connected as @$user") to
-            tr("\"Seguir viendo\" y lo que has visto se sincronizan entre tus Shields.", "\"Continue watching\" and your history sync across your Shields.")
-        else -> tr("Conectar con Trakt", "Connect Trakt") to
-            tr("Sincroniza \"Seguir viendo\" y lo que has visto entre tus Shields.", "Sync \"Continue watching\" and your history across your Shields.")
+        !state.traktAvailable -> localizedStringResource(StringsR.string.settings_trakt_not_available) to
+            localizedStringResource(StringsR.string.settings_this_build_of_bambi_has_no_traktclientid)
+        user != null && state.confirmDisconnect -> localizedStringResource(StringsR.string.settings_disconnect_trakt) to
+            localizedStringResource(StringsR.string.settings_trakt_disconnect_user, user)
+        user != null -> localizedStringResource(StringsR.string.settings_trakt_connected_user, user) to
+            localizedStringResource(StringsR.string.settings_continue_watching_and_your_history_sync_across)
+        else -> localizedStringResource(StringsR.string.settings_connect_trakt) to
+            localizedStringResource(StringsR.string.settings_sync_continue_watching_and_your_history_across)
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,

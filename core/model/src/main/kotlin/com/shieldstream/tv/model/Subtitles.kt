@@ -35,15 +35,5 @@ data class SubtitleFile(
 )
 
 object SubtitleLanguages {
-    val all: List<Pair<String, String>> = listOf(
-        "es" to tr("Español", "Spanish"),
-        "en" to tr("Inglés", "English"),
-        "ca" to tr("Catalán", "Catalan"),
-        "fr" to tr("Francés", "French"),
-        "it" to tr("Italiano", "Italian"),
-        "pt" to tr("Portugués", "Portuguese"),
-        "de" to tr("Alemán", "German"),
-    )
-
-    fun label(code: String): String = all.firstOrNull { it.first == code }?.second ?: code.uppercase()
+    val all: List<String> = listOf("es", "en", "ca", "fr", "it", "pt", "de")
 }

@@ -90,6 +90,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:strings"))
     implementation(project(":core:domain"))
     implementation(project(":core:network"))
     implementation(project(":core:data"))

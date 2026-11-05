@@ -1,6 +1,8 @@
 package com.shieldstream.tv.ui.component
 
-import com.shieldstream.tv.model.tr
+import androidx.annotation.StringRes
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.R as StringsR
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Spacer
@@ -37,14 +39,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-enum class TopTab(val label: String) {
-    SEARCH(tr("Buscar", "Search")),
-    HOME(tr("Inicio", "Home")),
-    EPISODES(tr("Episodios", "Episodes")),
-    TV(tr("Series", "TV Shows")),
-    MOVIES(tr("Películas", "Movies")),
-    MY_LIST(tr("Mi lista", "My list")),
+enum class TopTab {
+    SEARCH,
+    HOME,
+    EPISODES,
+    TV,
+    MOVIES,
+    MY_LIST,
 }
+
+@get:StringRes
+private val TopTab.labelResource: Int
+    get() = when (this) {
+        TopTab.SEARCH -> StringsR.string.common_search
+        TopTab.HOME -> StringsR.string.common_home
+        TopTab.EPISODES -> StringsR.string.common_episodes
+        TopTab.TV -> StringsR.string.common_tv_shows
+        TopTab.MOVIES -> StringsR.string.common_movies
+        TopTab.MY_LIST -> StringsR.string.common_my_list
+    }
 
 @Composable
 fun TopBar(
@@ -87,7 +100,7 @@ fun TopBar(
             TopTab.entries.forEach { tab ->
                 TopBarItem(
                     icon = if (tab == TopTab.SEARCH) AppIcons.Search else null,
-                    label = if (tab == TopTab.SEARCH) null else tab.label,
+                    label = if (tab == TopTab.SEARCH) null else localizedStringResource(tab.labelResource),
                     selected = tab == selected,
                     badgeCount = if (tab == TopTab.EPISODES) newEpisodeCount else 0,
                     onClick = { onSelect(tab) },

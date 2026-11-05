@@ -1,7 +1,8 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -59,6 +60,8 @@ import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.FeaturedBadge
+import com.shieldstream.tv.strings.localizedLabel
+import com.shieldstream.tv.strings.localizedTitle
 import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.ui.component.AppIcons
@@ -210,7 +213,7 @@ private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean) {
                 if (focused) {
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        text = tr("◀  ▶   Explorar", "◀  ▶   Browse"),
+                        text = localizedStringResource(StringsR.string.home_browse),
                         color = Color.White.copy(alpha = 0.65f),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -236,7 +239,7 @@ private fun MoreInfoAction(focused: Boolean) {
         Icon(AppIcons.List, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            text = tr("Más información", "More info"),
+            text = localizedStringResource(StringsR.string.home_more_info),
             color = content,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         )
@@ -247,7 +250,7 @@ private fun MoreInfoAction(focused: Boolean) {
 private fun MetaLine(featured: FeaturedItem) {
     val item = featured.item
     val text = listOfNotNull(
-        if (item.type == MediaType.TV) tr("Serie", "Series") else tr("Película", "Movie"),
+        if (item.type == MediaType.TV) localizedStringResource(StringsR.string.home_series) else localizedStringResource(StringsR.string.home_movie),
         featured.genre,
         item.year?.toString(),
         featured.durationText,
@@ -302,7 +305,7 @@ private fun BadgeChip(badge: FeaturedBadge, modifier: Modifier = Modifier) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            text = badge.label,
+            text = badge.localizedLabel(),
             color = Color.White,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         )
@@ -408,7 +411,7 @@ private fun CategoryChip(
             .padding(horizontal = 16.dp),
     ) {
         Text(
-            text = category.title,
+            text = category.localizedTitle(),
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             color = if (focused) Color.Black else Color.White.copy(alpha = 0.9f),

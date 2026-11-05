@@ -1,6 +1,7 @@
 package com.shieldstream.tv.ui.component
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.R as StringsR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,7 +101,7 @@ fun Hero(
                 .padding(24.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
         ) {
-            Text(tr("Reproducir", "Play"))
+            Text(localizedStringResource(StringsR.string.common_play))
         }
     }
 }

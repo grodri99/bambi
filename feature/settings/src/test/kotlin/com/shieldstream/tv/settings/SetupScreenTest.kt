@@ -59,11 +59,71 @@ class SetupScreenTest {
     }
 
     @Test
+    fun `welcome renders Spanish text`() {
+        renderStep(SetupStep.WELCOME, AppLanguage.ES)
+
+        composeRule.onNodeWithText("Vamos a dejar Bambi listo").assertExists()
+        composeRule.onNodeWithText("Idioma, audio y subtítulos").assertExists()
+        composeRule.onNodeWithText("Empezar").assertExists()
+        composeRule.onNodeWithText("Más tarde").assertExists()
+    }
+
+    @Test
+    fun `welcome renders English text`() {
+        renderStep(SetupStep.WELCOME, AppLanguage.EN)
+
+        composeRule.onNodeWithText("Let's get Bambi ready").assertExists()
+        composeRule.onNodeWithText("Language, audio & subtitles").assertExists()
+        composeRule.onNodeWithText("Start").assertExists()
+        composeRule.onNodeWithText("Later").assertExists()
+    }
+
+    @Test
+    fun `playback preferences render Spanish text`() {
+        renderStep(SetupStep.PLAYBACK, AppLanguage.ES)
+
+        composeRule.onNodeWithText("PASO 4 DE 4").assertExists()
+        composeRule.onNodeWithText("AUDIO Y SUBTÍTULOS").assertExists()
+        composeRule.onNodeWithText("Idioma de la interfaz").assertExists()
+        composeRule.onNodeWithText("Audio preferido").assertExists()
+        composeRule.onNodeWithText("Subtítulos automáticos").assertExists()
+        composeRule.onNodeWithText("Siguiente").assertExists()
+    }
+
+    @Test
+    fun `playback preferences render English text`() {
+        renderStep(SetupStep.PLAYBACK, AppLanguage.EN)
+
+        composeRule.onNodeWithText("STEP 4 OF 4").assertExists()
+        composeRule.onNodeWithText("AUDIO & SUBTITLES").assertExists()
+        composeRule.onNodeWithText("Interface language").assertExists()
+        composeRule.onNodeWithText("Preferred audio").assertExists()
+        composeRule.onNodeWithText("Automatic subtitles").assertExists()
+        composeRule.onNodeWithText("Next").assertExists()
+    }
+
+    @Test
     fun `done summary shows selected language instead of pre-restart language`() {
+        renderStep(
+            step = SetupStep.DONE,
+            selectedLanguage = AppLanguage.EN,
+            currentLanguage = AppLanguage.ES,
+        )
+
+        composeRule.onNodeWithText("Idioma").assertExists()
+        composeRule.onNodeWithText("English").assertExists()
+    }
+
+    private fun renderStep(
+        step: SetupStep,
+        selectedLanguage: AppLanguage,
+        currentLanguage: AppLanguage = selectedLanguage,
+    ) {
+        Lang.current = currentLanguage
         val viewModel = mockk<SetupViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(
             SetupUiState.Ready(
-                step = SetupStep.DONE,
+                step = step,
                 debrid = DebridService.REAL_DEBRID,
                 keys = mapOf(
                     ApiService.TMDB to "tmdb",
@@ -75,15 +135,12 @@ class SetupScreenTest {
                 error = null,
                 audio = SetupAudioPreference.ORIGINAL,
                 subtitles = SubtitlePreference.OFF,
-                language = AppLanguage.EN,
+                language = selectedLanguage,
             ),
         )
 
         composeRule.setContent {
             SetupScreen(onFinish = {}, onExit = {}, viewModel = viewModel)
         }
-
-        composeRule.onNodeWithText("Idioma").assertExists()
-        composeRule.onNodeWithText("English").assertExists()
     }
 }

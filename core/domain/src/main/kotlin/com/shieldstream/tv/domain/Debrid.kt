@@ -1,6 +1,5 @@
 package com.shieldstream.tv.domain
 
-import com.shieldstream.tv.model.tr
 
 enum class DebridService(
     val title: String,
@@ -35,20 +34,15 @@ interface TorrentioLinkResolver {
     suspend fun resolve(url: String, service: String): DebridLink
 }
 
-enum class SourceProvider(val title: String, val baseUrl: String?, val torrentioStyle: Boolean) {
-    TORRENTIO("Torrentio", "https://torrentio.strem.fun", true),
-    PEERFLIX("Peerflix", "https://addon.peerflix.mov", true),
-    KNABEN("Knaben", "https://api.knaben.org", false),
-    THEPIRATEBAY("The Pirate Bay", "https://apibay.org", false),
-    NYAA("Nyaa", "https://nyaa.si", false),
-    COMET("Comet", "https://comet.elfhosted.com", false),
-    AIOSTREAMS(tr("Addon de Stremio", "Stremio addon"), null, false),
+enum class SourceProvider(val baseUrl: String?, val torrentioStyle: Boolean) {
+    TORRENTIO("https://torrentio.strem.fun", true),
+    PEERFLIX("https://addon.peerflix.mov", true),
+    KNABEN("https://api.knaben.org", false),
+    THEPIRATEBAY("https://apibay.org", false),
+    NYAA("https://nyaa.si", false),
+    COMET("https://comet.elfhosted.com", false),
+    AIOSTREAMS(null, false),
     ;
-
-    val section: String get() = when (this) {
-        TORRENTIO, PEERFLIX, COMET, AIOSTREAMS -> title
-        else -> "The Pirate Bay"
-    }
 }
 
 fun enabledSourceProviders(savedProvidersOff: Set<SourceProvider>?): Set<SourceProvider> =

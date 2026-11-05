@@ -1,6 +1,7 @@
 package com.shieldstream.tv.data.repository
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.net.Uri
 import android.util.Log
 import com.shieldstream.tv.domain.DebridLink
@@ -20,11 +21,11 @@ internal fun torrentioConfig(debrid: DebridService, key: String): String = "${de
 internal fun TorrentioStreamDto.isDebridError(): Boolean =
     url?.contains("/videos/") == true && name.contains("error", ignoreCase = true)
 
-internal fun debridErrorMessage(title: String, service: String): String = when {
-    title.contains("expired", ignoreCase = true) -> tr("La suscripción de $service ha caducado o no es válida.", "Your $service subscription has expired or isn't valid.")
-    title.contains("invalid", ignoreCase = true) -> tr("Clave de $service no válida. Revísala en Ajustes.", "Invalid $service key. Check it in Settings.")
-    title.contains("blocked", ignoreCase = true) -> tr("$service ha bloqueado el acceso: revisa tu cuenta o el correo.", "$service has blocked access: check your account or email.")
-    else -> tr("$service no está disponible ahora mismo (según Torrentio). Prueba más tarde.", "$service isn't available right now (according to Torrentio). Try again later.")
+internal fun debridErrorMessage(title: String, service: String, texts: Texts): String = when {
+    title.contains("expired", ignoreCase = true) -> texts.get(StringsR.string.data_subscription_expired, service)
+    title.contains("invalid", ignoreCase = true) -> texts.get(StringsR.string.data_invalid_service_key, service)
+    title.contains("blocked", ignoreCase = true) -> texts.get(StringsR.string.data_service_blocked, service)
+    else -> texts.get(StringsR.string.data_service_unavailable_torrentio, service)
 }
 
 private val HASH = Regex("^[0-9a-fA-F]{40}$")
@@ -40,7 +41,10 @@ internal fun parseResolveUrl(url: String): Pair<String, Int?>? {
 }
 
 @Singleton
-class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : TorrentioLinkResolver {
+class TorrentioLinkResolverImpl @Inject constructor(
+    base: OkHttpClient,
+    private val texts: Texts,
+) : TorrentioLinkResolver {
 
     private val client = base.newBuilder()
         .followRedirects(false)
@@ -63,7 +67,7 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
                         if (type.startsWith("text/") || "json" in type) {
                             val host = Uri.parse(current).host
                             return@withContext DebridLink.Problem(
-                                tr("$host no ha devuelto un vídeo para esta fuente.", "$host didn't return a video for this source."),
+                                texts.get(StringsR.string.data_no_video_for_source, host.toString()),
                                 notCached = false,
                             )
                         }
@@ -71,7 +75,7 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
                     }
                     else -> {
                         return@withContext DebridLink.Problem(
-                        tr("${Uri.parse(current).host} respondió con error ${response.code} al pedir el enlace a $service.", "${Uri.parse(current).host} responded with error ${response.code} when requesting the $service link."),
+                        texts.get(StringsR.string.data_link_http_error, Uri.parse(current).host.toString(), response.code, service),
                         notCached = false,
                     )
                     }
@@ -82,7 +86,7 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
             if (isTorrentio(url) && !isTorrentio(next)) return@withContext DebridLink.Ready(next)
             current = next
         }
-        DebridLink.Problem(tr("Demasiadas redirecciones al pedir el enlace a $service.", "Too many redirects while requesting the $service link."), notCached = false)
+        DebridLink.Problem(texts.get(StringsR.string.data_too_many_redirects, service), notCached = false)
     }
 
     private fun isTorrentio(url: String) = Uri.parse(url).host?.contains("torrentio") == true
@@ -92,22 +96,22 @@ class TorrentioLinkResolverImpl @Inject constructor(base: OkHttpClient) : Torren
         val file = url.substringAfterLast('/')
         return when {
             file.startsWith("downloading") -> DebridLink.Problem(
-                tr("$service ha empezado a descargar esta fuente (no estaba en su caché). Prueba en unos minutos o elige una con ⚡.", "$service has started downloading this source (it wasn't cached). Try again in a few minutes or pick one with ⚡."),
+                texts.get(StringsR.string.data_download_started, service),
                 notCached = true,
             )
-            file.startsWith("download_failed") -> DebridLink.Problem(tr("$service no pudo descargar esta fuente.", "$service couldn't download this source."), notCached = true)
+            file.startsWith("download_failed") -> DebridLink.Problem(texts.get(StringsR.string.data_download_failed, service), notCached = true)
             file.startsWith("failed_access") -> DebridLink.Problem(
-                tr("Clave de $service no válida o suscripción caducada. Revísala en Ajustes.", "Invalid $service key or expired subscription. Check it in Settings."),
+                texts.get(StringsR.string.data_invalid_or_expired_key, service),
                 notCached = false,
             )
-            file.startsWith("failed_rar") -> DebridLink.Problem(tr("Esta fuente viene en RAR y no se puede reproducir.", "This source is packed in a RAR and can't be played."), notCached = true)
-            file.startsWith("failed_too_big") -> DebridLink.Problem(tr("Esta fuente es demasiado grande para $service.", "This source is too big for $service."), notCached = true)
-            file.startsWith("failed_opening") -> DebridLink.Problem(tr("$service no pudo abrir esta fuente.", "$service couldn't open this source."), notCached = true)
-            file.startsWith("failed_infringement") -> DebridLink.Problem(tr("$service ha bloqueado esta fuente por derechos de autor.", "$service blocked this source for copyright reasons."), notCached = true)
-            file.startsWith("limits_exceeded") -> DebridLink.Problem(tr("Has llegado al límite de descargas de $service.", "You've reached your $service download limit."), notCached = false)
-            file.startsWith("blocked_access") -> DebridLink.Problem(tr("$service ha bloqueado el acceso: revisa tu cuenta o el correo.", "$service has blocked access: check your account or email."), notCached = false)
-            file.startsWith("failed_unavailable") -> DebridLink.Problem(tr("$service no está disponible ahora mismo.", "$service isn't available right now."), notCached = false)
-            else -> DebridLink.Problem(tr("Torrentio no pudo conseguir el enlace de $service.", "Torrentio couldn't get the $service link."), notCached = true)
+            file.startsWith("failed_rar") -> DebridLink.Problem(texts.get(StringsR.string.data_this_source_is_packed_in_a_rar), notCached = true)
+            file.startsWith("failed_too_big") -> DebridLink.Problem(texts.get(StringsR.string.data_source_too_big, service), notCached = true)
+            file.startsWith("failed_opening") -> DebridLink.Problem(texts.get(StringsR.string.data_open_source_failed, service), notCached = true)
+            file.startsWith("failed_infringement") -> DebridLink.Problem(texts.get(StringsR.string.data_source_copyright, service), notCached = true)
+            file.startsWith("limits_exceeded") -> DebridLink.Problem(texts.get(StringsR.string.data_download_limit, service), notCached = false)
+            file.startsWith("blocked_access") -> DebridLink.Problem(texts.get(StringsR.string.data_service_blocked, service), notCached = false)
+            file.startsWith("failed_unavailable") -> DebridLink.Problem(texts.get(StringsR.string.data_service_unavailable, service), notCached = false)
+            else -> DebridLink.Problem(texts.get(StringsR.string.data_torrentio_link_failed, service), notCached = true)
         }
     }
 

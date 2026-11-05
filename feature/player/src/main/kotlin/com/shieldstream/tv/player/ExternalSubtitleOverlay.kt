@@ -1,6 +1,8 @@
 package com.shieldstream.tv.player
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
+import com.shieldstream.tv.strings.rememberTexts
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -70,6 +72,7 @@ internal fun ExternalSubtitleOverlay(
 
 @Composable
 internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifier: Modifier = Modifier) {
+    val texts = rememberTexts()
     Column(
         modifier
             .fillMaxWidth()
@@ -78,25 +81,25 @@ internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifie
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = tr("Sincronizar subtítulos", "Sync subtitles"),
+                text = localizedStringResource(StringsR.string.player_sync_subtitles),
                 color = Color.White,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
             Spacer(Modifier.width(24.dp))
             Text(
-                text = timing.describe(),
+                text = timing.describe(texts),
                 color = Color(0xFFE50914),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
         }
-        val statusText = status.describe()
+        val statusText = status.describe(texts)
         if (statusText.isNotBlank()) {
             Spacer(Modifier.height(4.dp))
             Text(statusText, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            text = tr("◀ ▶  ±0,1 s     ▼ ▲  ±1 s     OK  sincronizar automáticamente     Atrás  cerrar", "◀ ▶  ±0.1 s     ▼ ▲  ±1 s     OK  auto-sync     Back  close"),
+            text = localizedStringResource(StringsR.string.player_0_1_s_1_s_ok_auto),
             color = Color.White.copy(alpha = 0.55f),
             style = MaterialTheme.typography.bodySmall,
         )

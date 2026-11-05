@@ -2,7 +2,8 @@ package com.shieldstream.tv.settings
 
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.SubtitlePreference
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.R.string as StringResources
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.ApiKeysRepository
@@ -60,6 +61,7 @@ sealed interface SetupUiState {
 class SetupViewModel @Inject constructor(
     private val apiKeys: ApiKeysRepository,
     private val settings: SettingsRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     private val step = MutableStateFlow(SetupStep.WELCOME)
@@ -140,7 +142,7 @@ class SetupViewModel @Inject constructor(
     fun submitKey(service: ApiService, input: String) {
         val key = input.trim()
         if (key.isEmpty()) {
-            error.value = tr("Escribe la clave primero (pulsa OK sobre el recuadro para abrir el teclado).", "Type the key first (press OK on the box to open the keyboard).")
+            error.value = texts.get(StringResources.setup_key_required)
             return
         }
         if (checking.value) return
@@ -150,7 +152,7 @@ class SetupViewModel @Inject constructor(
             when (val result = apiKeys.check(service, key)) {
                 is KeyCheck.Valid -> {
                     apiKeys.set(service, key)
-                    details.update { it + (service to (result.detail ?: tr("Conectado", "Connected"))) }
+                    details.update { it + (service to (result.detail ?: texts.get(StringResources.setup_connected))) }
                 }
                 is KeyCheck.Invalid -> error.value = result.message
             }

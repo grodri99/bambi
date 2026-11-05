@@ -1,7 +1,8 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import android.content.Context
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
@@ -35,6 +36,7 @@ class HomeExtrasSource @Inject constructor(
     private val tmdb: TmdbApi,
     @ApplicationContext context: Context,
     private val store: TokenStore,
+    private val texts: Texts,
 ) {
     private val key: String get() = store.tmdbKey.orEmpty()
     private val prefs = context.getSharedPreferences("featured", Context.MODE_PRIVATE)
@@ -192,7 +194,7 @@ class HomeExtrasSource @Inject constructor(
             badge = pick.badge,
             logoUrl = pickLogo(d.images),
             genre = d.genres.firstOrNull()?.name,
-            durationText = seasons.takeIf { it > 0 }?.let { if (it == 1) tr("1 temporada", "1 season") else tr("$it temporadas", "$it seasons") },
+            durationText = seasons.takeIf { it > 0 }?.let { if (it == 1) texts.get(StringsR.string.data_1_season) else texts.get(StringsR.string.data_season_count, it) },
             certification = tvCertification(d.content_ratings),
         )
     }
@@ -283,24 +285,24 @@ class HomeExtrasSource @Inject constructor(
 
     private fun acclaimedRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> = when (filter) {
         HomeFilter.ALL -> listOf(
-            tr("Las mejor valoradas", "Top rated") to suspend {
+            texts.get(StringsR.string.data_top_rated) to suspend {
                 mix(movies(Query(), acclaimed(500)), series(Query(), acclaimed(150)))
             },
-            tr("Películas aclamadas", "Acclaimed movies") to suspend { movies(Query(), acclaimed(500), page = 2) },
-            tr("Series aclamadas", "Acclaimed TV shows") to suspend { series(Query(), acclaimed(150), page = 2) },
-            tr("Más joyas por descubrir", "More gems to discover") to suspend {
+            texts.get(StringsR.string.data_acclaimed_movies) to suspend { movies(Query(), acclaimed(500), page = 2) },
+            texts.get(StringsR.string.data_acclaimed_tv_shows) to suspend { series(Query(), acclaimed(150), page = 2) },
+            texts.get(StringsR.string.data_more_gems_to_discover) to suspend {
                 mix(movies(Query(), acclaimed(500), page = 3), series(Query(), acclaimed(150), page = 3))
             },
         )
         HomeFilter.MOVIES -> listOf(
-            tr("Películas aclamadas", "Acclaimed movies") to suspend { movies(Query(), acclaimed(500)) },
-            tr("Más películas aclamadas", "More acclaimed movies") to suspend { movies(Query(), acclaimed(500), page = 2) },
-            tr("Joyas por descubrir", "Gems to discover") to suspend { movies(Query(), acclaimed(500), page = 3) },
+            texts.get(StringsR.string.data_acclaimed_movies) to suspend { movies(Query(), acclaimed(500)) },
+            texts.get(StringsR.string.data_more_acclaimed_movies) to suspend { movies(Query(), acclaimed(500), page = 2) },
+            texts.get(StringsR.string.data_gems_to_discover) to suspend { movies(Query(), acclaimed(500), page = 3) },
         )
         HomeFilter.TV -> listOf(
-            tr("Series aclamadas", "Acclaimed TV shows") to suspend { series(Query(), acclaimed(150)) },
-            tr("Más series aclamadas", "More acclaimed TV shows") to suspend { series(Query(), acclaimed(150), page = 2) },
-            tr("Joyas por descubrir", "Gems to discover") to suspend { series(Query(), acclaimed(150), page = 3) },
+            texts.get(StringsR.string.data_acclaimed_tv_shows) to suspend { series(Query(), acclaimed(150)) },
+            texts.get(StringsR.string.data_more_acclaimed_tv_shows) to suspend { series(Query(), acclaimed(150), page = 2) },
+            texts.get(StringsR.string.data_gems_to_discover) to suspend { series(Query(), acclaimed(150), page = 3) },
         )
     }
 
@@ -311,37 +313,37 @@ class HomeExtrasSource @Inject constructor(
         val rows = ArrayList<Pair<String, suspend () -> List<CatalogItem>>>()
         val today = isoDate(Date())
         if (movie != null && tv != null) {
-            rows += tr("Lo más popular", "Most popular") to suspend { mix(movies(movie, POPULAR), series(tv, POPULAR)) }
-            rows += tr("Películas", "Movies") to suspend { movies(movie, POPULAR, page = 2) }
-            rows += tr("Series", "TV shows") to suspend { series(tv, POPULAR, page = 2) }
-            rows += tr("Las mejor valoradas", "Top rated") to suspend { mix(movies(movie, topRated(500)), series(tv, topRated(150))) }
-            rows += tr("Novedades", "New releases") to suspend { mix(movies(movie, newest(today, movie = true)), series(tv, newest(today, movie = false))) }
-            rows += tr("Más para descubrir", "More to discover") to suspend { mix(movies(movie, POPULAR, page = 3), series(tv, POPULAR, page = 3)) }
+            rows += texts.get(StringsR.string.data_most_popular) to suspend { mix(movies(movie, POPULAR), series(tv, POPULAR)) }
+            rows += texts.get(StringsR.string.data_movies) to suspend { movies(movie, POPULAR, page = 2) }
+            rows += texts.get(StringsR.string.data_tv_shows) to suspend { series(tv, POPULAR, page = 2) }
+            rows += texts.get(StringsR.string.data_top_rated) to suspend { mix(movies(movie, topRated(500)), series(tv, topRated(150))) }
+            rows += texts.get(StringsR.string.data_new_releases) to suspend { mix(movies(movie, newest(today, movie = true)), series(tv, newest(today, movie = false))) }
+            rows += texts.get(StringsR.string.data_more_to_discover) to suspend { mix(movies(movie, POPULAR, page = 3), series(tv, POPULAR, page = 3)) }
         } else if (movie != null) {
-            rows += tr("Lo más popular", "Most popular") to suspend { movies(movie, POPULAR) }
-            rows += tr("Las mejor valoradas", "Top rated") to suspend { movies(movie, topRated(500)) }
-            rows += tr("Novedades", "New releases") to suspend { movies(movie, newest(today, movie = true)) }
-            rows += tr("Más populares", "Most popular") to suspend { movies(movie, POPULAR, page = 2) }
-            rows += tr("Más para descubrir", "More to discover") to suspend { movies(movie, POPULAR, page = 3) }
+            rows += texts.get(StringsR.string.data_most_popular) to suspend { movies(movie, POPULAR) }
+            rows += texts.get(StringsR.string.data_top_rated) to suspend { movies(movie, topRated(500)) }
+            rows += texts.get(StringsR.string.data_new_releases) to suspend { movies(movie, newest(today, movie = true)) }
+            rows += texts.get(StringsR.string.data_most_popular_60061e) to suspend { movies(movie, POPULAR, page = 2) }
+            rows += texts.get(StringsR.string.data_more_to_discover) to suspend { movies(movie, POPULAR, page = 3) }
         } else if (tv != null) {
-            rows += tr("Lo más popular", "Most popular") to suspend { series(tv, POPULAR) }
-            rows += tr("Las mejor valoradas", "Top rated") to suspend { series(tv, topRated(150)) }
-            rows += tr("Novedades", "New releases") to suspend { series(tv, newest(today, movie = false)) }
-            rows += tr("Más populares", "Most popular") to suspend { series(tv, POPULAR, page = 2) }
-            rows += tr("Más para descubrir", "More to discover") to suspend { series(tv, POPULAR, page = 3) }
+            rows += texts.get(StringsR.string.data_most_popular) to suspend { series(tv, POPULAR) }
+            rows += texts.get(StringsR.string.data_top_rated) to suspend { series(tv, topRated(150)) }
+            rows += texts.get(StringsR.string.data_new_releases) to suspend { series(tv, newest(today, movie = false)) }
+            rows += texts.get(StringsR.string.data_most_popular_60061e) to suspend { series(tv, POPULAR, page = 2) }
+            rows += texts.get(StringsR.string.data_more_to_discover) to suspend { series(tv, POPULAR, page = 3) }
         }
         return rows
     }
 
     private fun moodRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> {
         val moods = listOf(
-            Triple(tr("Para reír", "For a laugh"), Query("35"), Query("35")),
-            Triple(tr("Para emocionarse", "Feel the emotion"), Query("18,10749"), Query("18")),
-            Triple(tr("Con el corazón en un puño", "On the edge of your seat"), Query("53"), Query("9648|80")),
-            Triple(tr("Para pasar miedo", "For a scare"), Query("27"), Query("9648,10765")),
-            Triple(tr("Para desconectar", "To unwind"), Query("16|10751"), Query("16|10751")),
-            Triple(tr("Para soñar despierto", "To daydream"), Query("14|12"), Query("10765")),
-            Triple(tr("Para pensar", "Food for thought"), Query("99|36"), Query("99")),
+            Triple(texts.get(StringsR.string.data_for_a_laugh), Query("35"), Query("35")),
+            Triple(texts.get(StringsR.string.data_feel_the_emotion), Query("18,10749"), Query("18")),
+            Triple(texts.get(StringsR.string.data_on_the_edge_of_your_seat), Query("53"), Query("9648|80")),
+            Triple(texts.get(StringsR.string.data_for_a_scare), Query("27"), Query("9648,10765")),
+            Triple(texts.get(StringsR.string.data_to_unwind), Query("16|10751"), Query("16|10751")),
+            Triple(texts.get(StringsR.string.data_to_daydream), Query("14|12"), Query("10765")),
+            Triple(texts.get(StringsR.string.data_food_for_thought), Query("99|36"), Query("99")),
         )
         return moods.map { (title, movie, tv) ->
             title to suspend {
@@ -462,7 +464,7 @@ class HomeExtrasSource @Inject constructor(
     private fun normalizeCertification(raw: String?): String? {
         val c = raw?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.isNotEmpty() } ?: return null
         return when {
-            c == "A" || c == "TP" || c == "APTA" || c == "G" || c == "TV-G" || c == "TV-Y" || c == "ALL" -> tr("TP", "ALL")
+            c == "A" || c == "TP" || c == "APTA" || c == "G" || c == "TV-G" || c == "TV-Y" || c == "ALL" -> texts.get(StringsR.string.data_all)
             c.all { it.isDigit() } -> "$c+"
             c == "PG" || c == "TV-Y7" || c == "TV-PG" -> "7+"
             c == "PG-13" || c == "TV-14" -> "13+"

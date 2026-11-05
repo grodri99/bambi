@@ -1,7 +1,8 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
@@ -262,30 +263,30 @@ internal class ReferenceCollector {
 
 private val UiLocale: Locale get() = Lang.locale
 
-fun SubtitleTiming.describe(): String {
+fun SubtitleTiming.describe(texts: Texts): String {
     val seconds = String.format(UiLocale, "%.1f", abs(offsetMs) / 1000.0)
     val offsetText = when {
-        offsetMs == 0L -> tr("0,0 s", "0.0 s")
-        offsetMs > 0 -> tr("+$seconds s (más tarde)", "+$seconds s (later)")
-        else -> tr("−$seconds s (antes)", "−$seconds s (earlier)")
+        offsetMs == 0L -> texts.get(StringsR.string.player_0_0_s)
+        offsetMs > 0 -> texts.get(StringsR.string.player_subtitle_offset_later, seconds)
+        else -> texts.get(StringsR.string.player_subtitle_offset_earlier, seconds)
     }
     val fps = when {
-        scale > 1.01 -> tr(" · 25 → 23,976 fps", " · 25 → 23.976 fps")
-        scale < 0.99 -> tr(" · 23,976 → 25 fps", " · 23.976 → 25 fps")
+        scale > 1.01 -> texts.get(StringsR.string.player_25_23_976_fps)
+        scale < 0.99 -> texts.get(StringsR.string.player_23_976_25_fps)
         else -> ""
     }
     return offsetText + fps
 }
 
-fun SyncStatus.describe(): String = when (this) {
+fun SyncStatus.describe(texts: Texts): String = when (this) {
     SyncStatus.Off -> ""
     is SyncStatus.Collecting -> if (referenceCues < SubtitleSync.MIN_REFERENCE_CUES) {
-        tr("Sincronización automática: leyendo los subtítulos del archivo ($referenceCues/${SubtitleSync.MIN_REFERENCE_CUES} frases)…", "Auto-sync: reading the file's subtitles ($referenceCues/${SubtitleSync.MIN_REFERENCE_CUES} lines)…")
+        texts.get(StringsR.string.player_sync_reading, referenceCues, SubtitleSync.MIN_REFERENCE_CUES)
     } else {
-        tr("Sincronización automática: buscando el ajuste ($referenceCues frases leídas)…", "Auto-sync: finding the offset ($referenceCues lines read)…")
+        texts.get(StringsR.string.player_sync_finding, referenceCues)
     }
-    is SyncStatus.Auto -> tr("Sincronizado automáticamente: ${timing.describe()}", "Synced automatically: ${timing.describe()}")
-    is SyncStatus.Manual -> tr("Ajuste manual: ${timing.describe()}", "Manual adjustment: ${timing.describe()}")
-    SyncStatus.NoReference -> tr("Este archivo no trae subtítulos que sirvan de referencia: ajuste manual", "This file has no subtitles to use as reference: manual adjustment")
-    SyncStatus.Unsure -> tr("No se ha encontrado un ajuste fiable: ajústalo a mano", "No reliable offset found: adjust it manually")
+    is SyncStatus.Auto -> texts.get(StringsR.string.player_sync_auto, timing.describe(texts))
+    is SyncStatus.Manual -> texts.get(StringsR.string.player_sync_manual, timing.describe(texts))
+    SyncStatus.NoReference -> texts.get(StringsR.string.player_this_file_has_no_subtitles_to_use)
+    SyncStatus.Unsure -> texts.get(StringsR.string.player_no_reliable_offset_found_adjust_it_manually)
 }

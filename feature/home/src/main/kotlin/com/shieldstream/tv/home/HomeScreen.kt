@@ -1,7 +1,8 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -69,6 +70,7 @@ import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ContinueInfo
 import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.Episode
+import com.shieldstream.tv.strings.localizedCode
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.RowStyle
@@ -436,9 +438,9 @@ private fun ContinueActions(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            TvButton(text = tr("Ver detalles", "View details"), onClick = onDetails, modifier = Modifier.focusRequester(requester))
-            TvButton(text = tr("Quitar de Seguir viendo", "Remove from Continue Watching"), onClick = onRemove)
-            TvButton(text = tr("Cancelar", "Cancel"), onClick = onCancel)
+            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.focusRequester(requester))
+            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_continue_watching), onClick = onRemove)
+            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel)
         }
     }
 }
@@ -467,7 +469,7 @@ private fun CatalogRowView(
             )
             if (row.style == RowStyle.CONTINUE) {
                 Text(
-                    text = tr("   Mantén OK para opciones", "   Hold OK for options"),
+                    text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.45f),
                 )
@@ -508,9 +510,10 @@ private fun CatalogRowView(
                             }
                             RowStyle.NEW_EPISODES -> {
                                 val episode = row.newEpisodes[item.key]
-                                val episodeLabel = remember(row.newEpisodes, item.key) {
+                                val episodeCode = episode?.localizedCode()
+                                val episodeLabel = remember(row.newEpisodes, item.key, episodeCode) {
                                     episode?.let {
-                                        listOf(it.code, formatEpisodeDate(it.airDate)).filter { part -> part.isNotEmpty() }.joinToString(" · ")
+                                        listOf(episodeCode.orEmpty(), formatEpisodeDate(it.airDate)).filter { part -> part.isNotEmpty() }.joinToString(" · ")
                                     }.orEmpty()
                                 }
                                 NewEpisodeCard(
@@ -606,8 +609,9 @@ private fun HeroInfo(item: CatalogItem) {
     }
 }
 
+@Composable
 private fun metaLine(item: CatalogItem): String = buildList {
-    add(if (item.type == MediaType.TV) tr("Serie", "Series") else tr("Película", "Movie"))
+    add(if (item.type == MediaType.TV) localizedStringResource(StringsR.string.home_series) else localizedStringResource(StringsR.string.home_movie))
     item.year?.let { add(it.toString()) }
     item.rating?.takeIf { it > 0f }?.let { add("★ " + String.format(Lang.locale, "%.1f", it)) }
 }.joinToString("  ·  ")
@@ -722,7 +726,7 @@ internal fun HomeError(message: String, onRetry: () -> Unit, modifier: Modifier 
     ) {
         Text(message, color = Color.White, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(16.dp))
-        TvButton(text = tr("Reintentar", "Retry"), onClick = onRetry, modifier = Modifier.focusRequester(retryRequester))
+        TvButton(text = localizedStringResource(StringsR.string.home_retry), onClick = onRetry, modifier = Modifier.focusRequester(retryRequester))
     }
 }
 

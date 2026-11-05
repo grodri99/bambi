@@ -1,9 +1,11 @@
 package com.shieldstream.tv.settings
 
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.AppLanguage
-import com.shieldstream.tv.model.tr
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.ApiKeysRepository
@@ -76,6 +78,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val playbackPolicies: PlaybackPolicyProvider,
     private val episodeTracking: EpisodeTrackingRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     private val statuses = MutableStateFlow<Map<ApiService, ServiceStatus>>(emptyMap())
@@ -152,7 +155,7 @@ class SettingsViewModel @Inject constructor(
     fun toggleProvider(p: SourceProvider) {
         viewModelScope.launch {
             val current = settings.sourceProviders.first()
-            val group = SourceProvider.entries.filter { it.section == p.section }.toSet()
+            val group = SourceProvider.entries.filter { texts.get(it.sectionResource) == texts.get(p.sectionResource) }.toSet()
             val next = if (group.all { it in current }) current - group else current + group
             if (next.isNotEmpty()) settings.setSourceProviders(next)
         }
@@ -170,7 +173,7 @@ class SettingsViewModel @Inject constructor(
         val current = editor.value ?: return
         val key = input.trim()
         if (key.isEmpty()) {
-            editor.value = current.copy(error = tr("Escribe la clave primero", "Type the key first"))
+            editor.value = current.copy(error = texts.get(StringsR.string.settings_type_the_key_first))
             return
         }
         editor.value = current.copy(busy = true, error = null)

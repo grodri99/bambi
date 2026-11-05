@@ -1,6 +1,7 @@
 package com.shieldstream.tv.player
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.Texts
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.lifecycle.ViewModel
@@ -108,6 +109,7 @@ class PlayerViewModel @Inject constructor(
     private val subtitles: SubtitleRepository,
     private val trakt: TraktRepository,
     private val skipSegmentsRepository: SkipSegmentsRepository,
+    private val texts: Texts,
 ) : ViewModel() {
 
     private val _player = MutableStateFlow<ExoPlayer?>(null)
@@ -116,7 +118,7 @@ class PlayerViewModel @Inject constructor(
     private val _videoInfo = MutableStateFlow<PlaybackVideoInfo?>(null)
     val videoInfo: StateFlow<PlaybackVideoInfo?> = _videoInfo.asStateFlow()
 
-    private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving(tr("Preparando…", "Preparing…"), 1, 1))
+    private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Resolving(texts.get(StringsR.string.player_preparing), 1, 1))
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private val _notice = MutableStateFlow<String?>(null)
@@ -212,7 +214,7 @@ class PlayerViewModel @Inject constructor(
 
         val queue = queueSnapshot
         if (queue.isEmpty()) {
-            _uiState.value = PlayerUiState.Error(tr("Sin fuente seleccionada", "No source selected"))
+            _uiState.value = PlayerUiState.Error(texts.get(StringsR.string.player_no_source_selected))
             return
         }
         loadSegments()
@@ -238,7 +240,7 @@ class PlayerViewModel @Inject constructor(
                 resolveStreamUseCase(source).collect { state ->
                     when (state) {
                         is ResolveState.Progress -> {
-                            val prefix = if (index > 0) tr("Fuente ${index + 1} de ${queue.size} · ", "Source ${index + 1} of ${queue.size} · ") else ""
+                            val prefix = if (index > 0) texts.get(StringsR.string.player_queue_source, index + 1, queue.size) else ""
                             _uiState.value = PlayerUiState.Resolving(prefix + state.message, index + 1, queue.size)
                         }
                         is ResolveState.Ready, is ResolveState.Failed -> outcome = state
@@ -261,7 +263,7 @@ class PlayerViewModel @Inject constructor(
                         val resumeAt = savedResumePosition()
                         trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
                         launchPlayer(result.url, startPositionMs = resumeAt)
-                        if (resumeAt > 0) _notice.value = tr("Reanudando desde ${formatTime(resumeAt)}", "Resuming from ${formatTime(resumeAt)}")
+                        if (resumeAt > 0) _notice.value = texts.get(StringsR.string.player_resume_from, formatTime(resumeAt))
                         _uiState.value = PlayerUiState.Playing
                         startProgressSaver()
                         startSegmentsWatcher()
@@ -278,16 +280,16 @@ class PlayerViewModel @Inject constructor(
             spanishFallback?.let { back ->
                 spanishFallback = null
                 spanishSkips = MAX_SPANISH_SKIPS
-                _notice.value = tr("No hay otra fuente en castellano que funcione: vuelve la anterior", "No other working Spanish source: back to the previous one")
+                _notice.value = texts.get(StringsR.string.player_no_other_working_spanish_source_back_to)
                 playFrom(back)
                 return@launch
             }
             _uiState.value = PlayerUiState.Error(
                 if (allNotCached) {
-                    tr("Ninguna de las fuentes probadas está en la caché de ", "None of the sources tried is cached on ") +
+                    texts.get(StringsR.string.player_none_of_the_sources_tried_is_cached) +
                         "${queue.firstNotNullOfOrNull { it.debrid } ?: "Real-Debrid"}.\n$lastQueueError"
                 } else {
-                    tr("No ha funcionado ninguna de las fuentes probadas.", "None of the sources tried worked.") + "\n$lastQueueError"
+                    texts.get(StringsR.string.player_none_of_the_sources_tried_worked) + "\n$lastQueueError"
                 },
             )
         }
@@ -305,7 +307,7 @@ class PlayerViewModel @Inject constructor(
     private fun searchExternalSubtitles(language: String, automatic: Boolean) {
         if (!automatic) subtitleDefaultHandled = true
         val query = buildQuery(language) ?: run {
-            _externalSubs.value = ExternalSubsState.Error(language, tr("No se sabe qué se está reproduciendo", "Unknown what's playing"))
+            _externalSubs.value = ExternalSubsState.Error(language, texts.get(StringsR.string.player_unknown_what_s_playing))
             return
         }
         subsJob?.cancel()
@@ -317,7 +319,7 @@ class PlayerViewModel @Inject constructor(
                     if (items.isEmpty()) {
                         _externalSubs.value = ExternalSubsState.Results(language, items)
                         if (automatic) {
-                            _notice.value = tr("No se encontraron subtítulos externos en este idioma", "No external subtitles found in this language")
+                            _notice.value = texts.get(StringsR.string.player_no_external_subtitles_found_in_this_language)
                         }
                     } else {
                         val count = candidateShortlist(items).size
@@ -327,8 +329,8 @@ class PlayerViewModel @Inject constructor(
                 }
                 .onFailure {
                     if (it is CancellationException) throw it
-                    _externalSubs.value = ExternalSubsState.Error(language, it.message ?: tr("Error buscando subtítulos", "Error searching subtitles"))
-                    if (automatic) _notice.value = tr("No se pudieron buscar subtítulos externos", "Couldn't search for external subtitles")
+                    _externalSubs.value = ExternalSubsState.Error(language, it.message ?: texts.get(StringsR.string.player_error_searching_subtitles))
+                    if (automatic) _notice.value = texts.get(StringsR.string.player_couldn_t_search_for_external_subtitles)
                 }
         }
     }
@@ -349,7 +351,7 @@ class PlayerViewModel @Inject constructor(
             runCatching {
                 val file = subtitles.download(item, query)
                 val segments = withContext(Dispatchers.IO) { parseSubtitle(file.path, file.mimeType) }
-                check(segments.isNotEmpty()) { tr("El subtítulo está vacío o no se puede leer", "The subtitle is empty or unreadable") }
+                check(segments.isNotEmpty()) { texts.get(StringsR.string.player_the_subtitle_is_empty_or_unreadable) }
                 file to segments
             }
                 .onSuccess { (file, segments) ->
@@ -361,7 +363,7 @@ class PlayerViewModel @Inject constructor(
                 .onFailure { e ->
                     if (e is CancellationException) throw e
                     Log.w(TAG, "SUBTITLE_DOWNLOAD_FAILURE ${externalContext(item)} error=${e.message}", e)
-                    _externalSubs.value = ExternalSubsState.Error(item.language, e.message ?: tr("No se pudo descargar", "Couldn't download"))
+                    _externalSubs.value = ExternalSubsState.Error(item.language, e.message ?: texts.get(StringsR.string.player_couldn_t_download))
                     if (previous is ExternalSubsState.Results) {
                         delay(2_500)
                         _externalSubs.value = previous.copy(evaluating = false)
@@ -488,7 +490,7 @@ class PlayerViewModel @Inject constructor(
     private suspend fun downloadCandidate(item: ExternalSubtitle, query: SubtitleQuery): SubtitleCandidate {
         val file = subtitles.download(item, query)
         val segments = withContext(Dispatchers.IO) { parseSubtitle(file.path, file.mimeType) }
-        check(segments.isNotEmpty()) { tr("El subtítulo está vacío o no se puede leer", "The subtitle is empty or unreadable") }
+        check(segments.isNotEmpty()) { texts.get(StringsR.string.player_the_subtitle_is_empty_or_unreadable) }
         return SubtitleCandidate(item, file.label, segments, SubtitleSync.intervalsOf(segments))
     }
 
@@ -510,9 +512,9 @@ class PlayerViewModel @Inject constructor(
         _syncStatus.value = SyncStatus.Off
         restoreReferenceSelection()
         _notice.value = if (reason == "no_reference") {
-            tr("Sin subtítulos de referencia: elige uno y ajústalo a mano", "No reference subtitles: choose one and adjust it manually")
+            texts.get(StringsR.string.player_no_reference_subtitles_choose_one_and_adjust)
         } else {
-            tr("Ningún subtítulo encaja automáticamente: elige uno a mano", "No subtitle matched automatically: choose one manually")
+            texts.get(StringsR.string.player_no_subtitle_matched_automatically_choose_one_manually)
         }
     }
 
@@ -577,7 +579,7 @@ class PlayerViewModel @Inject constructor(
         _syncStatus.value = SyncStatus.Collecting(0)
         beginReferenceCapture()
         if (referenceAvailable) {
-            _notice.value = tr("Subtítulos añadidos: $label · sincronizando…", "Subtitles added: $label · syncing…")
+            _notice.value = texts.get(StringsR.string.player_subtitles_added, label)
             startAutoSync()
         }
     }
@@ -613,7 +615,7 @@ class PlayerViewModel @Inject constructor(
         if (!referenceAvailable) {
             Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reference ${externalContext(currentExternal)}")
             _syncStatus.value = SyncStatus.NoReference
-            _notice.value = tr("Este archivo no trae subtítulos de referencia: solo se puede ajustar a mano", "This file has no reference subtitles: it can only be adjusted manually")
+            _notice.value = texts.get(StringsR.string.player_this_file_has_no_reference_subtitles_it)
             return
         }
         syncJob?.cancel()
@@ -626,7 +628,7 @@ class PlayerViewModel @Inject constructor(
                 applyAuto(result.timing, announce = true, force = true)
             } else {
                 _syncStatus.value = SyncStatus.Collecting(reference.cueCount)
-                _notice.value = tr("Aún no hay datos suficientes: deja correr la película unos segundos", "Not enough data yet: let the movie play for a few seconds")
+                _notice.value = texts.get(StringsR.string.player_not_enough_data_yet_let_the_movie)
                 startAutoSync()
             }
         }
@@ -649,7 +651,7 @@ class PlayerViewModel @Inject constructor(
                 .build()
             if (_activeExternal.value != null) {
                 if (_syncStatus.value !is SyncStatus.Manual) _syncStatus.value = SyncStatus.NoReference
-                _notice.value = tr("Subtítulos añadidos. Si no van a tiempo: Audio y subtítulos › Sincronizar", "Subtitles added. If they're out of sync: Audio & subtitles › Sync")
+                _notice.value = texts.get(StringsR.string.player_subtitles_added_if_they_re_out_of)
             }
             return
         }
@@ -714,8 +716,8 @@ class PlayerViewModel @Inject constructor(
                 .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
                 .build()
             _notice.value = when (subtitlePreference) {
-                SubtitlePreference.SPANISH -> tr("Subtítulos integrados en español", "Embedded Spanish subtitles")
-                SubtitlePreference.ENGLISH -> tr("Subtítulos integrados en inglés", "Embedded English subtitles")
+                SubtitlePreference.SPANISH -> texts.get(StringsR.string.player_embedded_spanish_subtitles)
+                SubtitlePreference.ENGLISH -> texts.get(StringsR.string.player_embedded_english_subtitles)
                 SubtitlePreference.OFF -> return
             }
             return
@@ -726,8 +728,8 @@ class PlayerViewModel @Inject constructor(
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             .build()
         _notice.value = when (subtitlePreference) {
-            SubtitlePreference.SPANISH -> tr("Sin subtítulos integrados en español: buscando externos…", "No embedded Spanish subtitles: finding external subtitles…")
-            SubtitlePreference.ENGLISH -> tr("Sin subtítulos integrados en inglés: buscando externos…", "No embedded English subtitles: finding external subtitles…")
+            SubtitlePreference.SPANISH -> texts.get(StringsR.string.player_no_embedded_spanish_subtitles_finding_external_subtitles)
+            SubtitlePreference.ENGLISH -> texts.get(StringsR.string.player_no_embedded_english_subtitles_finding_external_subtitles)
             SubtitlePreference.OFF -> return
         }
         searchExternalSubtitles(subtitlePreference.code ?: return, automatic = true)
@@ -775,7 +777,7 @@ class PlayerViewModel @Inject constructor(
                 } else if (count >= 80 && applied == null) {
                     Log.w(TAG, "AUTO_SYNC_FAILURE reason=no_reliable_offset refs=$count ${externalContext(currentExternal)}")
                     _syncStatus.value = SyncStatus.Unsure
-                    _notice.value = tr("No he podido sincronizar solo los subtítulos: Audio y subtítulos › Sincronizar", "Couldn't sync the subtitles automatically: Audio & subtitles › Sync")
+                    _notice.value = texts.get(StringsR.string.player_couldn_t_sync_the_subtitles_automatically_audio)
                     return@launch
                 }
             }
@@ -794,9 +796,9 @@ class PlayerViewModel @Inject constructor(
         _syncStatus.value = SyncStatus.Auto(timing)
         if (announce) {
             _notice.value = if (abs(timing.offsetMs) < 200 && timing.scale == 1.0) {
-                tr("Subtítulos comprobados: ya iban sincronizados", "Subtitles checked: already in sync")
+                texts.get(StringsR.string.player_subtitles_checked_already_in_sync)
             } else {
-                tr("Subtítulos sincronizados automáticamente: ${timing.describe()}", "Subtitles synced automatically: ${timing.describe()}")
+                texts.get(StringsR.string.player_subtitles_synced, timing.describe(texts))
             }
         }
     }
@@ -843,9 +845,9 @@ class PlayerViewModel @Inject constructor(
         val intro = segments.intro
         val prompt = when {
             recap != null && position in recap && recap.endMs - position > 2_000 ->
-                SkipPromptUiState.Showing(tr("Omitir resumen", "Skip recap"), recap.endMs)
+                SkipPromptUiState.Showing(texts.get(StringsR.string.player_skip_recap), recap.endMs)
             intro != null && position in intro && intro.endMs - position > 2_000 ->
-                SkipPromptUiState.Showing(tr("Omitir intro", "Skip intro"), intro.endMs)
+                SkipPromptUiState.Showing(texts.get(StringsR.string.player_skip_intro), intro.endMs)
             else -> SkipPromptUiState.Hidden
         }
         if (prompt != _skipPrompt.value) _skipPrompt.value = prompt
@@ -918,16 +920,16 @@ class PlayerViewModel @Inject constructor(
                 player.stop()
                 resolvedUrl = null
                 _uiState.value = PlayerUiState.Error(
-                    tr("No hay fuentes con audio en español verificado para este perfil", "No sources with verified Spanish audio available for this profile"),
+                    texts.get(StringsR.string.player_no_sources_with_verified_spanish_audio_available),
                 )
             } else {
-                _notice.value = tr("Esta fuente no trae audio en castellano", "This source has no Spanish audio")
+                _notice.value = texts.get(StringsR.string.player_this_source_has_no_spanish_audio)
             }
             return
         }
         spanishSkips++
         if (!spanishOnly && spanishFallback == null) spanishFallback = queueIndex
-        _notice.value = tr("Sin audio en castellano: probando otra fuente", "No Spanish audio: trying another source")
+        _notice.value = texts.get(StringsR.string.player_no_spanish_audio_trying_another_source)
         player.pause()
         viewModelScope.launch {
             saveProgress()
@@ -948,9 +950,9 @@ class PlayerViewModel @Inject constructor(
         if (source.resolveUrl == null || duration >= SLATE_MAX_MS || source.sizeBytes < SLATE_MIN_BYTES) return false
         if (queueIndex + 1 >= queueSnapshot.size) return false
         Log.i("PlayerVM", "Vídeo de error del addon (${duration / 1000} s, dice ${source.sizeBytes / 1_000_000} MB): ${source.title.take(80)}")
-        lastQueueError = tr("El addon no encontró el archivo de esta fuente.", "The addon couldn't find this source's file.")
+        lastQueueError = texts.get(StringsR.string.player_the_addon_couldn_t_find_this_source)
         allNotCached = false
-        _notice.value = tr("Esa fuente no tiene el episodio: probando otra", "That source doesn't have the episode: trying another")
+        _notice.value = texts.get(StringsR.string.player_that_source_doesn_t_have_the_episode)
         viewModelScope.launch {
             player.release()
             if (_player.value === player) _player.value = null
@@ -1109,7 +1111,7 @@ class PlayerViewModel @Inject constructor(
                     val sourceError = error.errorCode in
                         PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED
                     if (!everPlayed && sourceError && queueIndex + 1 < queueSnapshot.size) {
-                        lastQueueError = tr("La fuente no se pudo abrir (${error.errorCodeName}).", "The source couldn't be opened (${error.errorCodeName}).")
+                        lastQueueError = texts.get(StringsR.string.player_source_open_error, error.errorCodeName)
                         allNotCached = false
                         viewModelScope.launch {
                             player.release()
@@ -1125,7 +1127,7 @@ class PlayerViewModel @Inject constructor(
                         player.playWhenReady = !spanishOnly || spanishChecked
                     } else {
                         _uiState.value = PlayerUiState.Error(
-                            tr("La reproducción se ha cortado (${error.errorCodeName}).", "Playback stopped (${error.errorCodeName})."),
+                            texts.get(StringsR.string.player_playback_stopped, error.errorCodeName),
                         )
                     }
                 }

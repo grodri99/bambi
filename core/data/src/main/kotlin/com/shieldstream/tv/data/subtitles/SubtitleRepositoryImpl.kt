@@ -1,12 +1,13 @@
 package com.shieldstream.tv.data.subtitles
 
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
 import android.content.Context
 import android.util.Log
 import com.shieldstream.tv.domain.SubtitleRepository
 import com.shieldstream.tv.model.ExternalSubtitle
 import com.shieldstream.tv.model.SubtitleFile
-import com.shieldstream.tv.model.SubtitleLanguages
+import com.shieldstream.tv.strings.Texts
+import com.shieldstream.tv.strings.subtitleLanguage
 import com.shieldstream.tv.model.SubtitleQuery
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ class SubtitleRepositoryImpl @Inject constructor(
     openSubtitles: OpenSubtitlesProvider,
     podnapisi: PodnapisiProvider,
     subDl: SubDlProvider,
+    private val texts: Texts,
 ) : SubtitleRepository {
 
     private val providers: List<SubtitleProvider> = listOf(openSubtitles, podnapisi, subDl)
@@ -72,9 +74,9 @@ class SubtitleRepositoryImpl @Inject constructor(
                 .build()
             val raw = http.client.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Descarga fallida (HTTP ${response.code})" }
-                val body = response.body ?: error(tr("Respuesta vacía", "Empty response"))
+                val body = response.body ?: error(texts.get(StringsR.string.data_empty_response))
                 check(body.contentLength() <= SubtitleLimits.DOWNLOAD_BYTES) {
-                    tr("El subtítulo descargado es demasiado grande", "The subtitle download is too large")
+                    texts.get(StringsR.string.data_the_subtitle_download_is_too_large)
                 }
                 body.byteStream().use { it.readBounded(SubtitleLimits.DOWNLOAD_BYTES) }
             }
@@ -89,7 +91,7 @@ class SubtitleRepositoryImpl @Inject constructor(
                 path = file.absolutePath,
                 mimeType = mimeFor(ext),
                 language = subtitle.language,
-                label = "${SubtitleLanguages.label(subtitle.language)} · ${subtitle.provider}" +
+                label = "${texts.subtitleLanguage(subtitle.language)} · ${subtitle.provider}" +
                     if (subtitle.hearingImpaired) " (SDH)" else "",
             )
         }
@@ -103,23 +105,23 @@ class SubtitleRepositoryImpl @Inject constructor(
                 generateSequence { zip.nextEntry }.forEach { entry ->
                     entries++
                     check(entries <= SubtitleLimits.ARCHIVE_ENTRIES) {
-                        tr("El zip contiene demasiados archivos", "The zip contains too many files")
+                        texts.get(StringsR.string.data_the_zip_contains_too_many_files)
                     }
                     val ext = entry.name.substringAfterLast('.', "").lowercase()
                     if (!entry.isDirectory && ext in SUPPORTED_EXTENSIONS) {
                         val bytes = zip.readBounded(SubtitleLimits.SUBTITLE_BYTES)
                         totalBytes += bytes.size
                         check(totalBytes <= SubtitleLimits.ARCHIVE_BYTES) {
-                            tr("Los subtítulos descomprimidos son demasiado grandes", "The decompressed subtitles are too large")
+                            texts.get(StringsR.string.data_the_decompressed_subtitles_are_too_large)
                         }
                         candidates += entry.name to bytes
                     }
                 }
             }
-            check(candidates.isNotEmpty()) { tr("El zip no contiene subtítulos compatibles (srt/ass/vtt)", "The zip has no compatible subtitles (srt/ass/vtt)") }
+            check(candidates.isNotEmpty()) { texts.get(StringsR.string.data_the_zip_has_no_compatible_subtitles_srt) }
             val episode = episodeMatch(candidates, query)
             check(query.media.season == null || candidates.size == 1 || episode != null) {
-                tr("El zip no identifica el episodio ${query.media.season}x${query.media.episode}", "The zip doesn't identify episode ${query.media.season}x${query.media.episode}")
+                texts.get(StringsR.string.data_zip_episode_mismatch, query.media.season.toString(), query.media.episode.toString())
             }
             val chosen = episode ?: candidates.first()
             return chosen.second to chosen.first.substringAfterLast('.').lowercase()
@@ -130,7 +132,7 @@ class SubtitleRepositoryImpl @Inject constructor(
             } to "srt"
         }
         check(raw.size <= SubtitleLimits.SUBTITLE_BYTES) {
-            tr("El subtítulo es demasiado grande", "The subtitle is too large")
+            texts.get(StringsR.string.data_the_subtitle_is_too_large)
         }
         return raw to guessExtension(raw)
     }
