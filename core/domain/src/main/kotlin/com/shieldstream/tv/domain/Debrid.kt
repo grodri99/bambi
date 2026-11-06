@@ -34,6 +34,8 @@ interface TorrentioLinkResolver {
     suspend fun resolve(url: String, service: String): DebridLink
 }
 
+const val ITHIL_ALLDEBRID = "AllDebrid / Ithil"
+
 enum class SourceProvider(val baseUrl: String?, val torrentioStyle: Boolean) {
     TORRENTIO("https://torrentio.strem.fun", true),
     PEERFLIX("https://addon.peerflix.mov", true),
@@ -42,10 +44,11 @@ enum class SourceProvider(val baseUrl: String?, val torrentioStyle: Boolean) {
     NYAA("https://nyaa.si", false),
     COMET("https://comet.elfhosted.com", false),
     AIOSTREAMS(null, false),
+    ITHIL(null, false),
     ;
 }
 
 fun enabledSourceProviders(savedProvidersOff: Set<SourceProvider>?): Set<SourceProvider> =
     SourceProvider.entries.toSet() -
-        (if (savedProvidersOff == null) setOf(SourceProvider.COMET) else emptySet()) -
+        (if (savedProvidersOff == null) setOf(SourceProvider.COMET, SourceProvider.ITHIL) else emptySet()) -
         savedProvidersOff.orEmpty()

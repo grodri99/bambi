@@ -61,6 +61,7 @@ val SourceProvider.titleResource: Int
         SourceProvider.NYAA -> R.string.provider_nyaa
         SourceProvider.COMET -> R.string.provider_comet
         SourceProvider.AIOSTREAMS -> R.string.provider_aiostreams
+        SourceProvider.ITHIL -> R.string.provider_ithil
     }
 
 @get:StringRes

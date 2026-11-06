@@ -5,6 +5,7 @@ import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
+import com.shieldstream.tv.network.api.IthilApi
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.util.Log
@@ -72,6 +73,11 @@ object NetworkModule {
     @Singleton
     fun provideTorrentioApi(client: OkHttpClient, json: Json): TorrentioApi =
         buildRetrofit(ApiConfig.TORRENTIO_BASE_URL, client, json).create(TorrentioApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideIthilApi(client: OkHttpClient, json: Json): IthilApi =
+        buildRetrofit("https://api.github.com/", client, json).create(IthilApi::class.java)
 
     @Provides
     @Singleton

@@ -18,4 +18,6 @@ interface AllDebridAuthRepository {
     suspend fun requestPin(): Result<AllDebridPin>
 
     suspend fun pollPin(pin: AllDebridPin): AllDebridAuthPoll
+
+    suspend fun unlock(url: String): DebridLink
 }

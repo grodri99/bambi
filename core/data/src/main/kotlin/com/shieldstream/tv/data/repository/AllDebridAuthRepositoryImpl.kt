@@ -3,6 +3,10 @@ package com.shieldstream.tv.data.repository
 import com.shieldstream.tv.domain.AllDebridAuthPoll
 import com.shieldstream.tv.domain.AllDebridAuthRepository
 import com.shieldstream.tv.domain.AllDebridPin
+import com.shieldstream.tv.domain.ApiKeysRepository
+import com.shieldstream.tv.domain.ApiService
+import com.shieldstream.tv.domain.DebridLink
+import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.AllDebridResponse
 import com.shieldstream.tv.strings.R as StringsR
@@ -16,6 +20,7 @@ import javax.inject.Singleton
 class AllDebridAuthRepositoryImpl @Inject constructor(
     private val api: AllDebridApi,
     private val texts: Texts,
+    private val keys: ApiKeysRepository,
 ) : AllDebridAuthRepository {
 
     override suspend fun requestPin(): Result<AllDebridPin> = try {
@@ -60,6 +65,29 @@ class AllDebridAuthRepositoryImpl @Inject constructor(
         val apiKey = data.apikey?.takeIf { it.isNotBlank() }
             ?: return AllDebridAuthPoll.Failed(texts.get(StringsR.string.data_couldn_t_verify))
         return AllDebridAuthPoll.Connected(apiKey)
+    }
+
+    override suspend fun unlock(url: String): DebridLink {
+        val key = keys.keys.value[ApiService.ALLDEBRID].orEmpty()
+        if (key.isBlank()) {
+            return DebridLink.Problem(
+                texts.get(StringsR.string.data_debrid_key_missing, DebridService.ALLDEBRID.title),
+                notCached = false,
+            )
+        }
+        return try {
+            val response = api.unlock(agent = "Franklix", apiKey = key, link = url)
+            val unlocked = response.data?.link.orEmpty()
+            when {
+                response.status == "success" && unlocked.isNotBlank() -> DebridLink.Ready(unlocked)
+                else -> DebridLink.Problem(
+                    response.error?.message ?: texts.get(StringsR.string.data_couldn_t_unrestrict_the_link),
+                    notCached = false,
+                )
+            }
+        } catch (_: Exception) {
+            DebridLink.Problem(texts.get(StringsR.string.data_couldn_t_unrestrict_the_link), notCached = false)
+        }
     }
 
     private fun AllDebridResponse<*>.failure(): IOException =

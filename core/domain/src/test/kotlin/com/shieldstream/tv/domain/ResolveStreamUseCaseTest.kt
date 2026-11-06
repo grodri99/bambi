@@ -52,6 +52,20 @@ class ResolveStreamUseCaseTest {
     }
 
     @Test
+    fun `Ithil URL uses AllDebrid without calling Torrentio`() = runTest {
+        val fixture = Fixture()
+        fixture.allDebrid.result = DebridLink.Ready("https://cdn.test/video")
+
+        val states = fixture.useCase(
+            source(resolveUrl = "https://hoster.test/?abc", debrid = ITHIL_ALLDEBRID),
+        ).toList()
+
+        assertEquals(listOf("https://hoster.test/?abc"), fixture.allDebrid.requests)
+        assertTrue(fixture.torrentio.requests.isEmpty())
+        assertEquals(ResolveState.Ready("https://cdn.test/video"), states.last())
+    }
+
+    @Test
     fun `existing torrent uses the requested file index`() = runTest {
         val fixture = Fixture()
         val files = listOf(
@@ -129,7 +143,21 @@ class ResolveStreamUseCaseTest {
     private class Fixture {
         val realDebrid = FakeRealDebridRepository()
         val torrentio = FakeTorrentioLinkResolver()
-        val useCase = ResolveStreamUseCase(realDebrid, torrentio, TestResolveTexts)
+        val allDebrid = FakeAllDebridLinkResolver()
+        val useCase = ResolveStreamUseCase(realDebrid, torrentio, allDebrid, TestResolveTexts)
+    }
+
+    private class FakeAllDebridLinkResolver : AllDebridAuthRepository {
+        var result: DebridLink = DebridLink.Problem("unexpected AllDebrid resolve", notCached = false)
+        val requests = mutableListOf<String>()
+
+        override suspend fun unlock(url: String): DebridLink {
+            requests += url
+            return result
+        }
+
+        override suspend fun requestPin(): Result<AllDebridPin> = error("unused")
+        override suspend fun pollPin(pin: AllDebridPin): AllDebridAuthPoll = error("unused")
     }
 
     private class FakeTorrentioLinkResolver : TorrentioLinkResolver {

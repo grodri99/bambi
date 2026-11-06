@@ -139,6 +139,17 @@
     <string name="settings_own_anime_finder_cocoscrapers_real_debrid_only">Own anime finder (CocoScrapers). Real-Debrid only.</string>
     <string name="settings_comet_with_your_real_debrid_token_sent">Comet with your Real-Debrid token (sent to comet.elfhosted.com, like Umbrella).</string>
     <string name="settings_any_stremio_addon_aiostreams_comet_mediafusion_paste">Any Stremio addon (AIOStreams, Comet, MediaFusion…). Paste its manifest URL in Other services → Stremio addon.</string>
+    <string name="settings_ithil_indexed_sources_through_alldebrid">Indexed movie and episode links, unlocked with your AllDebrid key. Download the local library before searching sources.</string>
+    <string name="settings_ithil_library">Ithil library</string>
+    <string name="settings_ithil_not_installed">Not installed. The download is about 51 MB and builds a compact local index.</string>
+    <string name="settings_ithil_download">Download</string>
+    <string name="settings_ithil_update">Check for update</string>
+    <string name="settings_ithil_delete">Delete library</string>
+    <string name="settings_ithil_downloading">Downloading library… %1$d%%</string>
+    <string name="settings_ithil_indexing">Building the local index…</string>
+    <string name="settings_ithil_ready">Ready · %1$d movie links · %2$d episode links</string>
+    <string name="settings_ithil_error">Library operation failed: %1$s</string>
+    <string name="settings_ithil_unlocked">Ithil sources enabled</string>
     <string name="settings_player_buffer">Player buffer</string>
     <string name="settings_chosen_automatically_from_the_available_memory">Chosen automatically from the available memory.</string>
     <string name="settings_lightweight_5_s_back_buffer_up_to">Lightweight: 5 s back buffer, up to 64 MB and faster startup. Use ◀ ▶ to adjust seconds.</string>

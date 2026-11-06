@@ -13,10 +13,12 @@ import com.shieldstream.tv.strings.labelResource
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.shieldstream.tv.domain.SourceProvider
+import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.DeviceCapabilities
@@ -109,8 +111,11 @@ fun SettingsScreen(
     val ready = state as? SettingsUiState.Ready
     val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val ithilState by viewModel.ithilState.collectAsStateWithLifecycle()
+    val ithilUnlocked by viewModel.ithilUnlocked.collectAsStateWithLifecycle()
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
     val matchContentFrameRate by viewModel.matchContentFrameRate.collectAsStateWithLifecycle()
+    val ithilUnlockedMessage = localizedStringResource(StringsR.string.settings_ithil_unlocked)
     Box(
         Modifier
             .fillMaxSize()
@@ -137,6 +142,19 @@ fun SettingsScreen(
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
                     onToggleProvider = viewModel::toggleProvider,
+                    ithilState = ithilState,
+                    ithilUnlocked = ithilUnlocked,
+                    onDownloadIthil = viewModel::downloadIthil,
+                    onDeleteIthil = viewModel::deleteIthil,
+                    onAboutClick = {
+                        if (viewModel.onIthilUnlockTap()) {
+                            Toast.makeText(
+                                context,
+                                ithilUnlockedMessage,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
                 )
                 s.editor?.let { editor ->
                     KeyEditorDialog(
@@ -170,6 +188,11 @@ private fun SettingsList(
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
     onToggleProvider: (SourceProvider) -> Unit,
+    ithilState: IthilLibraryState,
+    ithilUnlocked: Boolean,
+    onDownloadIthil: () -> Unit,
+    onDeleteIthil: () -> Unit,
+    onAboutClick: () -> Unit,
 ) {
     val requesters = remember { ApiService.entries.associateWith { FocusRequester() } }
     val debridRequester = remember { FocusRequester() }
@@ -183,7 +206,9 @@ private fun SettingsList(
     }
     val debridUi = state.services.first { it.service == state.debrid.apiService }
     val otherServices = state.services.filter { !it.service.isDebrid }
-    val providerSections = SourceProvider.entries.map { it to localizedStringResource(it.sectionResource) }
+    val providerSections = SourceProvider.entries
+        .filter { it != SourceProvider.ITHIL || ithilUnlocked }
+        .map { it to localizedStringResource(it.sectionResource) }
     ProvideMinimalScroll(margin = 56.dp) {
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 120.dp, vertical = 40.dp),
@@ -253,6 +278,15 @@ private fun SettingsList(
             items(providerSections.distinctBy { it.second }) { (provider, section) ->
                 val enabled = providerSections.filter { it.second == section }.all { it.first in providers }
                 ProviderCard(provider, enabled = enabled, onClick = { onToggleProvider(provider) })
+            }
+            if (ithilUnlocked) {
+                item {
+                    IthilLibraryCard(
+                        state = ithilState,
+                        onDownload = onDownloadIthil,
+                        onDelete = onDeleteIthil,
+                    )
+                }
             }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_home)) }
             item { HomeRowLimitCard() }
@@ -387,7 +421,7 @@ private fun SettingsList(
                 )
             }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_about)) }
-            item { AboutCard() }
+            item { AboutCard(onClick = onAboutClick) }
             item { UpdateCard() }
             item { PhoneConfigCard(onClick = onOpenPhoneConfig) }
             item { SetupGuideCard(onClick = onOpenSetup) }
@@ -1152,6 +1186,7 @@ private fun providerNote(p: SourceProvider): String = when (p) {
     SourceProvider.NYAA -> localizedStringResource(StringsR.string.settings_own_anime_finder_cocoscrapers_real_debrid_only)
     SourceProvider.COMET -> localizedStringResource(StringsR.string.settings_comet_with_your_real_debrid_token_sent)
     SourceProvider.AIOSTREAMS -> localizedStringResource(StringsR.string.settings_any_stremio_addon_aiostreams_comet_mediafusion_paste)
+    SourceProvider.ITHIL -> localizedStringResource(StringsR.string.settings_ithil_indexed_sources_through_alldebrid)
 }
 
 @Composable
@@ -1243,7 +1278,7 @@ private fun Arrow(symbol: String, enabled: Boolean) {
 }
 
 @Composable
-private fun AboutCard() {
+private fun AboutCard(onClick: () -> Unit) {
     val context = LocalContext.current
     val version = remember {
         runCatching {
@@ -1252,7 +1287,7 @@ private fun AboutCard() {
         }.getOrNull() ?: "?"
     }
     val testing = context.packageName.endsWith(".debug")
-    FocusCard { _ ->
+    FocusCard(onClick = onClick) { _ ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(

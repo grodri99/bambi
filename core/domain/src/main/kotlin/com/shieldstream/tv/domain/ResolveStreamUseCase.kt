@@ -28,6 +28,7 @@ interface ResolveStreamTexts {
 class ResolveStreamUseCase(
     private val realDebrid: RealDebridRepository,
     private val torrentio: TorrentioLinkResolver,
+    private val allDebrid: AllDebridAuthRepository,
     private val texts: ResolveStreamTexts,
 ) {
     operator fun invoke(source: StreamSource): Flow<ResolveState> = flow {
@@ -39,7 +40,12 @@ class ResolveStreamUseCase(
         source.resolveUrl?.let { url ->
             val service = source.debrid ?: texts.debridService()
             emit(ResolveState.Progress(texts.requestingLink(service)))
-            when (val link = torrentio.resolve(url, service)) {
+            val result = if (source.debrid == ITHIL_ALLDEBRID) {
+                allDebrid.unlock(url)
+            } else {
+                torrentio.resolve(url, service)
+            }
+            when (val link = result) {
                 is DebridLink.Ready -> emit(ResolveState.Ready(link.url))
                 is DebridLink.Problem -> emit(ResolveState.Failed(link.message, notCached = link.notCached))
             }

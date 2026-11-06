@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
+import com.shieldstream.tv.domain.ITHIL_ALLDEBRID
 import com.shieldstream.tv.domain.PrioritizeSourcesUseCase
 import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.MyListRepository
@@ -525,7 +526,9 @@ class DetailsViewModel @Inject constructor(
         val queue = sorted.drop(startIndex)
             .filter { !c.spanishOnly || it.advertisesSpanishAudio }
             .distinctBy { it.infoHash.lowercase() }
-            .filterIndexed { index, s -> index == 0 || s.resolveUrl == null || s.isCached }
+            .filterIndexed { index, s ->
+                index == 0 || s.resolveUrl == null || s.isCached || s.debrid == ITHIL_ALLDEBRID
+            }
             .take(MAX_QUEUE)
         if (queue.isEmpty()) {
             updateContent {

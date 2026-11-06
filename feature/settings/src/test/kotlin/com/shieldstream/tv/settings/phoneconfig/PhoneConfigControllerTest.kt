@@ -4,6 +4,7 @@ import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.KeyCheck
+import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.AppLanguage
@@ -27,7 +28,8 @@ import org.junit.Test
 class PhoneConfigControllerTest {
     private val apiKeys = mockk<ApiKeysRepository>(relaxed = true)
     private val settings = mockk<SettingsRepository>(relaxed = true)
-    private val controller = PhoneConfigController(apiKeys, settings, FakeTexts())
+    private val ithilAccess = mockk<IthilAccessRepository>(relaxed = true)
+    private val controller = PhoneConfigController(apiKeys, settings, FakeTexts(), ithilAccess)
 
     init {
         every { apiKeys.keys } returns MutableStateFlow(
@@ -39,6 +41,7 @@ class PhoneConfigControllerTest {
         every { settings.language } returns AppLanguage.EN
         every { settings.debridService } returns MutableStateFlow(DebridService.ALLDEBRID)
         every { settings.sourceProviders } returns MutableStateFlow(SourceProvider.entries.toSet())
+        every { ithilAccess.unlocked } returns MutableStateFlow(true)
         every { settings.lightweightUi } returns MutableStateFlow(false)
         every { settings.experimentalSubtitleSync } returns MutableStateFlow(true)
         every { settings.autoNextEpisode } returns MutableStateFlow(true)
@@ -118,6 +121,19 @@ class PhoneConfigControllerTest {
         } catch (_: IllegalArgumentException) {
             coVerify(exactly = 0) { settings.setSourceProviders(any()) }
         }
+    }
+
+    @Test
+    fun `locked Ithil is hidden and cannot be enabled from phone configuration`() = runTest {
+        every { ithilAccess.unlocked } returns MutableStateFlow(false)
+
+        assertTrue(controller.snapshot().providerGroups.none { SourceProvider.ITHIL.name in it.providers })
+        val result = controller.update(
+            update(providers = listOf(SourceProvider.ITHIL.name, SourceProvider.TORRENTIO.name)),
+        )
+
+        assertTrue(result is PhoneConfigUpdateResult.Success)
+        coVerify(exactly = 1) { settings.setSourceProviders(setOf(SourceProvider.TORRENTIO)) }
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.shieldstream.tv.data.repository
 
 import com.shieldstream.tv.domain.AllDebridAuthPoll
+import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.AllDebridErrorDto
 import com.shieldstream.tv.network.api.AllDebridPinCheckDto
@@ -17,7 +18,7 @@ import org.junit.Test
 
 class AllDebridAuthRepositoryImplTest {
     private val api = mockk<AllDebridApi>()
-    private val repository = AllDebridAuthRepositoryImpl(api, mockk<Texts>(relaxed = true))
+    private val repository = AllDebridAuthRepositoryImpl(api, mockk<Texts>(relaxed = true), mockk<ApiKeysRepository>(relaxed = true))
     private val pin = com.shieldstream.tv.domain.AllDebridPin(
         pin = "ABCD",
         check = "check-token",

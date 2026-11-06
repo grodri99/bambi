@@ -43,6 +43,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         tokenStore.seedOnce(TokenStore.TMDB_KEY, BuildConfig.TMDB_API_KEY)
         tokenStore.seedOnce(TokenStore.SUBDL_KEY, BuildConfig.SUBDL_API_KEY)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            IthilLibraryScheduler.schedulePeriodic(this@App)
             episodeTracking.notificationsEnabled.collect { enabled ->
                 EpisodeNotificationScheduler.sync(this@App, enabled)
             }

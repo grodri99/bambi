@@ -30,6 +30,12 @@ import com.shieldstream.tv.data.skip.IntroDbRepository
 import com.shieldstream.tv.domain.SkipSegmentsRepository
 import com.shieldstream.tv.data.repository.MyListRepositoryImpl
 import com.shieldstream.tv.domain.MyListRepository
+import com.shieldstream.tv.domain.IthilLibraryRepository
+import com.shieldstream.tv.data.repository.IthilLibraryRepositoryImpl
+import com.shieldstream.tv.data.repository.IthilUpdateRepositoryImpl
+import com.shieldstream.tv.domain.IthilUpdateRepository
+import com.shieldstream.tv.data.repository.IthilAccessRepositoryImpl
+import com.shieldstream.tv.domain.IthilAccessRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -99,4 +105,17 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindMyListRepository(impl: MyListRepositoryImpl): MyListRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIthilLibraryRepository(impl: IthilLibraryRepositoryImpl): IthilLibraryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIthilUpdateRepository(impl: IthilUpdateRepositoryImpl): IthilUpdateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIthilAccessRepository(impl: IthilAccessRepositoryImpl): IthilAccessRepository
+
 }

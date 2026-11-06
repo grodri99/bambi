@@ -18,6 +18,8 @@ import com.shieldstream.tv.domain.StreamResults
 import com.shieldstream.tv.domain.ApiService
 import android.util.Log
 import com.shieldstream.tv.domain.CatalogRepository
+import com.shieldstream.tv.domain.IthilLibraryRepository
+import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.SettingsRepository
 import kotlinx.coroutines.flow.first
@@ -61,6 +63,8 @@ class CatalogRepositoryImpl @Inject constructor(
     private val settings: SettingsRepository,
     private val profiles: com.shieldstream.tv.domain.ProfileRepository,
     private val texts: Texts,
+    private val ithil: IthilLibraryRepository,
+    private val ithilAccess: IthilAccessRepository,
 ) : CatalogRepository {
 
     private val kids: Boolean get() = profiles.active.value.kids
@@ -343,16 +347,25 @@ class CatalogRepositoryImpl @Inject constructor(
     }
 
     override fun getStreams(item: CatalogItem, episode: Episode?): Flow<StreamResults> = channelFlow {
-        val imdbId = item.imdbId ?: resolveImdb(item) ?: error(texts.get(StringsR.string.data_imdb_id_missing, item.title))
-        val (type, streamId) = if (item.type == MediaType.TV) {
-            val ep = episode ?: error(texts.get(StringsR.string.data_pick_an_episode))
-            "series" to "$imdbId:${ep.season}:${ep.number}"
-        } else {
-            "movie" to imdbId
-        }
         val aioConfigured = !store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).isNullOrBlank()
         val enabled = settings.sourceProviders.first()
-        val providers = SourceProvider.entries.filter { it in enabled && (it != SourceProvider.AIOSTREAMS || aioConfigured) }
+        val providers = SourceProvider.entries.filter {
+            it in enabled &&
+                (it != SourceProvider.AIOSTREAMS || aioConfigured) &&
+                (it != SourceProvider.ITHIL || (ithilAccess.isUnlocked && ithil.isReady()))
+        }
+        val requiresImdb = providers.any { it != SourceProvider.ITHIL }
+        val imdbId = if (requiresImdb) {
+            item.imdbId ?: resolveImdb(item) ?: error(texts.get(StringsR.string.data_imdb_id_missing, item.title))
+        } else {
+            null
+        }
+        val (type, streamId) = if (item.type == MediaType.TV) {
+            val ep = episode ?: error(texts.get(StringsR.string.data_pick_an_episode))
+            "series" to if (requiresImdb) "$imdbId:${ep.season}:${ep.number}" else ""
+        } else {
+            "movie" to imdbId.orEmpty()
+        }
         val done = LinkedHashMap<SourceProvider, Result<List<StreamSource>>>()
         val lock = Mutex()
         fun snapshot(): StreamResults {
@@ -375,7 +388,7 @@ class CatalogRepositoryImpl @Inject constructor(
         coroutineScope {
             providers.map { p ->
                 launch {
-                    val r = runCatching { withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId) } }
+                    val r = runCatching { withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId, episode) } }
                     r.exceptionOrNull()?.let { Log.w("Catalog", "${texts.get(p.titleResource)} falló: ${it.message}") }
                     lock.withLock {
                         done[p] = r
@@ -394,8 +407,9 @@ class CatalogRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun providerStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String): List<StreamSource> =
+    private suspend fun providerStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String, episode: Episode?): List<StreamSource> =
         when (p) {
+            SourceProvider.ITHIL -> ithilSources(ithil, item, episode)
             SourceProvider.AIOSTREAMS -> coroutineScope {
                 val bases = aioStreamBases(store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).orEmpty())
                 bases.map { base ->

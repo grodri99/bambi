@@ -20,6 +20,9 @@ val tmdbApiKey: String = seed("tmdbApiKey")
 val traktClientId: String = localProps.getProperty("traktClientId")?.trim() ?: ""
 val traktClientSecret: String = localProps.getProperty("traktClientSecret")?.trim() ?: ""
 val traktRedirectUri: String = localProps.getProperty("traktRedirectUri")?.trim() ?: "urn:ietf:wg:oauth:2.0:oob"
+val ithilMetadataUrl: String = localProps.getProperty("ithilMetadataUrl")?.trim() ?: ""
+val ithilLinkSecret: String = localProps.getProperty("ithilLinkSecret")?.trim() ?: ""
+val ithilArchivePrefix: String = localProps.getProperty("ithilArchivePrefix")?.trim() ?: ""
 
 android {
     namespace = "com.shieldstream.tv"
@@ -39,6 +42,9 @@ android {
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
         buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"$traktClientSecret\"")
         buildConfigField("String", "TRAKT_REDIRECT_URI", "\"$traktRedirectUri\"")
+        buildConfigField("String", "ITHIL_METADATA_URL", "\"$ithilMetadataUrl\"")
+        buildConfigField("String", "ITHIL_LINK_SECRET", "\"$ithilLinkSecret\"")
+        buildConfigField("String", "ITHIL_ARCHIVE_PREFIX", "\"$ithilArchivePrefix\"")
     }
 
     buildFeatures {

@@ -5,6 +5,7 @@ import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.ResolveStreamUseCase
 import com.shieldstream.tv.strings.ResourceResolveStreamTexts
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.domain.AllDebridAuthRepository
 import com.shieldstream.tv.domain.TorrentioLinkResolver
 import com.shieldstream.tv.domain.ValidateTokenUseCase
 import dagger.Module
@@ -26,8 +27,9 @@ object UseCaseModule {
     fun provideResolveStreamUseCase(
         repo: RealDebridRepository,
         torrentio: TorrentioLinkResolver,
+        allDebrid: AllDebridAuthRepository,
         texts: ResourceResolveStreamTexts,
-    ): ResolveStreamUseCase = ResolveStreamUseCase(repo, torrentio, texts)
+    ): ResolveStreamUseCase = ResolveStreamUseCase(repo, torrentio, allDebrid, texts)
 
     @Provides
     @Singleton

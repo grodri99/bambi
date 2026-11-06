@@ -4,6 +4,7 @@ import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.KeyCheck
+import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.AppLanguage
@@ -95,6 +96,7 @@ class PhoneConfigController @Inject constructor(
     private val apiKeys: ApiKeysRepository,
     private val settings: SettingsRepository,
     private val texts: Texts,
+    private val ithilAccess: IthilAccessRepository,
 ) {
     private var selectedSetupLanguage: AppLanguage? = null
 
@@ -102,6 +104,7 @@ class PhoneConfigController @Inject constructor(
         val keys = apiKeys.keys.value
         val debrid = settings.debridService.first()
         val enabledProviders = settings.sourceProviders.first()
+        val ithilUnlocked = ithilAccess.unlocked.first()
         val setup = if (mode == PhoneConfigMode.SETUP) {
             PhoneSetupDto(
                 audio = when {
@@ -134,6 +137,7 @@ class PhoneConfigController @Inject constructor(
                     )
                 },
             providerGroups = SourceProvider.entries
+                .filter { it != SourceProvider.ITHIL || ithilUnlocked }
                 .groupBy { texts.get(it.sectionResource) }
                 .map { (title, group) ->
                     PhoneProviderGroupDto(
@@ -156,7 +160,10 @@ class PhoneConfigController @Inject constructor(
         mode: PhoneConfigMode = PhoneConfigMode.EDIT,
     ): PhoneConfigUpdateResult {
         val debrid = request.debrid.toEnum<DebridService>()
-        val providers = request.providers.map { it.toEnum<SourceProvider>() }.toSet()
+        val ithilUnlocked = ithilAccess.unlocked.first()
+        val providers = request.providers.map { it.toEnum<SourceProvider>() }
+            .filter { it != SourceProvider.ITHIL || ithilUnlocked }
+            .toSet()
         require(providers.isNotEmpty()) { texts.get(StringsR.string.settings_phone_config_source_required) }
         require(request.keys.map { it.service }.distinct().size == request.keys.size) {
             texts.get(StringsR.string.settings_phone_config_invalid_request)

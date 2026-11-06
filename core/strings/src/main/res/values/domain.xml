@@ -34,6 +34,7 @@
     <string name="provider_nyaa">Nyaa</string>
     <string name="provider_comet">Comet</string>
     <string name="provider_aiostreams">Stremio addon</string>
+    <string name="provider_ithil">Ithil</string>
     <string name="resolve_debrid_service">the debrid service</string>
     <string name="resolve_requesting_link">Requesting the link from %1$s…</string>
     <string name="resolve_looking_library">Looking in your Real-Debrid library…</string>

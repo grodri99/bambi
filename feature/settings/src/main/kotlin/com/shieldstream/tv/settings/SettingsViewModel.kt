@@ -12,6 +12,10 @@ import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
+import com.shieldstream.tv.domain.IthilDownloadScheduler
+import com.shieldstream.tv.domain.IthilUpdateRepository
+import com.shieldstream.tv.domain.IthilAccessRepository
+import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.media.PlaybackPolicyProvider
@@ -82,10 +86,14 @@ class SettingsViewModel @Inject constructor(
     private val playbackPolicies: PlaybackPolicyProvider,
     private val episodeTracking: EpisodeTrackingRepository,
     private val texts: Texts,
+    private val ithilUpdates: IthilUpdateRepository,
+    private val ithilScheduler: IthilDownloadScheduler,
+    private val ithilAccess: IthilAccessRepository,
 ) : ViewModel() {
 
     private val statuses = MutableStateFlow<Map<ApiService, ServiceStatus>>(emptyMap())
     private val editor = MutableStateFlow<KeyEditor?>(null)
+    private val ithilUnlockGesture = IthilUnlockGesture()
 
     private val playback = combine(
         settings.maxBufferSeconds,
@@ -194,6 +202,26 @@ class SettingsViewModel @Inject constructor(
             val group = SourceProvider.entries.filter { texts.get(it.sectionResource) == texts.get(p.sectionResource) }.toSet()
             val next = if (group.all { it in current }) current - group else current + group
             if (next.isNotEmpty()) settings.setSourceProviders(next)
+        }
+    }
+
+    val ithilState: StateFlow<IthilLibraryState> = ithilUpdates.state
+    val ithilUnlocked: StateFlow<Boolean> = ithilAccess.unlocked
+
+    fun onIthilUnlockTap(): Boolean {
+        if (ithilAccess.isUnlocked || !ithilUnlockGesture.registerTap(System.currentTimeMillis())) return false
+        ithilAccess.unlock()
+        return true
+    }
+
+    fun downloadIthil() = ithilScheduler.downloadNow()
+
+    fun deleteIthil() {
+        ithilScheduler.cancelDownloads()
+        viewModelScope.launch {
+            ithilUpdates.delete()
+            val providers = settings.sourceProviders.first() - SourceProvider.ITHIL
+            if (providers.isNotEmpty()) settings.setSourceProviders(providers)
         }
     }
 

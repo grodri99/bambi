@@ -71,5 +71,7 @@ class AllDebridConnectViewModelTest {
             pollCount++
             return pollResult
         }
+
+        override suspend fun unlock(url: String) = error("unused")
     }
 }

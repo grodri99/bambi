@@ -4,6 +4,7 @@ import com.shieldstream.tv.domain.CatalogRepository
 import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.MyListRepository
+import com.shieldstream.tv.domain.ITHIL_ALLDEBRID
 import com.shieldstream.tv.domain.PrioritizeSourcesUseCase
 import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.SelectedContentHolder
@@ -152,6 +153,44 @@ class DetailsViewModelTest {
         assertEquals(target.number, holder.playback.value?.media?.episode)
         assertEquals(next.number, holder.playback.value?.next?.episode)
         verify(exactly = 1) { catalog.getStreams(item, any()) }
+    }
+
+    @Test
+    fun `Ithil links stay queued for failover without allowing other uncached resolvers`() = runTest {
+        val item = CatalogItem(
+            id = "424242",
+            imdbId = null,
+            type = MediaType.MOVIE,
+            title = "Movie",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2001,
+            rating = null,
+        )
+        val sources = listOf("ithil-1", "other", "ithil-2").map { id ->
+            source(Episode(1, 1, "", "", null, null)).copy(
+                id = id,
+                infoHash = id,
+                directUrl = null,
+                resolveUrl = "https://video.test/$id",
+                isCached = false,
+                debrid = if (id.startsWith("ithil")) ITHIL_ALLDEBRID else "TorBox",
+            )
+        }
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
+        every { catalog.getStreams(item, null) } returns flowOf(StreamResults(sources = sources))
+        val holder = SelectedContentHolder().apply { selectItem(item) }
+        val viewModel = viewModel(catalog, holder)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.play()
+        testScheduler.advanceUntilIdle()
+
+        val queuedIds = holder.playback.value?.sources?.map { it.id }.orEmpty()
+        assertEquals(2, queuedIds.size)
+        assertEquals(setOf("ithil-1", "ithil-2"), queuedIds.toSet())
     }
 
     private fun viewModel(catalog: CatalogRepository, holder: SelectedContentHolder): DetailsViewModel =
