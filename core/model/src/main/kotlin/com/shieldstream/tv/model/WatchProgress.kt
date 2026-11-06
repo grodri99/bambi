@@ -4,6 +4,7 @@ data class WatchProgress(
     val positionMs: Long,
     val durationMs: Long,
     val updatedAt: Long,
+    val sourceId: String? = null,
 ) {
     val fraction: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f

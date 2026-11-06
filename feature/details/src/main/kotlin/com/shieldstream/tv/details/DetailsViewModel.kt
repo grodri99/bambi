@@ -427,7 +427,12 @@ class DetailsViewModel @Inject constructor(
 
     fun playSource(source: StreamSource) {
         val ready = content()?.sources as? SourcesState.Ready ?: return
-        startPlayback(ready.sources, startIndex = ready.sources.indexOf(source).coerceAtLeast(0), fromStart = false)
+        startPlayback(
+            ready.sources,
+            startIndex = ready.sources.indexOf(source).coerceAtLeast(0),
+            fromStart = false,
+            useSavedSource = false,
+        )
     }
 
     fun consumeMessage() = updateContent { it.copy(message = null) }
@@ -521,9 +526,28 @@ class DetailsViewModel @Inject constructor(
         startPlayback(ready.sources, startIndex = 0, fromStart = pendingFromStart)
     }
 
-    private fun startPlayback(sorted: List<StreamSource>, startIndex: Int, fromStart: Boolean) {
+    private fun startPlayback(
+        sorted: List<StreamSource>,
+        startIndex: Int,
+        fromStart: Boolean,
+        useSavedSource: Boolean = true,
+    ) {
         val c = content() ?: return
-        val queue = sorted.drop(startIndex)
+        val item = c.details.item
+        val episode = c.selectedEpisode?.takeIf { c.isSeries }
+        val key = if (episode != null) {
+            WatchProgress.episodeKey(item.id, episode.season, episode.number)
+        } else {
+            WatchProgress.movieKey(item.id)
+        }
+        val savedSourceId = if (useSavedSource) watchProgress.get(key)?.sourceId else null
+        val savedIndex = sorted.indexOfFirst { it.id == savedSourceId }
+        val ordered = if (savedIndex > 0) {
+            listOf(sorted[savedIndex]) + sorted.filterIndexed { index, _ -> index != savedIndex }
+        } else {
+            sorted
+        }
+        val queue = ordered.drop(startIndex)
             .filter { !c.spanishOnly || it.advertisesSpanishAudio }
             .distinctBy { it.infoHash.lowercase() }
             .filterIndexed { index, s ->
@@ -541,14 +565,7 @@ class DetailsViewModel @Inject constructor(
             }
             return
         }
-        val item = c.details.item
-        val episode = c.selectedEpisode?.takeIf { c.isSeries }
         val label = episode?.let { "${item.title} · ${texts.episodeCode(it)} · ${it.title}" } ?: item.title
-        val key = if (episode != null) {
-            WatchProgress.episodeKey(item.id, episode.season, episode.number)
-        } else {
-            WatchProgress.movieKey(item.id)
-        }
         val media = PlaybackMedia(
             type = item.type,
             imdbId = item.imdbId,

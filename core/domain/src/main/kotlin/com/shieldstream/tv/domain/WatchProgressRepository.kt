@@ -11,7 +11,7 @@ interface WatchProgressRepository {
 
     fun get(key: String): WatchProgress?
 
-    fun save(key: String, positionMs: Long, durationMs: Long)
+    fun save(key: String, positionMs: Long, durationMs: Long, sourceId: String? = null)
 
     fun clear(key: String)
 

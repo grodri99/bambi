@@ -52,12 +52,13 @@ class WatchProgressRepositoryImpl @Inject constructor(
 
     override fun get(key: String): WatchProgress? = _progress.value[key]
 
-    override fun save(key: String, positionMs: Long, durationMs: Long) {
+    override fun save(key: String, positionMs: Long, durationMs: Long, sourceId: String?) {
         if (durationMs <= 0) return
         val entry = WatchProgress(
             positionMs = positionMs.coerceIn(0L, durationMs),
             durationMs = durationMs,
             updatedAt = System.currentTimeMillis(),
+            sourceId = sourceId ?: get(key)?.sourceId,
         )
         store.prefs.edit().putString(key, encode(entry)).apply()
         _progress.update { it + (key to entry) }
@@ -72,10 +73,14 @@ class WatchProgressRepositoryImpl @Inject constructor(
 
     override fun importRemote(entries: Map<String, WatchProgress>) {
         if (entries.isEmpty()) return
+        val local = _progress.value
+        val merged = entries.mapValues { (key, value) ->
+            value.copy(sourceId = local[key]?.sourceId)
+        }
         val editor = store.prefs.edit()
-        entries.forEach { (key, value) -> editor.putString(key, encode(value)) }
+        merged.forEach { (key, value) -> editor.putString(key, encode(value)) }
         editor.apply()
-        _progress.update { it + entries }
+        _progress.update { it + merged }
     }
 
     override fun removeRemote(keys: Collection<String>) {
@@ -104,15 +109,19 @@ class WatchProgressRepositoryImpl @Inject constructor(
                 (value as? String)?.let { decode(it) }?.let { key to it }
             }.toMap()
 
-        private fun encode(p: WatchProgress) = "${p.positionMs}|${p.durationMs}|${p.updatedAt}"
+        private fun encode(p: WatchProgress) = buildString {
+            append(p.positionMs).append('|').append(p.durationMs).append('|').append(p.updatedAt)
+            p.sourceId?.let { append('|').append(it) }
+        }
 
         private fun decode(raw: String): WatchProgress? {
-            val parts = raw.split('|')
-            if (parts.size != 3) return null
+            val parts = raw.split('|', limit = 4)
+            if (parts.size !in 3..4) return null
             return WatchProgress(
                 positionMs = parts[0].toLongOrNull() ?: return null,
                 durationMs = parts[1].toLongOrNull() ?: return null,
                 updatedAt = parts[2].toLongOrNull() ?: return null,
+                sourceId = parts.getOrNull(3)?.takeIf { it.isNotEmpty() },
             )
         }
     }

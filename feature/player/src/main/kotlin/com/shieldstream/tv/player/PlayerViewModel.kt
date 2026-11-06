@@ -146,6 +146,7 @@ class PlayerViewModel @Inject constructor(
     private var trackSelectionToRestore: TrackSelectionParameters? = null
     private var resolvedUrl: String? = null
     private var playingFileName: String? = null
+    private var currentSourceId: String? = null
     private var resumePositionMs = 0L
 
     private var playbackRetries = 0
@@ -225,6 +226,7 @@ class PlayerViewModel @Inject constructor(
         val source = event.source
         Log.i("PlayerVM", "Fuente ${event.index + 1}/${queueSnapshot.size}: ${(source.fileName ?: source.title).take(120)}")
         playingFileName = source.fileName ?: source.title
+        currentSourceId = source.id
         val resumeAt = savedResumePosition()
         trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
         launchPlayer(event.url, startPositionMs = resumeAt)
@@ -393,7 +395,7 @@ class PlayerViewModel @Inject constructor(
         wentNext = true
         progressKey?.let { key ->
             val duration = _player.value?.duration ?: 0L
-            if (duration > 0) watchProgress.save(key, duration, duration)
+            if (duration > 0) watchProgress.save(key, duration, duration, currentSourceId)
         }
         scrobble(ScrobbleAction.STOP, fraction = 1f)
         holder.requestNext(next)
@@ -433,7 +435,7 @@ class PlayerViewModel @Inject constructor(
         val p = _player.value ?: return
         val duration = p.duration
         val position = p.currentPosition
-        if (duration > 0 && position > 0) watchProgress.save(key, position, duration)
+        if (duration > 0 && position > 0) watchProgress.save(key, position, duration, currentSourceId)
     }
 
     fun onStop() {
@@ -561,7 +563,7 @@ class PlayerViewModel @Inject constructor(
                     if (playbackState == Player.STATE_ENDED) {
                         val key = progressKey ?: return
                         val duration = player.duration
-                        if (duration > 0) watchProgress.save(key, duration, duration)
+                        if (duration > 0) watchProgress.save(key, duration, duration, currentSourceId)
                         scrobble(ScrobbleAction.STOP, fraction = 1f)
                         if (!nextUpDismissed && autoNext.value) playNextNow()
                     }

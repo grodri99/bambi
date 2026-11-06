@@ -23,6 +23,7 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.Season
 import com.shieldstream.tv.model.StreamSource
+import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.every
@@ -156,6 +157,118 @@ class DetailsViewModelTest {
     }
 
     @Test
+    fun `continue autoplay reuses the saved movie source and keeps failover alternatives`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.MOVIE,
+            title = "Movie",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val episode = Episode(1, 1, "", "", null, null)
+        val sources = listOf("a", "b", "c").map { id ->
+            source(episode).copy(id = "source-$id", infoHash = "hash-$id")
+        }
+        val key = WatchProgress.movieKey(item.id)
+        val saved = WatchProgress(60_000, 3_600_000, 1, sourceId = "source-b")
+        val progress = mockk<WatchProgressRepository>(relaxed = true) {
+            every { this@mockk.progress } returns MutableStateFlow(mapOf(key to saved))
+            every { this@mockk.get(key) } returns saved
+        }
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
+        every { catalog.getStreams(item, null) } returns flowOf(StreamResults(sources = sources))
+        val holder = SelectedContentHolder().apply { selectItem(item, playImmediately = true) }
+
+        viewModel(catalog, holder, progress)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf("source-b", "source-a", "source-c"),
+            holder.playback.value?.sources?.map { it.id },
+        )
+    }
+
+    @Test
+    fun `continue autoplay reuses the source saved for the target episode`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.TV,
+            title = "Show",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val episode = Episode(2, 3, "Current", "", null, 45)
+        val sources = listOf("a", "b", "c").map { id ->
+            source(episode).copy(id = "source-$id", infoHash = "hash-$id")
+        }
+        val key = WatchProgress.episodeKey(item.id, episode.season, episode.number)
+        val saved = WatchProgress(60_000, 2_700_000, 1, sourceId = "source-c")
+        val progress = mockk<WatchProgressRepository>(relaxed = true) {
+            every { this@mockk.progress } returns MutableStateFlow(mapOf(key to saved))
+            every { this@mockk.get(key) } returns saved
+        }
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
+        coEvery { catalog.getEpisodes(item, 2) } returns listOf(episode)
+        every { catalog.getStreams(item, any()) } returns flowOf(StreamResults(sources = sources))
+        val holder = SelectedContentHolder().apply {
+            selectItem(item, EpisodeTarget(2, 3), playImmediately = true)
+        }
+
+        viewModel(catalog, holder, progress)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf("source-c", "source-a", "source-b"),
+            holder.playback.value?.sources?.map { it.id },
+        )
+    }
+
+    @Test
+    fun `manual source selection overrides the previously saved source`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.MOVIE,
+            title = "Movie",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val episode = Episode(1, 1, "", "", null, null)
+        val sources = listOf("a", "b", "c").map { id ->
+            source(episode).copy(id = "source-$id", infoHash = "hash-$id")
+        }
+        val key = WatchProgress.movieKey(item.id)
+        val saved = WatchProgress(60_000, 3_600_000, 1, sourceId = "source-b")
+        val progress = mockk<WatchProgressRepository>(relaxed = true) {
+            every { this@mockk.progress } returns MutableStateFlow(mapOf(key to saved))
+            every { this@mockk.get(key) } returns saved
+        }
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
+        every { catalog.getStreams(item, null) } returns flowOf(StreamResults(sources = sources))
+        val holder = SelectedContentHolder().apply { selectItem(item) }
+        val viewModel = viewModel(catalog, holder, progress)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.playSource(sources.first())
+
+        assertEquals("source-a", holder.playback.value?.sources?.first()?.id)
+    }
+
+    @Test
     fun `Ithil links stay queued for failover without allowing other uncached resolvers`() = runTest {
         val item = CatalogItem(
             id = "424242",
@@ -193,7 +306,11 @@ class DetailsViewModelTest {
         assertEquals(setOf("ithil-1", "ithil-2"), queuedIds.toSet())
     }
 
-    private fun viewModel(catalog: CatalogRepository, holder: SelectedContentHolder): DetailsViewModel =
+    private fun viewModel(
+        catalog: CatalogRepository,
+        holder: SelectedContentHolder,
+        watchProgress: WatchProgressRepository? = null,
+    ): DetailsViewModel =
         DetailsViewModel(
             catalogRepository = catalog,
             realDebridRepository = mockk<RealDebridRepository>(relaxed = true),
@@ -207,7 +324,7 @@ class DetailsViewModelTest {
                 )
             },
             holder = holder,
-            watchProgress = mockk<WatchProgressRepository>(relaxed = true) {
+            watchProgress = watchProgress ?: mockk<WatchProgressRepository>(relaxed = true) {
                 every { progress } returns MutableStateFlow(emptyMap())
             },
             settings = mockk<SettingsRepository>(relaxed = true) {

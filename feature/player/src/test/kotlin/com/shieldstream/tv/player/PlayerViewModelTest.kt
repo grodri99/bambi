@@ -36,6 +36,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -110,6 +111,22 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun `stopping playback saves the selected source with watch progress`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(players, flowOf(40), SubtitlePreference.OFF)
+        fixture.viewModel.start()
+        yield()
+        every { players.player(0).duration } returns 120_000L
+        every { players.player(0).currentPosition } returns 45_000L
+
+        fixture.viewModel.onStop()
+
+        verify(exactly = 1) {
+            fixture.watchProgress.save("movie:1", 45_000L, 120_000L, "source")
+        }
+    }
+
+    @Test
     fun `subtitle appearance updates immediately and persists normalized values`() = runBlocking {
         val fixture = fixture(FakePlayers(Tracks.EMPTY), flowOf(40), SubtitlePreference.OFF)
         val requested = SubtitleAppearance(
@@ -180,8 +197,10 @@ class PlayerViewModelTest {
                 media = PlaybackMedia(MediaType.MOVIE, "tt1", "Movie", "Movie", 2020),
             )
         }
+        val watchProgress = mockk<WatchProgressRepository>(relaxed = true)
         return Fixture(
             settings = settings,
+            watchProgress = watchProgress,
             viewModel = PlayerViewModel(
                 media3Factory = media3Factory,
                 playbackPolicies = playbackPolicies,
@@ -189,7 +208,7 @@ class PlayerViewModelTest {
                 settings = settings,
                 profiles = profiles,
                 holder = holder,
-                watchProgress = mockk<WatchProgressRepository>(relaxed = true),
+                watchProgress = watchProgress,
                 subtitles = mockk<SubtitleRepository>(relaxed = true),
                 trakt = mockk<TraktRepository>(relaxed = true),
                 skipSegmentsRepository = mockk<SkipSegmentsRepository>(relaxed = true),
@@ -230,14 +249,17 @@ class PlayerViewModelTest {
     private data class Fixture(
         val viewModel: PlayerViewModel,
         val settings: SettingsRepository,
+        val watchProgress: WatchProgressRepository,
     )
 
     private class FakePlayers(private val tracks: Tracks) {
         val parameters = mutableListOf<TrackSelectionParameters>()
         private val listeners = mutableListOf<Player.Listener?>()
+        private val instances = mutableListOf<ExoPlayer>()
 
         fun create(): ExoPlayer {
             val player = mockk<ExoPlayer>(relaxed = true)
+            instances += player
             var selection = TrackSelectionParameters.DEFAULT
             parameters += selection
             listeners += null
@@ -262,6 +284,8 @@ class PlayerViewModelTest {
             assertNotNull(listeners[index])
             return listeners[index]!!
         }
+
+        fun player(index: Int): ExoPlayer = instances[index]
     }
 }
 
