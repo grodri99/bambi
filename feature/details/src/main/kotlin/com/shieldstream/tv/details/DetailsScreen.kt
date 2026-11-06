@@ -198,8 +198,8 @@ private fun DetailsContent(
         Column(
             Modifier
                 .fillMaxSize()
-                .then(if (!state.isSeries) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                .padding(top = 44.dp, bottom = 8.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(top = if (state.isSeries) 24.dp else 44.dp, bottom = 72.dp),
         ) {
             InfoBlock(
                 details = state.details,
@@ -218,15 +218,13 @@ private fun DetailsContent(
 
             if (state.isSeries) {
                 Spacer(Modifier.height(12.dp))
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    SeasonsAndEpisodes(
-                        state = state,
-                        interactive = !panelOpen && !actionsOpen,
-                        onSeason = { viewModel.selectSeason(it) },
-                        onEpisode = { viewModel.playEpisode(it) },
-                        onEpisodeLongPress = { viewModel.toggleEpisodeWatched(it) },
-                    )
-                }
+                SeasonsAndEpisodes(
+                    state = state,
+                    interactive = !panelOpen && !actionsOpen,
+                    onSeason = { viewModel.selectSeason(it) },
+                    onEpisode = { viewModel.playEpisode(it) },
+                    onEpisodeLongPress = { viewModel.toggleEpisodeWatched(it) },
+                )
             }
         }
         }
@@ -295,7 +293,7 @@ private fun InfoBlock(
                 contentDescription = item.title,
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                modifier = Modifier.heightIn(max = 110.dp).widthIn(max = 420.dp),
+                modifier = Modifier.heightIn(max = if (state.isSeries) 80.dp else 110.dp).widthIn(max = 420.dp),
             )
         } else {
             Text(
@@ -334,7 +332,7 @@ private fun InfoBlock(
             text = item.overview.ifBlank { details.tagline.orEmpty() },
             color = Color.White.copy(alpha = 0.9f),
             style = MaterialTheme.typography.bodyLarge,
-            maxLines = 3,
+            maxLines = if (state.isSeries) 2 else 3,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(20.dp))

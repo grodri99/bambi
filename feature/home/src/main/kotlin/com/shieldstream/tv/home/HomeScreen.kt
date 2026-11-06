@@ -694,7 +694,7 @@ private fun CatalogRowView(
 @Composable
 private fun HeroBackdrop(item: CatalogItem) {
     Box(Modifier.fillMaxSize()) {
-        val area = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.74f).fillMaxHeight(0.70f)
+        val area = Modifier.fillMaxSize()
         val backdropUrl = if (LocalLightweightUi.current) {
             item.backdropUrl?.replace("/w1280/", "/w780/")
         } else {

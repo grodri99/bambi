@@ -93,7 +93,7 @@ fun AppNavHost(holder: SelectedContentHolder, onExit: () -> Unit) {
                         val target = info.season?.let { season ->
                             info.episode?.let { episode -> EpisodeTarget(season, episode) }
                         }
-                        holder.selectItem(item, target, playImmediately = true)
+                        holder.selectItem(item, target)
                         navController.navigate("details")
                     }
                 },
@@ -108,7 +108,6 @@ fun AppNavHost(holder: SelectedContentHolder, onExit: () -> Unit) {
                         holder.selectItem(
                             item,
                             EpisodeTarget(episode.season, episode.number),
-                            playImmediately = true,
                         )
                         navController.navigate("details")
                     }
