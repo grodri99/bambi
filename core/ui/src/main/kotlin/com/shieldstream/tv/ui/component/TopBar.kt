@@ -179,7 +179,7 @@ private fun TopBarItem(
     // Focus is a faint pill; the selected tab carries a small accent underline.
     val background = if (focused) Color.White.copy(alpha = 0.18f) else Color.Transparent
     val foreground = if (focused || selected) Color.White else Color.White.copy(alpha = 0.6f)
-    val showIndicator = selected && label != null
+    val showIndicator = selected
     Box(
         modifier = modifier
             .graphicsLayer {

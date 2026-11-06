@@ -92,6 +92,9 @@ private val Green = AppColors.Success
 private val Grey = Color(0xFFB3B3B3)
 private val WatchedCountColor = Color.White.copy(alpha = 0.75f)
 
+/** Cached bolt on a focused (white) row: a darker green keeps contrast. */
+private val CachedFocused = Color(0xFF0A8F3C)
+
 internal enum class DetailsBackAction { DISMISS_ACTIONS, DISMISS_SOURCES, EXIT_DETAILS }
 
 internal fun detailsBackAction(actionsOpen: Boolean, panelOpen: Boolean): DetailsBackAction = when {
@@ -936,14 +939,24 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+        val secondary = if (focused) Color.Black.copy(alpha = 0.7f) else Grey
         Text(
-            note ?: buildString {
-                append(localizedStringResource(StringsR.string.details_source_count, count))
-                if (cached > 0) append(" · $cached ⚡")
-            },
-            color = if (focused) Color.Black.copy(alpha = 0.7f) else Grey,
+            note ?: localizedStringResource(StringsR.string.details_source_count, count),
+            color = secondary,
             style = MaterialTheme.typography.bodyMedium,
         )
+        if (note == null && cached > 0) {
+            // Same bolt icon and colour as the cached source rows, instead of a yellow emoji.
+            Text("  ·  ", color = secondary, style = MaterialTheme.typography.bodyMedium)
+            Icon(
+                AppIcons.Bolt,
+                contentDescription = localizedStringResource(StringsR.string.details_cached),
+                tint = if (focused) CachedFocused else Green,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(cached.toString(), color = secondary, style = MaterialTheme.typography.bodyMedium)
+        }
         if (note == null) Text(if (expanded) "   ▾" else "   ›", color = color, style = MaterialTheme.typography.titleMedium)
     }
 }
@@ -968,7 +981,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
         }
         val sub = if (focused) Color.Black.copy(alpha = 0.65f) else Color.White.copy(alpha = if (blocked) 0.3f else 0.55f)
         Box(Modifier.width(26.dp)) {
-            if (source.isCached) Icon(AppIcons.Bolt, contentDescription = localizedStringResource(StringsR.string.details_in_your_real_debrid), tint = if (focused) Color(0xFF0A8F3C) else Green)
+            if (source.isCached) Icon(AppIcons.Bolt, contentDescription = localizedStringResource(StringsR.string.details_in_your_real_debrid), tint = if (focused) CachedFocused else Green)
         }
         Column(Modifier.weight(1f)) {
             // Primary line: what the viewer chooses by (format, size, languages).

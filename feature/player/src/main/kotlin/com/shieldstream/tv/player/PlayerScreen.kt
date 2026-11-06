@@ -596,22 +596,30 @@ private fun ControlsOverlay(
     }
 }
 
+/**
+ * Fraction of [durationMs] covered by [ms], or null while the duration is unknown (0 or less).
+ * Without this guard an unknown duration made any position render as a full bar.
+ */
+internal fun seekFraction(ms: Long, durationMs: Long): Float? =
+    if (durationMs > 0) (ms.toFloat() / durationMs).coerceIn(0f, 1f) else null
+
 @Composable
 private fun SeekBar(playback: PlaybackState, positionMs: Long) {
-    val duration = playback.durationMs.coerceAtLeast(1L)
-    val played = (positionMs.toFloat() / duration).coerceIn(0f, 1f)
-    val buffered = (playback.bufferedMs.toFloat() / duration).coerceIn(0f, 1f)
+    val played = seekFraction(positionMs, playback.durationMs)
+    val buffered = seekFraction(playback.bufferedMs, playback.durationMs)
     BoxWithConstraints(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.CenterStart) {
         Box(Modifier.fillMaxWidth().height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.25f)))
-        Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.45f)))
-        Box(Modifier.fillMaxWidth(played).height(4.dp).clip(AppShapes.Pill).background(AppColors.Accent))
-        Box(
-            Modifier
-                .offset(x = maxWidth * played - 7.dp)
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(AppColors.Accent),
-        )
+        if (played != null && buffered != null) {
+            Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.45f)))
+            Box(Modifier.fillMaxWidth(played).height(4.dp).clip(AppShapes.Pill).background(AppColors.Accent))
+            Box(
+                Modifier
+                    .offset(x = maxWidth * played - 7.dp)
+                    .size(14.dp)
+                    .clip(CircleShape)
+                    .background(AppColors.Accent),
+            )
+        }
     }
 }
 
