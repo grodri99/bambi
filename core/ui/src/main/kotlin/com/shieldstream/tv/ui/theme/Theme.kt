@@ -12,12 +12,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFE50914),
-    onPrimary = Color.White,
+    primary = AppColors.Accent,
+    onPrimary = AppColors.OnAccent,
     secondary = Color(0xFFB0B3B8),
-    background = Color(0xFF0E0E10),
+    background = AppColors.Background,
     onBackground = Color.White,
-    surface = Color(0xFF1A1A1D),
+    surface = AppColors.Surface,
     onSurface = Color.White,
 )
 

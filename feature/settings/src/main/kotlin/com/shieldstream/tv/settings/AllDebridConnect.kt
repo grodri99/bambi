@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -152,13 +153,13 @@ fun AllDebridQrPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .width(250.dp)
-            .background(Color(0xFF1A1C27), RoundedCornerShape(18.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+            .background(AppColors.Surface, AppShapes.Panel)
+            .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
             .padding(20.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(190.dp).background(Color.White, RoundedCornerShape(12.dp)).padding(12.dp),
+            modifier = Modifier.size(190.dp).background(Color.White, AppShapes.Control).padding(12.dp),
         ) {
             when (val s = state) {
                 is AllDebridConnectUiState.ShowPin -> QrCode(s.url, Modifier.fillMaxSize())
@@ -194,14 +195,14 @@ fun AllDebridQrPanel(
                     textAlign = TextAlign.Center,
                 )
             }
-            AllDebridConnectUiState.Connected -> PanelStatus(localizedStringResource(StringsR.string.settings_connected), Color(0xFF46D369))
+            AllDebridConnectUiState.Connected -> PanelStatus(localizedStringResource(StringsR.string.settings_connected), AppColors.Success)
             AllDebridConnectUiState.Expired -> {
                 PanelStatus(localizedStringResource(StringsR.string.settings_the_code_has_expired), Color.White)
                 Spacer(Modifier.height(10.dp))
                 TvButton(localizedStringResource(StringsR.string.settings_get_a_new_code), onClick = { viewModel.start { currentOnConnected() } })
             }
             is AllDebridConnectUiState.Error -> {
-                PanelStatus(s.message, Color(0xFFFF5A5F))
+                PanelStatus(s.message, AppColors.Error)
                 Spacer(Modifier.height(10.dp))
                 TvButton(localizedStringResource(StringsR.string.settings_retry), onClick = { viewModel.start { currentOnConnected() } })
             }
@@ -211,7 +212,7 @@ fun AllDebridQrPanel(
 
 @Composable
 private fun PanelMessage(text: String) {
-    Text(text, color = Color(0xFF1A1C27), fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+    Text(text, color = AppColors.Surface, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
 }
 
 @Composable

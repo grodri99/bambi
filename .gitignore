@@ -27,6 +27,9 @@ _archivo/
 .git_log.txt
 .git_msg
 
+# --- Exportaciones de sesiones de agentes (registros en bruto) ---
+pi-session-*.html
+
 # --- IDE / sistema ---
 .idea/
 *.iml

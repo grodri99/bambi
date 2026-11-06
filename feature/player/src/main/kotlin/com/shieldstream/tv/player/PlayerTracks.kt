@@ -1,5 +1,7 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.Texts
@@ -21,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,7 +63,6 @@ import com.shieldstream.tv.ui.component.tvClickable
 import java.util.Locale
 
 private val UiLocale: Locale get() = Lang.locale
-private val NetflixRed = Color(0xFFE50914)
 
 private data class TrackOption(
     val key: String,
@@ -436,7 +436,7 @@ private fun AppearanceControlRow(
                     else -> false
                 }
             }
-            .clip(RoundedCornerShape(6.dp))
+            .clip(AppShapes.Control)
             .background(if (focused) Color.White else Color.Transparent)
             .tvClickable(onClick = { onShift(1) })
             .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -467,7 +467,7 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(6.dp))
+            .clip(AppShapes.Control)
             .background(if (focused) Color.White else Color.Transparent)
             .tvClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -475,7 +475,7 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
     ) {
         Text(
             text = if (option.selected) "✓" else "",
-            color = if (focused) Color.Black else NetflixRed,
+            color = if (focused) Color.Black else AppColors.Accent,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.width(28.dp),
         )

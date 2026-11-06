@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.phoneconfig
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,9 +45,9 @@ import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.theme.DisplayFont
 
-private val PhoneBackground = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
+private val PhoneBackground = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
 private val PhoneMuted = Color.White.copy(alpha = 0.62f)
-private val PhonePanel = Color(0xFF1A1C27)
+private val PhonePanel = AppColors.Surface
 
 @Composable
 fun PhoneConfigScreen(
@@ -119,7 +120,7 @@ fun PhoneConfigScreen(
                                 },
                             ),
                             style = MaterialTheme.typography.titleLarge,
-                            color = if (setupComplete || configurationSaved) Color(0xFF46D369) else PhoneMuted,
+                            color = if (setupComplete || configurationSaved) AppColors.Success else PhoneMuted,
                         )
                         Spacer(Modifier.height(20.dp))
                         Text(s.connection.displayUrl, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -138,7 +139,7 @@ fun PhoneConfigScreen(
                     PhoneConfigUiState.Error -> Text(
                         viewModel.errorMessage(),
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color(0xFFFF5A5F),
+                        color = AppColors.Error,
                     )
                 }
                 Spacer(Modifier.height(30.dp))
@@ -176,11 +177,11 @@ fun PhoneConfigScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .width(328.dp)
-                        .background(PhonePanel, RoundedCornerShape(20.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                        .background(PhonePanel, AppShapes.Panel)
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
                         .padding(24.dp),
                 ) {
-                    Box(Modifier.size(280.dp).background(Color.White, RoundedCornerShape(14.dp)).padding(16.dp)) {
+                    Box(Modifier.size(280.dp).background(Color.White, AppShapes.Control).padding(16.dp)) {
                         QrCode(connection.url, Modifier.fillMaxSize())
                     }
                     Spacer(Modifier.height(16.dp))

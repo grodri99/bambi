@@ -1,5 +1,7 @@
 package com.shieldstream.tv.ui.component
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -12,10 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,8 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
@@ -47,8 +48,7 @@ import com.shieldstream.tv.strings.localizedPluralResource
 import com.shieldstream.tv.strings.localizedStringResource
 
 val PosterWidth: Dp = 136.dp
-private val CardShape = RoundedCornerShape(12.dp)
-private val AccentColor = Color(0xFFE50914)
+private val CardShape = AppShapes.Control
 private val FocusBorderColor = Color.White.copy(alpha = 0.88f)
 private val PosterCaptionHeight = 48.dp
 private val ContinueCardWidth = 240.dp
@@ -87,7 +87,7 @@ fun PosterCard(
                     scaleY = scale
                 }
                 .clip(CardShape)
-                .background(Color(0xFF232327))
+                .background(AppColors.Placeholder)
                 .then(if (focused) Modifier.border(2.dp, FocusBorderColor, CardShape) else Modifier),
         ) {
             if (item.posterUrl != null) {
@@ -115,7 +115,7 @@ fun PosterCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .background(Color(0xFFE50914), RoundedCornerShape(3.dp))
+                        .background(AppColors.Alert, AppShapes.Badge)
                         .padding(horizontal = 5.dp, vertical = 2.dp),
                 )
             }
@@ -199,7 +199,7 @@ fun ContinueCard(
                 scaleY = scale
             }
             .clip(CardShape)
-            .background(Color(0xFF232327))
+            .background(AppColors.Placeholder)
             .then(if (focused) Modifier.border(2.dp, FocusBorderColor, CardShape) else Modifier),
     ) {
         val imageUrl = item.backdropUrl ?: item.posterUrl
@@ -234,7 +234,7 @@ fun ContinueCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.58f), RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.58f), AppShapes.Pill)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
@@ -249,7 +249,7 @@ fun ContinueCard(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(8.dp)
-                    .background(AccentColor, RoundedCornerShape(4.dp))
+                    .background(AppColors.Alert, AppShapes.Badge)
                     .padding(horizontal = 6.dp, vertical = 3.dp),
             )
         }
@@ -275,7 +275,7 @@ fun ContinueCard(
                 Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                    .background(AccentColor),
+                    .background(AppColors.Accent),
             )
         }
     }
@@ -310,7 +310,7 @@ fun NewEpisodeCard(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(6.dp)
-                    .background(Color(0xFFE50914), RoundedCornerShape(3.dp))
+                    .background(AppColors.Alert, AppShapes.Badge)
                     .padding(horizontal = 5.dp, vertical = 2.dp),
             )
         },
@@ -344,30 +344,29 @@ fun Top10Card(
     onFocused: () -> Unit = {},
     newEpisodeCount: Int = 0,
 ) {
-    val numberWidth = if (rank >= 10) 104.dp else 70.dp
-    val posterHeight = PosterWidth * 1.5f
-    Box(modifier = Modifier.width(numberWidth + PosterWidth).height(posterHeight)) {
-        val numberStyle = TextStyle(
-            fontSize = 150.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = (-12).sp,
-        )
-        Text(
-            text = rank.toString(),
-            style = numberStyle.copy(color = Color(0xFF0E0E10)),
-            modifier = Modifier.align(Alignment.BottomStart).offset(x = (-4).dp, y = 36.dp),
-        )
-        Text(
-            text = rank.toString(),
-            style = numberStyle.copy(color = Color(0xFF8C8C90), drawStyle = Stroke(width = 5f)),
-            modifier = Modifier.align(Alignment.BottomStart).offset(x = (-4).dp, y = 36.dp),
-        )
-        PosterCard(
-            item = item,
-            onClick = onClick,
-            onFocused = onFocused,
-            newEpisodeCount = newEpisodeCount,
-            modifier = modifier.align(Alignment.BottomEnd),
-        )
-    }
+    PosterCard(
+        item = item,
+        onClick = onClick,
+        onFocused = onFocused,
+        newEpisodeCount = newEpisodeCount,
+        modifier = modifier,
+        overlay = {
+            Text(
+                text = rank.toString(),
+                color = Color.White,
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Black,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.75f),
+                        offset = Offset(2f, 2f),
+                        blurRadius = 6f,
+                    ),
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 4.dp),
+            )
+        },
+    )
 }

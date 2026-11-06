@@ -1,5 +1,7 @@
 package com.shieldstream.tv.ui.component
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.annotation.StringRes
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.R as StringsR
@@ -10,6 +12,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.res.painterResource
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -84,14 +90,14 @@ fun TopBar(
             Image(
                 painter = painterResource(R.drawable.franklix_logo),
                 contentDescription = "Franklix",
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(32.dp),
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
                 text = "Franklix",
                 color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
             )
         }
         Row(
@@ -145,13 +151,13 @@ private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
             .border(
                 width = 2.dp,
                 color = if (focused) Color.White else Color.Transparent,
-                shape = RoundedCornerShape(8.dp),
+                shape = CircleShape,
             )
             .padding(3.dp)
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick),
     ) {
-        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp)
+        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp, shape = CircleShape)
     }
 }
 
@@ -170,23 +176,29 @@ private fun TopBarItem(
     } else {
         animateFloatAsState(if (focused) 1.03f else 1f, label = "topBarScale").value
     }
-    val background = when {
-        focused -> Color.White
-        selected -> Color.White.copy(alpha = 0.12f)
-        else -> Color.Transparent
-    }
-    val foreground = when {
-        focused -> Color.Black
-        selected -> Color.White
-        else -> Color.White.copy(alpha = 0.75f)
-    }
+    // Focus is a faint pill; the selected tab carries a small accent underline.
+    val background = if (focused) Color.White.copy(alpha = 0.18f) else Color.Transparent
+    val foreground = if (focused || selected) Color.White else Color.White.copy(alpha = 0.6f)
+    val showIndicator = selected && label != null
     Box(
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .background(background, RoundedCornerShape(50))
+            .background(background, AppShapes.Pill)
+            .drawBehind {
+                if (showIndicator) {
+                    val width = 18.dp.toPx()
+                    val height = 3.dp.toPx()
+                    drawRoundRect(
+                        color = AppColors.Accent,
+                        topLeft = Offset((size.width - width) / 2f, size.height - height - 1.dp.toPx()),
+                        size = Size(width, height),
+                        cornerRadius = CornerRadius(height / 2f),
+                    )
+                }
+            }
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
             .padding(horizontal = if (label != null) 18.dp else 10.dp, vertical = 7.dp),
@@ -210,7 +222,7 @@ private fun TopBarItem(
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier
-                            .background(Color(0xFFE50914), RoundedCornerShape(50))
+                            .background(AppColors.Alert, AppShapes.Pill)
                             .padding(horizontal = 5.dp, vertical = 1.dp),
                     )
                 }

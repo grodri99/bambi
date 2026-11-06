@@ -1,5 +1,7 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -23,7 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -115,7 +116,7 @@ fun SearchScreen(
         runCatching { layoutKey.requestFocus() }
     }
 
-    Row(Modifier.fillMaxSize().background(Color.Black)) {
+    Row(Modifier.fillMaxSize().background(AppColors.Background)) {
         Column(
             Modifier
                 .width(if (qwerty) 452.dp else 330.dp)
@@ -126,9 +127,9 @@ fun SearchScreen(
                 Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF1C1C1F))
-                    .then(if (systemKeyboard) Modifier.border(2.dp, Color.White, RoundedCornerShape(4.dp)) else Modifier)
+                    .clip(AppShapes.Control)
+                    .background(AppColors.Surface)
+                    .then(if (systemKeyboard) Modifier.border(2.dp, Color.White, AppShapes.Control) else Modifier)
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -296,9 +297,9 @@ private fun KeyButton(
             .width(width)
             .height(40.dp)
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (focused) Color.White else Color(0xFF1C1C1F))
-            .then(if (focused) Modifier else Modifier.border(1.dp, Color(0xFF2C2C30), RoundedCornerShape(4.dp)))
+            .clip(AppShapes.Control)
+            .background(if (focused) Color.White else AppColors.Surface)
+            .then(if (focused) Modifier else Modifier.border(1.dp, Color(0xFF2C2C30), AppShapes.Control))
             .tvClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

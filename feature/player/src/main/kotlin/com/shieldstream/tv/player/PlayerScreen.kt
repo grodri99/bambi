@@ -1,5 +1,7 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.rememberTexts
@@ -38,7 +40,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -87,7 +88,6 @@ import com.shieldstream.tv.ui.component.PlaybackMediaBadges
 import com.shieldstream.tv.ui.component.onBackKey
 import kotlinx.coroutines.delay
 
-private val NetflixRed = Color(0xFFE50914)
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -298,7 +298,7 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .onBackKey(enabled = scrubMs != null) {
                 scrubMs = null
                 if (resumeAfterScrub) player?.play()
@@ -358,7 +358,7 @@ fun PlayerScreen(
 
         if (state == PlayerUiState.Playing) {
             if (playback.buffering) {
-                CircularProgressIndicator(color = NetflixRed, modifier = Modifier.align(Alignment.Center).size(48.dp))
+                CircularProgressIndicator(color = AppColors.Accent, modifier = Modifier.align(Alignment.Center).size(48.dp))
             }
             AnimatedVisibility(visible = controlsVisible && !syncOpen, enter = fadeIn(), exit = fadeOut()) {
                 ControlsOverlay(
@@ -377,7 +377,7 @@ fun PlayerScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.55f), AppShapes.Control)
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 )
             }
@@ -396,7 +396,7 @@ fun PlayerScreen(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 40.dp)
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(AppShapes.Pill)
                         .background(Color.Black.copy(alpha = 0.7f))
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 )
@@ -453,7 +453,7 @@ private const val SKIP_VISIBLE_MS = 10_000L
 
 @Composable
 private fun PlayerPill(text: String, icon: ImageVector, fill: Float?, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(50)
+    val shape = AppShapes.Pill
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -602,15 +602,15 @@ private fun SeekBar(playback: PlaybackState, positionMs: Long) {
     val played = (positionMs.toFloat() / duration).coerceIn(0f, 1f)
     val buffered = (playback.bufferedMs.toFloat() / duration).coerceIn(0f, 1f)
     BoxWithConstraints(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.CenterStart) {
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.25f)))
-        Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.45f)))
-        Box(Modifier.fillMaxWidth(played).height(4.dp).clip(RoundedCornerShape(2.dp)).background(NetflixRed))
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.25f)))
+        Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.45f)))
+        Box(Modifier.fillMaxWidth(played).height(4.dp).clip(AppShapes.Pill).background(AppColors.Accent))
         Box(
             Modifier
                 .offset(x = maxWidth * played - 7.dp)
                 .size(14.dp)
                 .clip(CircleShape)
-                .background(NetflixRed),
+                .background(AppColors.Accent),
         )
     }
 }
@@ -618,7 +618,7 @@ private fun SeekBar(playback: PlaybackState, positionMs: Long) {
 @Composable
 private fun StatusOverlay(title: String, message: String, loading: Boolean) {
     Column(
-        modifier = Modifier.fillMaxSize().background(Color.Black).padding(48.dp),
+        modifier = Modifier.fillMaxSize().background(AppColors.Background).padding(48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -632,7 +632,7 @@ private fun StatusOverlay(title: String, message: String, loading: Boolean) {
             Spacer(Modifier.height(20.dp))
         }
         if (loading) {
-            CircularProgressIndicator(color = NetflixRed, modifier = Modifier.size(40.dp))
+            CircularProgressIndicator(color = AppColors.Accent, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(16.dp))
         }
         Text(

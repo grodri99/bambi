@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
@@ -21,9 +22,9 @@ fun ProfileAvatar(
     avatar: Int,
     size: Dp,
     modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(size * 0.14f),
 ) {
     val (top, bottom) = ProfileAvatars.colors[ProfileAvatars.safe(avatar)]
-    val shape = RoundedCornerShape(size * 0.14f)
     Box(
         modifier
             .size(size)

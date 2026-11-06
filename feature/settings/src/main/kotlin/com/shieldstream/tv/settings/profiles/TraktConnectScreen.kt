@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,7 +55,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
             Column(Modifier.width(500.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(52.dp).background(TraktRed, RoundedCornerShape(50)),
+                        Modifier.size(52.dp).background(TraktRed, AppShapes.Pill),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("t", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
@@ -89,8 +90,8 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                                 Box(
                                     Modifier
                                         .size(width = 46.dp, height = 60.dp)
-                                        .background(Color(0xFF1A1C27), RoundedCornerShape(10.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+                                        .background(AppColors.Surface, AppShapes.Control)
+                                        .border(1.dp, Color.White.copy(alpha = 0.18f), AppShapes.Control),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
@@ -116,7 +117,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                     is TraktConnectUiState.Connected -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
-                                Modifier.size(40.dp).background(Color(0xFF46D369), RoundedCornerShape(50)),
+                                Modifier.size(40.dp).background(AppColors.Success, AppShapes.Pill),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(AppIcons.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(28.dp))
@@ -147,7 +148,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         }
                     }
                     is TraktConnectUiState.Error -> {
-                        Text(s.message, color = Color(0xFFFF5A5F), fontSize = 22.sp)
+                        Text(s.message, color = AppColors.Error, fontSize = 22.sp)
                         Spacer(Modifier.height(24.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             TvButton(localizedStringResource(StringsR.string.settings_retry), onClick = viewModel::start, modifier = Modifier.focusRequester(buttonRequester))
@@ -162,11 +163,11 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .background(Color(0xFF1A1C27), RoundedCornerShape(18.dp))
+                        .background(AppColors.Surface, AppShapes.Panel)
                         .padding(22.dp),
                 ) {
                     Box(
-                        Modifier.size(190.dp).background(Color.White, RoundedCornerShape(12.dp)).padding(12.dp),
+                        Modifier.size(190.dp).background(Color.White, AppShapes.Control).padding(12.dp),
                     ) {
                         QrCode(code.url, Modifier.fillMaxSize())
                     }
@@ -182,7 +183,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
 private fun Step(number: String, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(32.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(50)),
+            Modifier.size(32.dp).background(Color.White.copy(alpha = 0.12f), AppShapes.Pill),
             contentAlignment = Alignment.Center,
         ) {
             Text(number, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)

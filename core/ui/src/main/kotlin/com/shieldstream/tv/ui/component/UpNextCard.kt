@@ -1,5 +1,7 @@
 package com.shieldstream.tv.ui.component
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +37,7 @@ import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Episode
 
-private val UpNextCardShape = RoundedCornerShape(12.dp)
+private val UpNextCardShape = AppShapes.Control
 private val UpNextCardWidth = 240.dp
 
 fun upNextImageUrl(item: CatalogItem, episode: Episode): String? =
@@ -72,7 +73,7 @@ fun UpNextCard(
                 scaleY = scale
             }
             .clip(UpNextCardShape)
-            .background(Color(0xFF232327))
+            .background(AppColors.Placeholder)
             .then(if (focused) Modifier.border(2.dp, Color.White.copy(alpha = 0.88f), UpNextCardShape) else Modifier),
     ) {
         val imageUrl = upNextImageUrl(item, episode)
@@ -112,7 +113,7 @@ fun UpNextCard(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(8.dp)
-                .background(Color(0xFFE50914), RoundedCornerShape(3.dp))
+                .background(AppColors.Alert, AppShapes.Badge)
                 .padding(horizontal = 5.dp, vertical = 2.dp),
         )
         Column(

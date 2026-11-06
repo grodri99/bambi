@@ -1,5 +1,7 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -20,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -265,7 +266,7 @@ internal fun SeekThumbnailStrip(
             color = Color.White,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier
-                .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.65f), AppShapes.Pill)
                 .padding(horizontal = 14.dp, vertical = 4.dp),
         )
         Spacer(Modifier.height(8.dp))
@@ -296,13 +297,13 @@ private fun ThumbCard(bitmap: Bitmap?, label: String?, visible: Boolean, highlig
         Spacer(Modifier.size(width, height))
         return
     }
-    val shape = RoundedCornerShape(6.dp)
+    val shape = AppShapes.Control
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(width, height)
             .clip(shape)
-            .background(Color(0xFF15161E))
+            .background(AppColors.Surface)
             .border(if (highlighted) 2.dp else 1.dp, if (highlighted) Color.White else Color.White.copy(alpha = 0.15f), shape),
     ) {
         if (bitmap != null) {

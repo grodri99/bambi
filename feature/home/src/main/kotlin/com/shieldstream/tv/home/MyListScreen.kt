@@ -1,5 +1,6 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -160,7 +160,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
                     selected -> Color.White.copy(alpha = 0.22f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
-                RoundedCornerShape(50),
+                AppShapes.Pill,
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)

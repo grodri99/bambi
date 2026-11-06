@@ -1,5 +1,7 @@
 package com.shieldstream.tv.details
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.domain.SourceProvider
@@ -34,7 +36,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -87,7 +88,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import java.util.Locale
 
-private val Green = Color(0xFF46D369)
+private val Green = AppColors.Success
 private val Grey = Color(0xFFB3B3B3)
 
 internal enum class DetailsBackAction { DISMISS_ACTIONS, DISMISS_SOURCES, EXIT_DETAILS }
@@ -126,7 +127,7 @@ fun DetailsScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenHidden() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onScreenResumed() }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(AppColors.Background)) {
         when (val s = state) {
             DetailsUiState.Loading -> CircularProgressIndicator(
                 color = Color.White,
@@ -422,7 +423,7 @@ private fun DetailsActions(
         Column(
             Modifier
                 .width(360.dp)
-                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .background(AppColors.Surface, AppShapes.Control)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -525,7 +526,7 @@ private fun Badge(text: String) {
         color = Color.White,
         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
         modifier = Modifier
-            .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.6f), AppShapes.Badge)
             .padding(horizontal = 6.dp, vertical = 1.dp),
     )
 }
@@ -677,9 +678,9 @@ private fun SeasonChip(label: String, selected: Boolean, enabled: Boolean, onCli
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
         modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(20.dp))
+            .clip(AppShapes.Pill)
             .background(bg)
-            .then(if (!focused && !selected) Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) else Modifier)
+            .then(if (!focused && !selected) Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), AppShapes.Pill) else Modifier)
             .tvClickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 7.dp),
     )
@@ -697,7 +698,7 @@ private fun EpisodeCard(
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "episodeScale")
-    val shape = RoundedCornerShape(6.dp)
+    val shape = AppShapes.Control
     Column(
         Modifier
             .width(200.dp)
@@ -712,7 +713,7 @@ private fun EpisodeCard(
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .clip(shape)
-                .background(Color(0xFF232327))
+                .background(AppColors.Placeholder)
                 .then(if (focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
                 .then(if (enabled) Modifier.tvClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.tvClickable(enabled = false) {}),
@@ -731,7 +732,7 @@ private fun EpisodeCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .size(26.dp)
-                        .clip(RoundedCornerShape(13.dp))
+                        .clip(AppShapes.Pill)
                         .background(Color.Black.copy(alpha = 0.75f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -748,7 +749,7 @@ private fun EpisodeCard(
             }
             if (focused || loading) {
                 Box(
-                    Modifier.align(Alignment.Center).size(44.dp).clip(RoundedCornerShape(22.dp))
+                    Modifier.align(Alignment.Center).size(44.dp).clip(AppShapes.Pill)
                         .background(Color.Black.copy(alpha = 0.6f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -896,7 +897,7 @@ private fun SpanishOnlyChip(enabled: Boolean, onClick: () -> Unit) {
                     enabled -> Color.White.copy(alpha = 0.22f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
-                RoundedCornerShape(50),
+                AppShapes.Pill,
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
@@ -912,7 +913,7 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .background(if (focused) Color.White else Color.White.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.10f), AppShapes.Control)
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -937,7 +938,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(6.dp))
+            .clip(AppShapes.Control)
             .background(if (focused) Color.White else Color.White.copy(alpha = 0.06f))
             .tvClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -995,14 +996,14 @@ private fun WatchBar(fraction: Float, modifier: Modifier = Modifier) {
     Box(
         modifier
             .height(4.dp)
-            .clip(RoundedCornerShape(2.dp))
+            .clip(AppShapes.Pill)
             .background(Color.White.copy(alpha = 0.3f)),
     ) {
         Box(
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(Color(0xFFE50914)),
+                .background(AppColors.Accent),
         )
     }
 }

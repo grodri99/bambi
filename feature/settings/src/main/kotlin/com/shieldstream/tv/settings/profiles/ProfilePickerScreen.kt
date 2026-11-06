@@ -1,5 +1,6 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.animation.core.animateFloatAsState
@@ -51,7 +52,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
-internal val ProfileBackground = Brush.verticalGradient(listOf(Color(0xFF14151F), Color.Black))
+internal val ProfileBackground = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
 internal val ProfileMuted = Color.White.copy(alpha = 0.55f)
 
 @Composable
@@ -63,7 +64,7 @@ fun ProfilePickerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ready = state as? ProfilesUiState.Ready ?: run {
-        Box(Modifier.fillMaxSize().background(Color.Black))
+        Box(Modifier.fillMaxSize().background(AppColors.Background))
         return
     }
     var manage by remember { mutableStateOf(false) }

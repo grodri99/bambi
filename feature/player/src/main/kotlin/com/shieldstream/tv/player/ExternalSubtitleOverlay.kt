@@ -1,5 +1,6 @@
 package com.shieldstream.tv.player
 
+import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.rememberTexts
@@ -85,13 +86,13 @@ internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifie
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = localizedStringResource(StringsR.string.player_sync_subtitles),
-                color = Color.White,
+                color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
             Spacer(Modifier.width(24.dp))
             Text(
                 text = timing.describe(texts),
-                color = Color(0xFFE50914),
+                color = AppColors.Accent,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
         }

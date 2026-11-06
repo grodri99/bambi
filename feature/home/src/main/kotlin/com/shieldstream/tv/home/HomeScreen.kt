@@ -1,5 +1,8 @@
 package com.shieldstream.tv.home
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
+import com.shieldstream.tv.ui.theme.AppSpacing
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.model.Lang
@@ -28,7 +31,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,6 +58,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,8 +97,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import java.util.Locale
 
-private val ContentStart = 48.dp
-private val RowBackground = Color(0xFF0B0D12)
+private val ContentStart = AppSpacing.ScreenEdge
+private val RowBackground = AppColors.Background
 
 internal enum class UpNextBadge { UP_NEXT, NEW_EPISODE, NEW_SEASON }
 
@@ -281,7 +284,7 @@ private fun Billboard(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .onBackKey(enabled = !topBarFocused) { focusTopBar() },
     ) {
         if (featured.isNotEmpty()) {
@@ -397,7 +400,7 @@ internal fun RowsBrowser(
                         text = it.uppercase(Lang.locale),
                         fontFamily = DisplayFont,
                         fontSize = 30.sp,
-                        color = Color(0xFFE50914),
+                        color = AppColors.Accent,
                     )
                 }
                 HeroInfo(item = hero)
@@ -500,7 +503,7 @@ private fun ContinueActions(
         Column(
             Modifier
                 .width(360.dp)
-                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .background(AppColors.Surface, AppShapes.Control)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -535,7 +538,7 @@ private fun UpNextActions(
         Column(
             Modifier
                 .width(360.dp)
-                .background(Color(0xFF1C1C20), RoundedCornerShape(12.dp))
+                .background(AppColors.Surface, AppShapes.Control)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -565,12 +568,12 @@ private fun CatalogRowView(
     Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.padding(start = ContentStart, top = 4.dp),
+            modifier = Modifier.padding(start = ContentStart, top = 22.dp),
         ) {
             Text(
                 text = row.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.90f),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White.copy(alpha = 0.92f),
             )
             if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT) {
                 Spacer(Modifier.width(12.dp))
@@ -711,9 +714,9 @@ private fun HeroBackdrop(item: CatalogItem) {
         Box(
             Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(
-                    0f to Color(0xFF0B0D12),
-                    0.28f to Color(0xFF0B0D12),
-                    0.52f to Color(0xFF0B0D12).copy(alpha = 0.72f),
+                    0f to AppColors.Background,
+                    0.28f to AppColors.Background,
+                    0.52f to AppColors.Background.copy(alpha = 0.72f),
                     0.72f to Color.Transparent,
                 ),
             ),
@@ -722,8 +725,8 @@ private fun HeroBackdrop(item: CatalogItem) {
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     0.40f to Color.Transparent,
-                    0.72f to Color(0xFF0B0D12).copy(alpha = 0.25f),
-                    1f to Color(0xFF0B0D12),
+                    0.72f to AppColors.Background.copy(alpha = 0.25f),
+                    1f to AppColors.Background,
                 ),
             ),
         )
@@ -756,8 +759,8 @@ private fun metaLine(item: CatalogItem): String = buildList {
     item.rating?.takeIf { it > 0f }?.let { add("★ " + String.format(Lang.locale, "%.1f", it)) }
 }.joinToString("  ·  ")
 
-private val BillboardBackground = Brush.verticalGradient(listOf(Color(0xFF0B0B0D), Color.Black))
-private val SkeletonColor = Color(0xFF202023)
+private val BillboardBackground = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
+private val SkeletonColor = AppColors.Placeholder
 
 @Composable
 private fun delayedSkeletonAlpha(): Float {
@@ -791,14 +794,14 @@ private fun ColumnScope.BillboardSkeleton() {
             .weight(1f)
             .fillMaxWidth()
             .graphicsLayer { this.alpha = alpha }
-            .background(Brush.verticalGradient(listOf(Color(0xFF17171B), Color(0xFF0D0D0F)))),
+            .background(Brush.verticalGradient(listOf(AppColors.BackgroundRaised, AppColors.Background))),
     ) {
         Column(Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 40.dp)) {
-            Box(Modifier.width(320.dp).height(42.dp).background(SkeletonColor, RoundedCornerShape(6.dp)))
+            Box(Modifier.width(320.dp).height(42.dp).background(SkeletonColor, AppShapes.Badge))
             Spacer(Modifier.height(14.dp))
-            Box(Modifier.width(340.dp).height(16.dp).background(SkeletonColor, RoundedCornerShape(4.dp)))
+            Box(Modifier.width(340.dp).height(16.dp).background(SkeletonColor, AppShapes.Badge))
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.width(126.dp).height(36.dp).background(SkeletonColor, RoundedCornerShape(50)))
+            Box(Modifier.width(126.dp).height(36.dp).background(SkeletonColor, AppShapes.Pill))
         }
     }
     Row(
@@ -813,7 +816,7 @@ private fun ColumnScope.BillboardSkeleton() {
                 Modifier
                     .width((104 + (index % 3) * 18).dp)
                     .height(40.dp)
-                    .background(SkeletonColor, RoundedCornerShape(50)),
+                    .background(SkeletonColor, AppShapes.Pill),
             )
         }
     }
@@ -825,7 +828,7 @@ internal fun HomeSkeleton() {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(AppColors.Background)
             .graphicsLayer { this.alpha = alpha }
             .padding(start = ContentStart, top = 140.dp),
     ) {
@@ -834,7 +837,7 @@ internal fun HomeSkeleton() {
                 Modifier
                     .width(180.dp)
                     .height(18.dp)
-                    .background(SkeletonColor, RoundedCornerShape(4.dp)),
+                    .background(SkeletonColor, AppShapes.Badge),
             )
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -843,7 +846,7 @@ internal fun HomeSkeleton() {
                         Modifier
                             .width(PosterWidth)
                             .aspectRatio(2f / 3f)
-                            .background(SkeletonColor, RoundedCornerShape(12.dp)),
+                            .background(SkeletonColor, AppShapes.Control),
                     )
                 }
             }
@@ -860,7 +863,7 @@ internal fun HomeError(message: String, onRetry: () -> Unit, modifier: Modifier 
         runCatching { retryRequester.requestFocus() }
     }
     Column(
-        modifier.background(Color.Black),
+        modifier.background(AppColors.Background),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

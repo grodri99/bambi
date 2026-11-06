@@ -1,5 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
+import com.shieldstream.tv.ui.theme.AppColors
+import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -328,11 +329,11 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF101119), RoundedCornerShape(10.dp))
+                    .background(AppColors.Field, AppShapes.Control)
                     .border(
                         width = if (focused) 2.dp else 1.dp,
                         color = if (focused) Color.White else Color.White.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = AppShapes.Control,
                     )
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             ) {
@@ -361,7 +362,7 @@ private fun ColorChoice(initial: String, avatar: Int, selected: Boolean, onClick
                     selected -> Color.White.copy(alpha = 0.55f)
                     else -> Color.Transparent
                 },
-                shape = RoundedCornerShape(10.dp),
+                shape = AppShapes.Control,
             )
             .padding(4.dp)
             .onFocusChanged { focused = it.isFocused }
@@ -394,11 +395,11 @@ private fun TraktCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (focused) Color(0xFF2A2D3D) else Color(0xFF1A1C27), RoundedCornerShape(14.dp))
+            .background(if (focused) AppColors.SurfaceFocused else AppColors.Surface, AppShapes.Control)
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) Color.White else Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(14.dp),
+                shape = AppShapes.Control,
             )
             .onFocusChanged {
                 focused = it.isFocused
@@ -410,7 +411,7 @@ private fun TraktCard(
             .padding(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Box(
-            Modifier.size(44.dp).background(TraktRed, RoundedCornerShape(50)),
+            Modifier.size(44.dp).background(TraktRed, AppShapes.Pill),
             contentAlignment = Alignment.Center,
         ) {
             Text("t", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
@@ -418,7 +419,7 @@ private fun TraktCard(
         Spacer(Modifier.width(18.dp))
         Column {
             Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = if (state.confirmDisconnect) Color(0xFFF5B83D) else ProfileMuted, fontSize = 15.sp)
+            Text(subtitle, color = if (state.confirmDisconnect) AppColors.Warning else ProfileMuted, fontSize = 15.sp)
         }
     }
 }
@@ -444,7 +445,7 @@ private fun OptionChip(
                     highlighted -> Color.White.copy(alpha = 0.2f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
-                RoundedCornerShape(50),
+                AppShapes.Pill,
             )
             .onFocusChanged {
                 focused = it.isFocused
