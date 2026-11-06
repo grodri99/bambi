@@ -28,6 +28,14 @@ class DetailsOverlayTest {
     }
 
     @Test
+    fun `source languages are capped at three codes`() {
+        assertEquals("", compactLanguages(emptyList()))
+        assertEquals("EN", compactLanguages(listOf("EN")))
+        assertEquals("EN/ES/FR", compactLanguages(listOf("EN", "ES", "FR")))
+        assertEquals("EN/RU/IT +4", compactLanguages(listOf("EN", "RU", "IT", "LAT", "FR", "DE", "HI")))
+    }
+
+    @Test
     fun `release dates are shown only for future episodes`() {
         assertEquals("2026-11-13", upcomingEpisodeDate("2026-11-13", today = "2026-11-06"))
         assertEquals(null, upcomingEpisodeDate("2026-11-06", today = "2026-11-06"))

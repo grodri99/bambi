@@ -90,6 +90,7 @@ import java.util.Locale
 
 private val Green = AppColors.Success
 private val Grey = Color(0xFFB3B3B3)
+private val WatchedCountColor = Color.White.copy(alpha = 0.75f)
 
 internal enum class DetailsBackAction { DISMISS_ACTIONS, DISMISS_SOURCES, EXIT_DETAILS }
 
@@ -102,6 +103,12 @@ internal fun detailsBackAction(actionsOpen: Boolean, panelOpen: Boolean): Detail
 internal fun detailsSourcesVisible(panelOpen: Boolean, actionsOpen: Boolean): Boolean = panelOpen && !actionsOpen
 
 internal fun detailsMoreVisible(pendingPlay: Boolean): Boolean = !pendingPlay
+
+/** Shows at most [max] language codes and summarises the rest, e.g. "EN/RU/IT +4". */
+internal fun compactLanguages(languages: List<String>, max: Int = 3): String {
+    if (languages.size <= max) return languages.joinToString("/")
+    return languages.take(max).joinToString("/") + " +" + (languages.size - max)
+}
 
 internal fun upcomingEpisodeDate(airDate: String?, today: String): String? =
     airDate?.takeIf { it.isNotBlank() && it > today }
@@ -613,8 +620,8 @@ private fun SeasonsAndEpisodes(
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
-                        color = Grey,
-                        style = MaterialTheme.typography.bodySmall,
+                        color = WatchedCountColor,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -633,8 +640,8 @@ private fun SeasonsAndEpisodes(
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
-                        color = Grey,
-                        style = MaterialTheme.typography.bodySmall,
+                        color = WatchedCountColor,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -667,20 +674,24 @@ private fun SeasonsAndEpisodes(
 @Composable
 private fun SeasonChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
+    // Same filled style as the other chips: faint, brighter when selected, inverted on focus.
     val bg = when {
         focused -> Color.White
-        selected -> Color.White.copy(alpha = 0.25f)
-        else -> Color.Transparent
+        selected -> Color.White.copy(alpha = 0.22f)
+        else -> Color.White.copy(alpha = 0.08f)
     }
     Text(
         text = label,
-        color = if (focused) Color.Black else Color.White,
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
+        color = when {
+            focused -> Color.Black
+            selected -> Color.White
+            else -> Color.White.copy(alpha = 0.75f)
+        },
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
         modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
             .clip(AppShapes.Pill)
             .background(bg)
-            .then(if (!focused && !selected) Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), AppShapes.Pill) else Modifier)
             .tvClickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 7.dp),
     )
@@ -773,10 +784,16 @@ private fun EpisodeCard(
         val releaseDate = remember(episode.airDate, today, Lang.current) {
             formatEpisodeDate(upcomingEpisodeDate(episode.airDate, today), includeYear = true)
         }
-        val metadata = listOfNotNull(
-            episode.runtimeMinutes?.let { "$it min" },
-            releaseDate.ifBlank { null },
-        ).joinToString(" · ")
+        val remainingMinutes = progress?.takeIf { it.isResumable }?.let { ((it.remainingMs + 59_999) / 60_000).toInt() }
+        val remainingLabel = remainingMinutes?.let {
+            localizedStringResource(StringsR.string.details_remaining, formatRuntime(it))
+        }
+        val metadata = remember(remainingLabel, episode.runtimeMinutes, releaseDate) {
+            listOfNotNull(
+                remainingLabel ?: episode.runtimeMinutes?.let { "$it min" },
+                releaseDate.ifBlank { null },
+            ).joinToString(" · ")
+        }
         if (metadata.isNotEmpty()) {
             Text(metadata, color = Grey, style = MaterialTheme.typography.bodySmall)
         }
@@ -828,7 +845,7 @@ private fun SourcesPanel(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(520.dp)
-                .background(Color(0xF2141414))
+                .background(AppColors.BackgroundRaised.copy(alpha = 0.95f))
                 .padding(top = 32.dp, start = 24.dp, end = 24.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -949,24 +966,22 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
             blocked -> Color.White.copy(alpha = 0.4f)
             else -> Color.White
         }
-        val sub = if (focused) Color.Black.copy(alpha = 0.7f) else Grey.copy(alpha = if (blocked) 0.5f else 1f)
+        val sub = if (focused) Color.Black.copy(alpha = 0.65f) else Color.White.copy(alpha = if (blocked) 0.3f else 0.55f)
         Box(Modifier.width(26.dp)) {
             if (source.isCached) Icon(AppIcons.Bolt, contentDescription = localizedStringResource(StringsR.string.details_in_your_real_debrid), tint = if (focused) Color(0xFF0A8F3C) else Green)
         }
         Column(Modifier.weight(1f)) {
+            // Primary line: what the viewer chooses by (format, size, languages).
+            // Secondary line: torrent health and the raw release name.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SourceMediaBadges(source)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = buildString {
                         if (source.sizeBytes > 0) append(formatSize(source.sizeBytes))
-                        source.seeders?.let {
-                            if (isNotEmpty()) append(" · ")
-                            append(it).append(" seeds")
-                        }
                         if (source.languages.isNotEmpty()) {
                             if (isNotEmpty()) append(" · ")
-                            append(source.languages.joinToString("/"))
+                            append(compactLanguages(source.languages))
                         }
                         if (blocked) {
                             if (isNotEmpty()) append(" · ")
@@ -974,14 +989,15 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
                         }
                     },
                     color = fg,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
             }
+            Spacer(Modifier.height(2.dp))
             Text(
-                text = source.title,
+                text = source.seeders?.let { "$it seeds · ${source.title}" } ?: source.title,
                 color = sub,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
