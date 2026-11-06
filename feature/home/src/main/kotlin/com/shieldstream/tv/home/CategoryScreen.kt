@@ -14,6 +14,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
+import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.HomeFilter
@@ -23,8 +24,10 @@ import com.shieldstream.tv.strings.localizedTitle
 import com.shieldstream.tv.ui.component.onBackKey
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -58,9 +61,13 @@ fun CategoryScreen(
 class CategoryViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val texts: Texts,
+    settings: SettingsRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<HomeUiState> = combine(_uiState, settings.homeRowItemLimit) { state, maxItems ->
+        if (state !is HomeUiState.Content) return@combine state
+        state.copy(rows = state.rows.map { it.withItemLimit(maxItems) })
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState.Loading)
     private var loaded: Pair<Category, HomeFilter>? = null
 
     fun load(category: Category, filter: HomeFilter, force: Boolean = false) {

@@ -10,7 +10,6 @@ import java.util.Date
 import java.util.Locale
 
 object NewEpisodes {
-    const val MAX_ITEMS = 15
     const val MAX_CANDIDATES = 15
     const val RECENT_DAYS = 30
     const val UPCOMING_DAYS = 30

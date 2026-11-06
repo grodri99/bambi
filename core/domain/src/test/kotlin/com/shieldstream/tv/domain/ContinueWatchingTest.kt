@@ -36,7 +36,7 @@ class ContinueWatchingTest {
     }
 
     @Test
-    fun `only resumable valid entries are returned and capped`() {
+    fun `all resumable valid entries are returned without a row limit`() {
         val progress = buildMap {
             repeat(20) { index ->
                 put(WatchProgress.movieKey(index.toString()), progress(updatedAt = index.toLong()))
@@ -49,8 +49,9 @@ class ContinueWatchingTest {
 
         val entries = ContinueWatching.entries(progress, HomeFilter.ALL)
 
-        assertEquals(ContinueWatching.MAX_ITEMS, entries.size)
+        assertEquals(20, entries.size)
         assertEquals("movie:19", entries.first().key)
+        assertEquals("movie:0", entries.last().key)
         assertTrue(entries.none { it.id in setOf("watched", "short", "invalid", "show") })
     }
 

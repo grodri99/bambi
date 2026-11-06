@@ -13,8 +13,6 @@ data class ContinueEntry(
 )
 
 object ContinueWatching {
-    const val MAX_ITEMS = 15
-
     fun entries(all: Map<String, WatchProgress>, filter: HomeFilter): List<ContinueEntry> {
         val parsed = all.mapNotNull { (key, progress) -> parse(key, progress) }
         val movies = parsed.filter { it.type == MediaType.MOVIE }
@@ -33,7 +31,6 @@ object ContinueWatching {
                 }
             }
             .sortedByDescending { it.progress.updatedAt }
-            .take(MAX_ITEMS)
     }
 
     fun keysToRemove(all: Map<String, WatchProgress>, type: MediaType, id: String): List<String> =

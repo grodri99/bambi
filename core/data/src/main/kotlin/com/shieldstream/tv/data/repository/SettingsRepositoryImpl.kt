@@ -116,6 +116,22 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setHiddenCategories(names: Set<String>) {
         profiles.save(profiles.active.value.copy(hiddenCategories = names))
     }
+
+    private val homeRowItemLimitFlow = MutableStateFlow(
+        prefs.getInt(KEY_HOME_ROW_ITEM_LIMIT, SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT)
+            .coerceIn(SettingsRepository.MIN_HOME_ROW_ITEM_LIMIT, SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT),
+    )
+    override val homeRowItemLimit: Flow<Int> = homeRowItemLimitFlow
+
+    override suspend fun setHomeRowItemLimit(limit: Int) {
+        val normalized = limit.coerceIn(
+            SettingsRepository.MIN_HOME_ROW_ITEM_LIMIT,
+            SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT,
+        )
+        prefs.edit().putInt(KEY_HOME_ROW_ITEM_LIMIT, normalized).apply()
+        homeRowItemLimitFlow.value = normalized
+    }
+
     private val debridFlow = MutableStateFlow(
         runCatching { DebridService.valueOf(prefs.getString(KEY_DEBRID, null) ?: "") }
             .getOrDefault(DebridService.ALLDEBRID),
@@ -185,6 +201,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_LIGHTWEIGHT_UI = "lightweight_ui"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
         const val KEY_AUTO_NEXT = "auto_next_episode"
+        const val KEY_HOME_ROW_ITEM_LIMIT = "home_row_item_limit"
         const val KEY_DEBRID = "debrid_service"
         const val KEY_PROVIDERS_OFF = "source_providers_off"
         const val MIN_BUFFER = 20

@@ -76,7 +76,7 @@ class HomeViewModelsTest {
             watchProgress = mockk { every { this@mockk.progress } returns MutableStateFlow(progress) },
             episodeReleases = mockk { coEvery { status(any()) } returns null },
             tracking = tracking(),
-            settings = mockk { every { hiddenCategories } returns MutableStateFlow(emptySet()) },
+            settings = homeSettings(),
             myList = mockk { every { entries } returns MutableStateFlow(emptyList()) },
             profiles = mockk { every { active } returns MutableStateFlow(Profile("main", "Main", 0)) },
             trakt = mockk(),
@@ -92,6 +92,37 @@ class HomeViewModelsTest {
         assertEquals(2, continueRow.progress[show.key]?.season)
         assertEquals(3, continueRow.progress[show.key]?.episode)
         assertEquals("base", state.rows.last().id)
+    }
+
+    @Test
+    fun `home row limit updates catalog rows without limiting continue watching`() = runTest {
+        val items = (1..20).map { item(it.toString(), MediaType.MOVIE, "Movie $it") }
+        val catalog = mockk<CatalogRepository> {
+            coEvery { getHome(any()) } returns listOf(CatalogRow("base", "Base", items))
+            coEvery { getFeatured(any()) } returns emptyList()
+            items.forEach { item -> coEvery { getItem(item.type, item.id) } returns item }
+        }
+        val progress = items.mapIndexed { index, item ->
+            WatchProgress.movieKey(item.id) to progress(updatedAt = index.toLong())
+        }.toMap()
+        val rowItemLimit = MutableStateFlow(10)
+        val viewModel = homeViewModel(
+            catalog,
+            mockk(),
+            profileFlow(traktUser = null),
+            progress = progress,
+            rowItemLimit = rowItemLimit,
+        )
+
+        viewModel.load(HomeFilter.ALL)
+        advanceUntilIdle()
+        assertEquals((1..10).map { it.toString() }, viewModel.baseRowItems())
+        assertEquals(20, viewModel.continueRowSize())
+
+        rowItemLimit.value = 15
+        advanceUntilIdle()
+        assertEquals((1..15).map { it.toString() }, viewModel.baseRowItems())
+        assertEquals(20, viewModel.continueRowSize())
     }
 
     @Test
@@ -113,7 +144,7 @@ class HomeViewModelsTest {
             watchProgress = mockk { every { progress } returns MutableStateFlow(emptyMap()) },
             episodeReleases = mockk(),
             tracking = tracking(),
-            settings = mockk { every { hiddenCategories } returns MutableStateFlow(emptySet()) },
+            settings = homeSettings(),
             myList = mockk { every { entries } returns MutableStateFlow(emptyList()) },
             profiles = mockk {
                 every { active } returns MutableStateFlow(Profile("main", "Main", 0, traktUser = "viewer"))
@@ -556,6 +587,12 @@ class HomeViewModelsTest {
     private fun HomeViewModel.recommendedRow() =
         (uiState.value as HomeUiState.Content).rows.firstOrNull { it.id == "recommended_for_you" }
 
+    private fun HomeViewModel.baseRowItems() =
+        (uiState.value as HomeUiState.Content).rows.single { it.id == "base" }.items.map { it.id }
+
+    private fun HomeViewModel.continueRowSize() =
+        (uiState.value as HomeUiState.Content).rows.single { it.style == RowStyle.CONTINUE }.items.size
+
     private fun HomeViewModel.upNextRow() =
         (uiState.value as HomeUiState.Content).rows.firstOrNull { it.id == "up_next" }
 
@@ -571,17 +608,25 @@ class HomeViewModelsTest {
         progress: Map<String, WatchProgress> = emptyMap(),
         watchProgress: WatchProgressRepository? = null,
         episodeTracking: EpisodeTrackingRepository = tracking(),
+        rowItemLimit: MutableStateFlow<Int> = MutableStateFlow(SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT),
     ) = HomeViewModel(
         catalogRepository = catalog,
         watchProgress = watchProgress ?: mockk { every { this@mockk.progress } returns MutableStateFlow(progress) },
         episodeReleases = mockk(),
         tracking = episodeTracking,
-        settings = mockk { every { hiddenCategories } returns MutableStateFlow(emptySet()) },
+        settings = homeSettings(rowItemLimit),
         myList = mockk { every { entries } returns MutableStateFlow(emptyList()) },
         profiles = mockk { every { this@mockk.active } returns active },
         trakt = trakt,
         texts = mockk(relaxed = true),
     )
+
+    private fun homeSettings(
+        rowItemLimit: MutableStateFlow<Int> = MutableStateFlow(SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT),
+    ) = mockk<SettingsRepository> {
+        every { hiddenCategories } returns MutableStateFlow(emptySet())
+        every { homeRowItemLimit } returns rowItemLimit
+    }
 
     private fun catalog(base: CatalogItem, vararg hydrated: CatalogItem): CatalogRepository {
         val catalog = mockk<CatalogRepository>()

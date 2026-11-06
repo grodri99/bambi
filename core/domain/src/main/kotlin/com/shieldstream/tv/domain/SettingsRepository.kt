@@ -56,10 +56,20 @@ interface SettingsRepository {
     val hiddenCategories: Flow<Set<String>>
     suspend fun setHiddenCategories(names: Set<String>)
 
+    val homeRowItemLimit: Flow<Int>
+    suspend fun setHomeRowItemLimit(limit: Int)
+
     val sourceProviders: Flow<Set<SourceProvider>>
     suspend fun setSourceProviders(providers: Set<SourceProvider>)
 
     /** Servicio debrid en uso (AllDebrid por defecto). */
     val debridService: Flow<DebridService>
     suspend fun setDebridService(service: DebridService)
+
+    companion object {
+        const val DEFAULT_HOME_ROW_ITEM_LIMIT = 30
+        const val MIN_HOME_ROW_ITEM_LIMIT = 10
+        const val MAX_HOME_ROW_ITEM_LIMIT = 100
+        const val HOME_ROW_ITEM_LIMIT_STEP = 10
+    }
 }

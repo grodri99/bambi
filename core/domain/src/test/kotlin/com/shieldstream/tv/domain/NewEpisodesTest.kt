@@ -32,6 +32,10 @@ class NewEpisodesTest {
             NewEpisodes.candidateIds(progress, listed, HomeFilter.TV),
         )
         assertTrue(NewEpisodes.candidateIds(progress, listed, HomeFilter.MOVIES).isEmpty())
+        assertEquals(
+            listOf("10", "20"),
+            NewEpisodes.candidateIds(progress, listed, HomeFilter.ALL, maxItems = 2),
+        )
     }
 
     @Test

@@ -154,6 +154,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setLightweightUi(enabled) }
     }
 
+    val homeRowItemLimit: StateFlow<Int> = settings.homeRowItemLimit
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT,
+        )
+
+    fun changeHomeRowItemLimit(delta: Int) {
+        viewModelScope.launch {
+            settings.setHomeRowItemLimit(settings.homeRowItemLimit.first() + delta)
+        }
+    }
+
     val providers: StateFlow<Set<SourceProvider>> =
         settings.sourceProviders.stateIn(viewModelScope, SharingStarted.Eagerly, SourceProvider.entries.toSet())
 

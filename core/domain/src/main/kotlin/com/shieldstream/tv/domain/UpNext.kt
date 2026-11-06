@@ -13,10 +13,13 @@ data class UpNextCandidate(
 )
 
 object UpNext {
-    const val MAX_ITEMS = 15
     const val MAX_CANDIDATES = 10
 
-    fun candidates(all: Map<String, WatchProgress>, filter: HomeFilter): List<UpNextCandidate> {
+    fun candidates(
+        all: Map<String, WatchProgress>,
+        filter: HomeFilter,
+        maxItems: Int = MAX_CANDIDATES,
+    ): List<UpNextCandidate> {
         if (filter == HomeFilter.MOVIES) return emptyList()
         return all.entries.mapNotNull { (key, progress) -> parse(key, progress) }
             .groupBy { it.showId }
@@ -26,7 +29,7 @@ object UpNext {
                 all[WatchProgress.episodeKey(candidate.showId, candidate.season, candidate.episode)]?.isWatched == true
             }
             .sortedByDescending { it.updatedAt }
-            .take(MAX_CANDIDATES)
+            .take(maxItems)
     }
 
     fun seasonsToLoad(candidate: UpNextCandidate, seasons: List<Season>): List<Season> {

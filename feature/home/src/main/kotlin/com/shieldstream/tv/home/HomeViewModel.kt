@@ -52,16 +52,23 @@ sealed interface HomeUiState {
     data class Content(val rows: List<CatalogRow>, val featured: List<FeaturedItem> = emptyList()) : HomeUiState
 }
 
+private data class HomeRowQuery(
+    val filter: HomeFilter,
+    val maxItems: Int,
+)
+
 private data class NewEpisodeQuery(
     val showIds: List<String>,
     val watchedKeys: Set<String>,
     val dismissedKeys: Set<String>,
+    val maxItems: Int,
 )
 
 private data class UpNextQuery(
     val candidates: List<UpNextCandidate>,
     val watchedKeys: Set<String>,
     val dismissedKeys: Set<String>,
+    val maxItems: Int,
 )
 
 private data class RecommendationQuery(
@@ -69,6 +76,7 @@ private data class RecommendationQuery(
     val profileId: String,
     val traktUser: String?,
     val kids: Boolean,
+    val maxItems: Int,
 )
 
 private data class RecommendationResult(
@@ -99,6 +107,9 @@ class HomeViewModel @Inject constructor(
 
     private val continueRows = MutableStateFlow<List<CatalogRow>?>(null)
     private val filterFlow = MutableStateFlow<HomeFilter?>(null)
+    private val homeRowQuery = combine(filterFlow.filterNotNull(), settings.homeRowItemLimit) { filter, maxItems ->
+        HomeRowQuery(filter, maxItems)
+    }
 
     private val newEpisodeRows = MutableStateFlow<List<CatalogRow>?>(null)
 
@@ -141,6 +152,13 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
+    }.combine(settings.homeRowItemLimit) { state, maxItems ->
+        if (state !is HomeUiState.Content) return@combine state
+        state.copy(
+            rows = state.rows.map { row ->
+                if (row.style == RowStyle.CONTINUE) row else row.withItemLimit(maxItems)
+            },
+        )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState.Loading)
 
     private var loadedFilter: HomeFilter? = null
@@ -156,16 +174,23 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch {
             combine(
-                filterFlow.filterNotNull(),
+                homeRowQuery,
                 watchProgress.progress,
                 myList.entries,
                 tracking.followedShowIds,
                 tracking.dismissedEpisodeKeys,
-            ) { filter, progress, list, followed, dismissed ->
+            ) { rowQuery, progress, list, followed, dismissed ->
                 NewEpisodeQuery(
-                    showIds = NewEpisodes.candidateIds(progress, list, filter, followed),
+                    showIds = NewEpisodes.candidateIds(
+                        progress,
+                        list,
+                        rowQuery.filter,
+                        followed,
+                        maxItems = rowQuery.maxItems,
+                    ),
                     watchedKeys = progress.filterValues { it.isWatched }.keys,
                     dismissedKeys = dismissed,
+                    maxItems = rowQuery.maxItems,
                 )
             }
                 .distinctUntilChanged()
@@ -173,14 +198,14 @@ class HomeViewModel @Inject constructor(
                 .collect { newEpisodeRows.value = it }
         }
         viewModelScope.launch {
-            combine(filterFlow.filterNotNull(), myList.entries) { filter, entries ->
+            combine(homeRowQuery, myList.entries) { rowQuery, entries ->
                 entries.filter {
-                    when (filter) {
+                    when (rowQuery.filter) {
                         HomeFilter.ALL -> true
                         HomeFilter.MOVIES -> it.type == MediaType.MOVIE
                         HomeFilter.TV -> it.type == MediaType.TV
                     }
-                }.take(MY_LIST_MAX)
+                }.take(rowQuery.maxItems)
             }
                 .distinctUntilChanged()
                 .mapLatest { entries -> listOfNotNull(buildMyListRow(entries)) }
@@ -188,14 +213,15 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch {
             combine(
-                filterFlow.filterNotNull(),
+                homeRowQuery,
                 watchProgress.progress,
                 tracking.dismissedEpisodeKeys,
-            ) { filter, progress, dismissed ->
+            ) { rowQuery, progress, dismissed ->
                 UpNextQuery(
-                    candidates = UpNext.candidates(progress, filter),
+                    candidates = UpNext.candidates(progress, rowQuery.filter, maxItems = rowQuery.maxItems),
                     watchedKeys = progress.filterValues { it.isWatched }.keys,
                     dismissedKeys = dismissed,
+                    maxItems = rowQuery.maxItems,
                 )
             }
                 .distinctUntilChangedBy { query ->
@@ -206,8 +232,14 @@ class HomeViewModel @Inject constructor(
                 .collect { upNextRows.value = it }
         }
         viewModelScope.launch {
-            combine(filterFlow.filterNotNull(), profiles.active) { filter, profile ->
-                RecommendationQuery(filter, profile.id, profile.traktUser, profile.kids)
+            combine(homeRowQuery, profiles.active) { rowQuery, profile ->
+                RecommendationQuery(
+                    rowQuery.filter,
+                    profile.id,
+                    profile.traktUser,
+                    profile.kids,
+                    rowQuery.maxItems,
+                )
             }
                 .distinctUntilChanged()
                 .onEach { recommendationRows.value = emptyList() }
@@ -325,7 +357,7 @@ class HomeViewModel @Inject constructor(
             }
         }.filterNotNull()
         if (loaded.isEmpty()) return null
-        val entries = loaded.sortedByDescending { it.third }.take(UpNext.MAX_ITEMS)
+        val entries = loaded.sortedByDescending { it.third }.take(query.maxItems)
         return CatalogRow(
             id = UP_NEXT_ROW_ID,
             title = texts.get(StringsR.string.home_up_next),
@@ -346,7 +378,7 @@ class HomeViewModel @Inject constructor(
             }
         }.filterNotNull()
         if (loaded.isEmpty()) return null
-        val entries = loaded.sortedByDescending { it.second.airDate }.take(NewEpisodes.MAX_ITEMS)
+        val entries = loaded.sortedByDescending { it.second.airDate }.take(query.maxItems)
         return CatalogRow(
             id = NEW_EPISODES_ROW_ID,
             title = texts.get(StringsR.string.home_new_episodes),
@@ -368,7 +400,7 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun buildRecommendationsRow(query: RecommendationQuery): CatalogRow? {
         if (query.kids || query.traktUser == null) return null
-        val entries = recommendationEntries(query).take(RECOMMENDATIONS_MAX)
+        val entries = recommendationEntries(query).take(query.maxItems)
         if (entries.isEmpty()) return null
         val items = entries.mapConcurrent(concurrency = 4) { (type, id) ->
             withTimeoutOrNull(5_000) { runCatching { catalogRepository.getItem(type, id) }.getOrNull() }
@@ -430,8 +462,6 @@ class HomeViewModel @Inject constructor(
         const val UP_NEXT_ROW_ID = "up_next"
         const val MY_LIST_ROW_ID = "my_list"
         const val RECOMMENDATIONS_ROW_ID = "recommended_for_you"
-        const val MY_LIST_MAX = 40
-        const val RECOMMENDATIONS_MAX = 40
     }
 
     private fun prefetchOtherTabs() {

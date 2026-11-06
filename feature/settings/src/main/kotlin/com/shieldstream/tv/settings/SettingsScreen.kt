@@ -81,6 +81,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
+import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.ui.component.ProvideMinimalScroll
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.onBackKey
@@ -253,6 +254,7 @@ private fun SettingsList(
                 ProviderCard(provider, enabled = enabled, onClick = { onToggleProvider(provider) })
             }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_home)) }
+            item { HomeRowLimitCard() }
             item { LightweightModeCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
@@ -703,6 +705,59 @@ internal fun DebridSelectorCard(active: DebridService, onChange: (DebridService)
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeRowLimitCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val limit by viewModel.homeRowItemLimit.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.changeHomeRowItemLimit(SettingsRepository.HOME_ROW_ITEM_LIMIT_STEP) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> {
+                    if (limit > SettingsRepository.MIN_HOME_ROW_ITEM_LIMIT) {
+                        viewModel.changeHomeRowItemLimit(-SettingsRepository.HOME_ROW_ITEM_LIMIT_STEP)
+                    }
+                    true
+                }
+                Key.DirectionRight -> {
+                    if (limit < SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT) {
+                        viewModel.changeHomeRowItemLimit(SettingsRepository.HOME_ROW_ITEM_LIMIT_STEP)
+                    }
+                    true
+                }
+                else -> false
+            }
+        },
+    ) { focused ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_items_per_home_row),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_items_per_home_row_explanation),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Arrow("◀", enabled = focused && limit > SettingsRepository.MIN_HOME_ROW_ITEM_LIMIT)
+                Text(
+                    "$limit",
+                    fontFamily = DisplayFont,
+                    fontSize = 34.sp,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                )
+                Arrow("▶", enabled = focused && limit < SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT)
             }
         }
     }

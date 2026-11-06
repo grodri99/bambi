@@ -84,6 +84,8 @@
     <string name="settings_torrentio_sources_opensubtitles_and_podnapisi_subtitles_don">Torrentio (sources), OpenSubtitles and Podnapisi (subtitles) don\'t need a key.</string>
     <string name="settings_source_finders">Source finders</string>
     <string name="settings_home">Home</string>
+    <string name="settings_items_per_home_row">Items per home row</string>
+    <string name="settings_items_per_home_row_explanation">Maximum items in each row. Continue Watching always shows every item.</string>
     <string name="settings_experimental_subtitle_sync">Experimental subtitle sync</string>
     <string name="settings_sync_demux_explanation">Uses embedded subtitles to align downloads. Turn off on slow devices; the best subtitle still downloads and attaches automatically.</string>
     <string name="settings_match_content_frame_rate">Match content frame rate</string>
