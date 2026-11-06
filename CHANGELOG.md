@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.14] - 2026-11-06
+
+### Improved
+
+- **Monochrome look:** white is the only accent across Home, Details, the player, Settings, setup, and profiles. Red remains for new-episode badges and counts; colour is kept only for status, age ratings, ratings, and third-party brands.
+- **Consistent shapes and surfaces:** one set of corner radii and neutral panels replaces the previous mix of radii and blue-tinted surfaces.
+- **Top bar:** text tabs with a faint focus pill, an underline on the selected tab, and a round profile avatar.
+- **Home billboard:** badge, title, details, a two-line synopsis, More info, and page dots in one left-aligned column.
+- **Top 10 row:** reworked ranking numbers.
+- **Source picker:** format, size, and languages on the main line; seeds and the release name on a dimmer second line. Long language lists are shortened, for example "EN/RU/IT +4".
+- **Details:** season chips share one style, the watched count is easier to read, and episodes in progress show the remaining time.
+
+### Fixed
+
+- The player seek bar no longer shows as full before the video duration is known.
+
 ## [1.0.11] - 2026-11-05
 
 ### Added
