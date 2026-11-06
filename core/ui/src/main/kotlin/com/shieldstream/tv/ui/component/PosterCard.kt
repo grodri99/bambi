@@ -76,16 +76,16 @@ fun PosterCard(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .tvClickable(onLongClick = onLongClick, onClick = onClick)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            },
+            .tvClickable(onLongClick = onLongClick, onClick = onClick),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .clip(CardShape)
                 .background(Color(0xFF232327))
                 .then(if (focused) Modifier.border(2.dp, FocusBorderColor, CardShape) else Modifier),
