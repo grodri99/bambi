@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.style.TextOverflow
 import com.shieldstream.tv.model.PlaybackVideoInfo
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -311,6 +314,18 @@ fun PlayerScreen(
             .focusable(),
     ) {
         player?.let { exoPlayer ->
+            val displayModeRequest = remember(exoPlayer, viewModel.earlyFrameRate) {
+                viewModel.earlyFrameRate?.let { rate ->
+                    context.findActivity()?.let { activity -> EarlyDisplayModeRequest(activity, rate) }
+                }
+            }
+            LaunchedEffect(displayModeRequest, exoPlayer) {
+                displayModeRequest?.applyAndWait()
+                viewModel.onEarlyDisplayModeReady(exoPlayer)
+            }
+            DisposableEffect(displayModeRequest) {
+                onDispose { displayModeRequest?.restore() }
+            }
             val playerView = remember(exoPlayer) {
                 PlayerView(context).apply {
                     useController = false
@@ -323,6 +338,7 @@ fun PlayerScreen(
                     playerView = playerView,
                     player = exoPlayer,
                     enabled = viewModel.matchContentFrameRate,
+                    initialFrameRate = viewModel.earlyFrameRate,
                 )
                 matcher.attach()
                 onDispose { matcher.detach() }
@@ -631,5 +647,11 @@ private fun StatusOverlay(title: String, message: String, loading: Boolean) {
             Text(localizedStringResource(StringsR.string.player_press_back_to_pick_another_source), color = Color(0xFFB3B3B3), style = MaterialTheme.typography.bodyMedium)
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 

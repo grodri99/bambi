@@ -155,6 +155,7 @@ class PlayerViewModelTest {
             spanishFirst = false,
             spanishOnlySources = false,
             subtitlePreference = subtitlePreference,
+            matchContentFrameRate = false,
         )
         val profiles = mockk<ProfileRepository> {
             every { active } returns MutableStateFlow(profile)

@@ -134,11 +134,15 @@ class PlayerViewModel @Inject constructor(
     val subtitleAppearance: StateFlow<SubtitleAppearance> = _subtitleAppearance.asStateFlow()
     private val experimentalSubtitleSync = profiles.active.value.experimentalSubtitleSync
     val matchContentFrameRate = profiles.active.value.matchContentFrameRate
+    private val frameRateProbe = EarlyFrameRateProbe(media3Factory.dataSourceFactory)
+    var earlyFrameRate: Float? = null
+        private set
 
     private var started = false
     private var playbackVisible = true
     private var playerGeneration = 0L
     private var playerCreationJob: Job? = null
+    private var earlyPreparationPending: ExoPlayer? = null
     private var trackSelectionToRestore: TrackSelectionParameters? = null
     private var resolvedUrl: String? = null
     private var playingFileName: String? = null
@@ -436,6 +440,7 @@ class PlayerViewModel @Inject constructor(
         playerGeneration++
         playerCreationJob?.cancel()
         playerCreationJob = null
+        earlyPreparationPending = null
         saveProgress()
         scrobble(ScrobbleAction.PAUSE)
         _player.value?.let { p ->
@@ -454,6 +459,15 @@ class PlayerViewModel @Inject constructor(
         launchPlayer(url, resumePositionMs)
     }
 
+    fun onEarlyDisplayModeReady(player: ExoPlayer) {
+        if (_player.value !== player) return
+        if (earlyPreparationPending === player) {
+            earlyPreparationPending = null
+            player.prepare()
+        }
+        player.playWhenReady = !spanishOnly || sourceFailover.spanishChecked
+    }
+
     private fun launchPlayer(url: String, startPositionMs: Long) {
         if (!playbackVisible) return
         playerCreationJob?.cancel()
@@ -468,9 +482,12 @@ class PlayerViewModel @Inject constructor(
             settings.seekThumbnails.first(),
         )
         if (!playbackVisible || generation != playerGeneration) return
+        earlyPreparationPending = null
+        earlyFrameRate = if (matchContentFrameRate) frameRateProbe.probe(url) else null
+        if (!playbackVisible || generation != playerGeneration) return
         val player = media3Factory.createPlayer(policy)
         if (matchContentFrameRate) {
-            // ContentFrameRateMatcher owns Surface.setFrameRate so it can allow non-seamless changes.
+            // PlayerScreen coordinates non-seamless Activity and surface display-mode changes.
             player.setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
         }
         if (!playbackVisible || generation != playerGeneration) {
@@ -479,6 +496,7 @@ class PlayerViewModel @Inject constructor(
         }
         _videoInfo.value = null
         var activeDecoderName: String? = null
+        val diagnostics = PlaybackDiagnostics()
         fun updateVideoInfo(format: Format? = player.videoFormat) {
             if (format != null) _videoInfo.value = VideoFormatInspector.inspect(format, activeDecoderName)
         }
@@ -501,6 +519,14 @@ class PlayerViewModel @Inject constructor(
                 ) {
                     _videoInfo.value = VideoFormatInspector.inspect(format, activeDecoderName)
                 }
+
+                override fun onDroppedVideoFrames(
+                    eventTime: AnalyticsListener.EventTime,
+                    droppedFrames: Int,
+                    elapsedMs: Long,
+                ) {
+                    diagnostics.onDroppedFrames(player.currentPosition, droppedFrames, elapsedMs)
+                }
             },
         )
         if (spanishFirst) {
@@ -513,7 +539,11 @@ class PlayerViewModel @Inject constructor(
         player.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_BUFFERING) {
+                        diagnostics.onBuffering(player.currentPosition)
+                    }
                     if (playbackState == Player.STATE_READY) {
+                        diagnostics.onReady(player.currentPosition)
                         updateVideoInfo()
                         subtitleCoordinator.onPlayerReady(player, player.currentTracks)
                         checkSpanishAudio(player, player.currentTracks)
@@ -574,14 +604,20 @@ class PlayerViewModel @Inject constructor(
         player.setMediaItem(buildMediaItem(url), startPositionMs)
         sourceFailover.onPlayerCreated()
         _player.value = player
-        player.playWhenReady = !spanishOnly
-        player.prepare()
+        if (earlyFrameRate != null) {
+            earlyPreparationPending = player
+            player.playWhenReady = false
+        } else {
+            player.playWhenReady = !spanishOnly
+            player.prepare()
+        }
     }
 
     override fun onCleared() {
         playbackVisible = false
         playerGeneration++
         playerCreationJob?.cancel()
+        earlyPreparationPending = null
         saveProgress()
         scrobble(ScrobbleAction.STOP)
         _player.value?.release()

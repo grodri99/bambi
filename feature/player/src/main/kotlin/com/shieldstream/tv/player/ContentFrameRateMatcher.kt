@@ -21,6 +21,7 @@ class ContentFrameRateMatcher(
     private val playerView: PlayerView,
     private val player: ExoPlayer,
     private val enabled: Boolean,
+    private val initialFrameRate: Float? = null,
 ) {
     private val surfaceView = playerView.videoSurfaceView as? SurfaceView
     @Volatile private var attached = false
@@ -35,9 +36,13 @@ class ContentFrameRateMatcher(
             format: Format,
             decoderReuseEvaluation: DecoderReuseEvaluation?,
         ) {
-            contentFrameRate = format.frameRate
+            contentFrameRate = if (format.frameRate.isUsable()) {
+                format.frameRate
+            } else {
+                initialFrameRate ?: NO_FRAME_RATE
+            }
             estimator.reset()
-            Log.i(TAG, "FRAME_RATE_MATCH format content=$contentFrameRate")
+            Log.i(TAG, "FRAME_RATE_MATCH format declared=${format.frameRate} effective=$contentFrameRate")
             if (contentFrameRate.isUsable()) apply() else clearFrameRate()
         }
     }
@@ -69,11 +74,13 @@ class ContentFrameRateMatcher(
         Log.i(
             TAG,
             "FRAME_RATE_MATCH attach enabled=$enabled surface=${playerView.videoSurfaceView?.javaClass?.simpleName} " +
-                "format=${player.videoFormat?.frameRate}",
+                "format=${player.videoFormat?.frameRate} initial=$initialFrameRate",
         )
         if (attached || !enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.R || surfaceView == null) return
         attached = true
-        contentFrameRate = player.videoFormat?.frameRate ?: NO_FRAME_RATE
+        contentFrameRate = initialFrameRate?.takeIf { it.isUsable() }
+            ?: player.videoFormat?.frameRate
+            ?: NO_FRAME_RATE
         player.addAnalyticsListener(analyticsListener)
         player.setVideoFrameMetadataListener(frameMetadataListener)
         surfaceView.holder.addCallback(surfaceCallback)
