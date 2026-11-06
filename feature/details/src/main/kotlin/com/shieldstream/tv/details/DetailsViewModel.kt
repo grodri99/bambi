@@ -1,6 +1,7 @@
 package com.shieldstream.tv.details
 
 import com.shieldstream.tv.strings.R as StringsR
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
@@ -110,6 +111,8 @@ class DetailsViewModel @Inject constructor(
     private var episodesJob: Job? = null
     private var pendingFromStart = false
     private var pendingNext: NextEpisode? = null
+    private var requestedAtNs = 0L
+    private var detailsLoaded = false
 
     init {
         load()
@@ -212,15 +215,70 @@ class DetailsViewModel @Inject constructor(
             return
         }
         val item = request.item
-        viewModelScope.launch {
-            val details = runCatching { catalogRepository.getDetails(item) }.getOrElse { CatalogDetails(item) }
+        requestedAtNs = request.requestedAtNs
+        detailsLoaded = false
+        trace("details_opened")
+        val prefetchAutoplay = request.playImmediately &&
+            (item.type == MediaType.MOVIE || request.target != null)
+        if (request.playImmediately) {
             _uiState.value = DetailsUiState.Content(
-                details,
+                CatalogDetails(item),
                 progress = watchProgress.progress.value,
-                inMyList = myList.contains(details.item.type, details.item.id),
-                spanishFirst = settings.spanishFirst.first(),
-                spanishOnly = settings.spanishOnlySources.first(),
             )
+        }
+        viewModelScope.launch {
+            if (prefetchAutoplay) {
+                val target = request.target
+                if (item.type == MediaType.TV && target != null) {
+                    selectSeason(
+                        target.season,
+                        preferredEpisode = target.number,
+                        playImmediately = true,
+                        prefetchSources = true,
+                    )
+                } else {
+                    loadSources(episode = null)
+                }
+            }
+            val details = runCatching { catalogRepository.getDetails(item) }.getOrElse { CatalogDetails(item) }
+            trace("details_ready")
+            val spanishFirst = settings.spanishFirst.first()
+            val spanishOnly = settings.spanishOnlySources.first()
+            if (request.playImmediately) {
+                updateContent {
+                    it.copy(
+                        details = details,
+                        progress = watchProgress.progress.value,
+                        inMyList = myList.contains(details.item.type, details.item.id),
+                        spanishFirst = spanishFirst,
+                        spanishOnly = spanishOnly,
+                    )
+                }
+            } else {
+                _uiState.value = DetailsUiState.Content(
+                    details,
+                    progress = watchProgress.progress.value,
+                    inMyList = myList.contains(details.item.type, details.item.id),
+                    spanishFirst = spanishFirst,
+                    spanishOnly = spanishOnly,
+                )
+            }
+            detailsLoaded = true
+            if (prefetchAutoplay) {
+                if (item.type == MediaType.MOVIE) {
+                    when (content()?.sources) {
+                        is SourcesState.Error -> updateContent { it.copy(pendingPlay = false) }
+                        SourcesState.Idle -> play()
+                        else -> {
+                            updateContent { it.copy(pendingPlay = true) }
+                            tryStartPendingPlayback()
+                        }
+                    }
+                } else {
+                    tryStartPendingPlayback()
+                }
+                return@launch
+            }
             val playImmediately = request.playImmediately
             if (details.item.type == MediaType.TV) {
                 val requested = request.target?.let { it.season to it.number }
@@ -230,7 +288,11 @@ class DetailsViewModel @Inject constructor(
                 if (season != null) {
                     selectSeason(season, preferredEpisode = episode, playImmediately = playImmediately)
                 } else {
-                    updateContent { it.copy(episodes = EpisodesState.Error(texts.get(StringsR.string.details_no_seasons_available))) }
+                    updateContent {
+                        it.copy(
+                            episodes = EpisodesState.Error(texts.get(StringsR.string.details_no_seasons_available)),
+                        )
+                    }
                 }
             } else {
                 if (playImmediately) play() else loadSources(episode = null)
@@ -254,7 +316,12 @@ class DetailsViewModel @Inject constructor(
         return nextSeason.number to 1
     }
 
-    fun selectSeason(season: Int, preferredEpisode: Int? = null, playImmediately: Boolean = false) {
+    fun selectSeason(
+        season: Int,
+        preferredEpisode: Int? = null,
+        playImmediately: Boolean = false,
+        prefetchSources: Boolean = false,
+    ) {
         val content = content() ?: return
         if (preferredEpisode == null && content.selectedSeason == season && content.episodes is EpisodesState.Ready) return
         episodesJob?.cancel()
@@ -268,26 +335,45 @@ class DetailsViewModel @Inject constructor(
                 pendingPlay = false,
             )
         }
+        if (prefetchSources && preferredEpisode != null) {
+            trace("source_prefetch_started")
+            loadSources(Episode(season, preferredEpisode, "", "", null, null))
+        }
         episodesJob = viewModelScope.launch {
             runCatching { catalogRepository.getEpisodes(content.details.item, season) }
                 .onSuccess { eps ->
+                    trace("episodes_ready")
                     var episodeToPlay: Episode? = null
                     updateContent { c ->
                         val selected = preferredEpisode?.let { n -> eps.firstOrNull { it.number == n } }
                             ?: eps.firstOrNull()
-                        if (playImmediately) episodeToPlay = selected
+                        if (playImmediately && c.sources !is SourcesState.Error) episodeToPlay = selected
                         c.copy(
                             episodes = EpisodesState.Ready(eps),
                             selectedEpisode = selected,
                         )
                     }
-                    episodeToPlay?.let { playEpisode(it) }
+                    episodeToPlay?.let { episode ->
+                        if (content()?.sources == SourcesState.Idle) {
+                            playEpisode(episode)
+                        } else {
+                            updateContent { it.copy(selectedEpisode = episode, pendingPlay = true) }
+                            tryStartPendingPlayback()
+                        }
+                    }
                     pendingNext?.takeIf { it.season == season }?.let { next ->
                         pendingNext = null
                         eps.firstOrNull { it.number == next.episode }?.let { playEpisode(it) }
                     }
                 }
-                .onFailure { e -> updateContent { it.copy(episodes = EpisodesState.Error(e.message ?: "Error")) } }
+                .onFailure { e ->
+                    updateContent {
+                        it.copy(
+                            episodes = EpisodesState.Error(e.message ?: "Error"),
+                            pendingPlay = false,
+                        )
+                    }
+                }
         }
     }
 
@@ -375,6 +461,7 @@ class DetailsViewModel @Inject constructor(
         val c = content() ?: return
         sourcesJob?.cancel()
         updateContent { it.copy(sources = SourcesState.Loading) }
+        var sourcesLogged = false
         sourcesJob = viewModelScope.launch {
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
@@ -411,15 +498,26 @@ class DetailsViewModel @Inject constructor(
                     }
                 }
                 .collect { (result, sorted) ->
-                    updateContent { it.copy(sources = SourcesState.Ready(sorted, result.unavailable, result.pending)) }
-                    val now = content() ?: return@collect
-                    val enoughCached = sorted.count { it.isCached && (!now.spanishOnly || it.advertisesSpanishAudio) } >= MIN_CACHED_TO_START
-                    if (now.pendingPlay && (enoughCached || result.pending.isEmpty())) {
-                        updateContent { it.copy(pendingPlay = false) }
-                        startPlayback(sorted, startIndex = 0, fromStart = pendingFromStart)
+                    if (sorted.isNotEmpty() && !sourcesLogged) {
+                        sourcesLogged = true
+                        trace("sources_ready", "count=${sorted.size}")
                     }
+                    updateContent { it.copy(sources = SourcesState.Ready(sorted, result.unavailable, result.pending)) }
+                    tryStartPendingPlayback()
                 }
         }
+    }
+
+    private fun tryStartPendingPlayback() {
+        val c = content() ?: return
+        if (!c.pendingPlay || !detailsLoaded) return
+        val ready = c.sources as? SourcesState.Ready ?: return
+        val enoughCached = ready.sources.count {
+            it.isCached && (!c.spanishOnly || it.advertisesSpanishAudio)
+        } >= MIN_CACHED_TO_START
+        if (!enoughCached && ready.pending.isNotEmpty()) return
+        updateContent { it.copy(pendingPlay = false) }
+        startPlayback(ready.sources, startIndex = 0, fromStart = pendingFromStart)
     }
 
     private fun startPlayback(sorted: List<StreamSource>, startIndex: Int, fromStart: Boolean) {
@@ -431,9 +529,12 @@ class DetailsViewModel @Inject constructor(
             .take(MAX_QUEUE)
         if (queue.isEmpty()) {
             updateContent {
-                it.copy(message = if (c.spanishOnly)
-                    texts.get(StringsR.string.details_no_spanish_sources_available_for_this_profile_7dd7b1)
-                else texts.get(StringsR.string.details_no_sources_available_for_this_right_now))
+                it.copy(
+                    message = if (c.spanishOnly)
+                        texts.get(StringsR.string.details_no_spanish_sources_available_for_this_profile_7dd7b1)
+                    else texts.get(StringsR.string.details_no_sources_available_for_this_right_now),
+                    pendingPlay = false,
+                )
             }
             return
         }
@@ -454,6 +555,8 @@ class DetailsViewModel @Inject constructor(
             season = episode?.season,
             episode = episode?.number,
         )
+        updateContent { it.copy(pendingPlay = false) }
+        trace("player_handoff", "queue=${queue.size}")
         holder.playQueue(
             queue,
             label,
@@ -461,17 +564,25 @@ class DetailsViewModel @Inject constructor(
             fromStart = fromStart,
             media = media,
             next = episode?.let { nextEpisodeAfter(c, it) },
+            requestedAtNs = requestedAtNs,
         )
         _events.tryEmit(DetailsEvent.OpenPlayer)
     }
 
     private fun content(): DetailsUiState.Content? = _uiState.value as? DetailsUiState.Content
 
+    private fun trace(stage: String, details: String = "") {
+        if (requestedAtNs == 0L) return
+        val totalMs = (System.nanoTime() - requestedAtNs) / 1_000_000
+        Log.i(STARTUP_TRACE_TAG, "stage=$stage totalMs=$totalMs" + if (details.isEmpty()) "" else " $details")
+    }
+
     private fun updateContent(transform: (DetailsUiState.Content) -> DetailsUiState.Content) {
         _uiState.update { s -> if (s is DetailsUiState.Content) transform(s) else s }
     }
 
     private companion object {
+        const val STARTUP_TRACE_TAG = "StartupTrace"
         const val MAX_QUEUE = 30
         const val MIN_CACHED_TO_START = 3
     }

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
 
@@ -47,10 +47,11 @@ fun TvButton(
     Row(
         modifier = modifier
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(background)
             .tvClickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
+            .height(44.dp)
+            .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
@@ -60,7 +61,7 @@ fun TvButton(
         Text(
             text = text,
             color = content,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleMedium,
         )
     }
 }

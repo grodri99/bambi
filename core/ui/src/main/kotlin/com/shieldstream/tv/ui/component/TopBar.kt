@@ -91,7 +91,7 @@ fun TopBar(
                 text = "Franklix",
                 color = Color.White,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             )
         }
         Row(
@@ -172,7 +172,7 @@ private fun TopBarItem(
     }
     val background = when {
         focused -> Color.White
-        selected -> Color.White.copy(alpha = 0.18f)
+        selected -> Color.White.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
     val foreground = when {
@@ -200,7 +200,7 @@ private fun TopBarItem(
                     text = label,
                     color = foreground,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Medium,
+                        fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Medium,
                     ),
                 )
                 if (badgeCount > 0) {

@@ -580,6 +580,32 @@ class HomeViewModelsTest {
         assertTrue(viewModel.uiState.value is MyListUiState.Empty)
     }
 
+    @Test
+    fun `handoff cancels the remaining other tab prefetch`() = runTest {
+        val movie = item("movie", MediaType.MOVIE, "Movie")
+        val catalog = catalog(movie)
+        val tvPrefetchStarted = CompletableDeferred<Unit>()
+        val tvPrefetch = CompletableDeferred<List<CatalogRow>>()
+        coEvery { catalog.getHome(HomeFilter.TV) } coAnswers {
+            tvPrefetchStarted.complete(Unit)
+            tvPrefetch.await()
+        }
+        val viewModel = homeViewModel(
+            catalog = catalog,
+            trakt = mockk(relaxed = true),
+            active = profileFlow(traktUser = null),
+        )
+
+        viewModel.load(HomeFilter.ALL)
+        advanceUntilIdle()
+        assertTrue(tvPrefetchStarted.isCompleted)
+
+        viewModel.cancelBackgroundPrefetch()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { catalog.getHome(HomeFilter.MOVIES) }
+    }
+
     private fun MyListViewModel.content() = uiState.value as MyListUiState.Content
 
     private fun HomeViewModel.rowIds() = (uiState.value as HomeUiState.Content).rows.map { it.id }

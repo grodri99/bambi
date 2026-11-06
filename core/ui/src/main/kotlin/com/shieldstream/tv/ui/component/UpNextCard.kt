@@ -36,7 +36,7 @@ import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Episode
 
-private val UpNextCardShape = RoundedCornerShape(6.dp)
+private val UpNextCardShape = RoundedCornerShape(12.dp)
 private val UpNextCardWidth = 240.dp
 
 fun upNextImageUrl(item: CatalogItem, episode: Episode): String? =
@@ -73,7 +73,7 @@ fun UpNextCard(
             }
             .clip(UpNextCardShape)
             .background(Color(0xFF232327))
-            .then(if (focused) Modifier.border(1.dp, Color.White.copy(alpha = 0.9f), UpNextCardShape) else Modifier),
+            .then(if (focused) Modifier.border(2.dp, Color.White.copy(alpha = 0.88f), UpNextCardShape) else Modifier),
     ) {
         val imageUrl = upNextImageUrl(item, episode)
         if (imageUrl != null) {
@@ -124,17 +124,17 @@ fun UpNextCard(
             Text(
                 text = item.title,
                 color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(3.dp))
             Text(
                 text = label,
-                color = Color.White,
+                color = Color.White.copy(alpha = 0.78f),
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -142,7 +142,7 @@ fun UpNextCard(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = releaseLabel,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = Color.White.copy(alpha = 0.58f),
                     fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

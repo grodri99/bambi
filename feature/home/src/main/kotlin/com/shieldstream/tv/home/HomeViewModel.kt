@@ -29,6 +29,7 @@ import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.model.UpNextInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -162,6 +163,7 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState.Loading)
 
     private var loadedFilter: HomeFilter? = null
+    private var prefetchJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -464,8 +466,14 @@ class HomeViewModel @Inject constructor(
         const val RECOMMENDATIONS_ROW_ID = "recommended_for_you"
     }
 
+    fun cancelBackgroundPrefetch() {
+        prefetchJob?.cancel()
+        prefetchJob = null
+    }
+
     private fun prefetchOtherTabs() {
-        viewModelScope.launch {
+        prefetchJob?.cancel()
+        prefetchJob = viewModelScope.launch {
             delay(1_500)
             for (other in listOf(HomeFilter.TV, HomeFilter.MOVIES)) {
                 coroutineScope {
@@ -479,6 +487,7 @@ class HomeViewModel @Inject constructor(
     fun load(filter: HomeFilter, force: Boolean = false) {
         filterFlow.value = filter
         if (!force && loadedFilter == filter && _uiState.value is HomeUiState.Content) return
+        prefetchJob?.cancel()
         loadedFilter = filter
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading

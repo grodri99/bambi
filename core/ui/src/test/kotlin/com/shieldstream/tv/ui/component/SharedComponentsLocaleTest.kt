@@ -4,7 +4,10 @@ import android.content.ComponentName
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -164,6 +167,26 @@ class SharedComponentsLocaleTest {
         composeRule.onNodeWithText("S2:E1 · Pilot").assertExists()
         composeRule.onNodeWithText("Nov 5").assertExists()
         composeRule.onNodeWithText("New season").assertExists()
+    }
+
+    @Test
+    fun `catalog captions stay visible during focus changes`() {
+        val requester = FocusRequester()
+        val item = testItem.copy(posterUrl = "https://invalid.local/poster.jpg", year = 2026)
+        composeRule.setContent {
+            CatalogPosterCard(
+                item = item,
+                onClick = {},
+                modifier = Modifier.focusRequester(requester),
+            )
+        }
+
+        composeRule.onNodeWithText(item.title).assertIsDisplayed()
+        composeRule.onNodeWithText("2026").assertIsDisplayed()
+        composeRule.runOnIdle { requester.requestFocus() }
+
+        composeRule.onNodeWithText(item.title).assertIsDisplayed()
+        composeRule.onNodeWithText("2026").assertIsDisplayed()
     }
 
     private fun renderBadges() {

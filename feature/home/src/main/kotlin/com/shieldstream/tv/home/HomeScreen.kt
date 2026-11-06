@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -57,7 +56,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,7 +74,7 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.ui.component.ContinueCard
 import com.shieldstream.tv.ui.component.NewEpisodeCard
-import com.shieldstream.tv.ui.component.PosterCard
+import com.shieldstream.tv.ui.component.CatalogPosterCard
 import com.shieldstream.tv.ui.component.PosterWidth
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.Top10Card
@@ -97,6 +95,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import java.util.Locale
 
 private val ContentStart = 48.dp
+private val RowBackground = Color(0xFF0B0D12)
 
 internal enum class UpNextBadge { UP_NEXT, NEW_EPISODE, NEW_SEASON }
 
@@ -156,10 +155,22 @@ fun HomeScreen(
                     else -> Category.forFilter(filter).filter { it.name !in hidden }.ifEmpty { Category.forFilter(filter) }
                 }
             },
-            onItemClick = onItemClick,
-            onContinueClick = onContinueClick,
-            onNewEpisodeClick = onNewEpisodeClick,
-            onUpNextClick = onUpNextClick,
+            onItemClick = { item ->
+                viewModel.cancelBackgroundPrefetch()
+                onItemClick(item)
+            },
+            onContinueClick = { item, info ->
+                viewModel.cancelBackgroundPrefetch()
+                onContinueClick(item, info)
+            },
+            onNewEpisodeClick = { item, episode ->
+                viewModel.cancelBackgroundPrefetch()
+                onNewEpisodeClick(item, episode)
+            },
+            onUpNextClick = { item, episode ->
+                viewModel.cancelBackgroundPrefetch()
+                onUpNextClick(item, episode)
+            },
             onOpenCategory = onOpenCategory,
             onRemoveContinue = viewModel::removeFromContinue,
             onMarkUpNextWatched = viewModel::markUpNextWatched,
@@ -363,7 +374,7 @@ internal fun RowsBrowser(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(RowBackground)
             .onBackKey(enabled = true) { onBack() }
             .onPreviewKeyEvent { e ->
                 val vertical = e.key == Key.DirectionDown || e.key == Key.DirectionUp
@@ -377,7 +388,7 @@ internal fun RowsBrowser(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .height(236.dp)
+                    .height(140.dp)
                     .padding(start = ContentStart, top = 24.dp, end = 320.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
@@ -494,9 +505,9 @@ private fun ContinueActions(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.focusRequester(requester))
-            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_continue_watching), onClick = onRemove)
-            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel)
+            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.fillMaxWidth().focusRequester(requester))
+            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_continue_watching), onClick = onRemove, modifier = Modifier.fillMaxWidth())
+            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -558,15 +569,15 @@ private fun CatalogRowView(
         ) {
             Text(
                 text = row.title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.90f),
             )
             if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT) {
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.45f),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.38f),
                 )
             }
         }
@@ -574,13 +585,13 @@ private fun CatalogRowView(
             ProvidePivotScroll(leading = ContentStart + 3.dp) {
                 LazyRow(
                     state = rememberLoopingRowState(row.items.size),
-                    contentPadding = PaddingValues(horizontal = ContentStart, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 12.dp),
+                    contentPadding = PaddingValues(horizontal = ContentStart, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 16.dp),
                 ) {
                     loopingItems(row.items) { virtual, index, item ->
                         val itemModifier = if (keyOf(row, virtual) == focusKey) Modifier.focusRequester(restoreRequester) else Modifier
                         when (row.style) {
-                            RowStyle.POSTER -> PosterCard(
+                            RowStyle.POSTER -> CatalogPosterCard(
                                 item = item,
                                 onClick = { onItemClick(item) },
                                 onFocused = { onFocused(virtual) },
@@ -641,7 +652,7 @@ private fun CatalogRowView(
                                     UpNextBadge.UP_NEXT -> localizedStringResource(StringsR.string.home_up_next)
                                 }
                                 if (episode == null) {
-                                    PosterCard(
+                                    CatalogPosterCard(
                                         item = item,
                                         onClick = { onItemClick(item) },
                                         onFocused = { onFocused(virtual) },
@@ -698,19 +709,21 @@ private fun HeroBackdrop(item: CatalogItem) {
             )
         }
         Box(
-            area.background(
+            Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(
-                    0f to Color.Black,
-                    0.30f to Color.Black.copy(alpha = 0.55f),
-                    0.65f to Color.Transparent,
+                    0f to Color(0xFF0B0D12),
+                    0.28f to Color(0xFF0B0D12),
+                    0.52f to Color(0xFF0B0D12).copy(alpha = 0.72f),
+                    0.72f to Color.Transparent,
                 ),
             ),
         )
         Box(
-            area.background(
+            Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0.45f to Color.Transparent,
-                    1f to Color.Black,
+                    0.40f to Color.Transparent,
+                    0.72f to Color(0xFF0B0D12).copy(alpha = 0.25f),
+                    1f to Color(0xFF0B0D12),
                 ),
             ),
         )
@@ -722,25 +735,16 @@ private fun HeroInfo(item: CatalogItem) {
     Column {
         Text(
             text = item.title,
-            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.headlineLarge,
             color = Color.White,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             text = metaLine(item),
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = Color(0xFF46D369),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = item.overview,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.85f),
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 520.dp),
+            color = Color.White.copy(alpha = 0.62f),
         )
     }
 }
@@ -823,7 +827,7 @@ internal fun HomeSkeleton() {
             .fillMaxSize()
             .background(Color.Black)
             .graphicsLayer { this.alpha = alpha }
-            .padding(start = ContentStart, top = 204.dp),
+            .padding(start = ContentStart, top = 140.dp),
     ) {
         repeat(2) {
             Box(
@@ -839,7 +843,7 @@ internal fun HomeSkeleton() {
                         Modifier
                             .width(PosterWidth)
                             .aspectRatio(2f / 3f)
-                            .background(SkeletonColor, RoundedCornerShape(6.dp)),
+                            .background(SkeletonColor, RoundedCornerShape(12.dp)),
                     )
                 }
             }

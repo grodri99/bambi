@@ -15,6 +15,7 @@ data class DetailsRequest(
     val item: CatalogItem,
     val target: EpisodeTarget? = null,
     val playImmediately: Boolean = false,
+    val requestedAtNs: Long = System.nanoTime(),
 )
 
 data class PlaybackRequest(
@@ -24,6 +25,7 @@ data class PlaybackRequest(
     val fromStart: Boolean = false,
     val media: PlaybackMedia? = null,
     val next: NextEpisode? = null,
+    val requestedAtNs: Long = System.nanoTime(),
 )
 
 class SelectedContentHolder {
@@ -61,7 +63,8 @@ class SelectedContentHolder {
         fromStart: Boolean = false,
         media: PlaybackMedia? = null,
         next: NextEpisode? = null,
+        requestedAtNs: Long = System.nanoTime(),
     ) {
-        _playback.value = PlaybackRequest(sources, label, progressKey, fromStart, media, next)
+        _playback.value = PlaybackRequest(sources, label, progressKey, fromStart, media, next, requestedAtNs)
     }
 }

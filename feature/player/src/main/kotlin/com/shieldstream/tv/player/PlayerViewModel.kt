@@ -181,6 +181,7 @@ class PlayerViewModel @Inject constructor(
     fun start() {
         if (started) return
         started = true
+        trace("player_opened")
 
         val queue = queueSnapshot
         if (queue.isEmpty()) {
@@ -218,6 +219,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun onSourceReady(event: SourceResolutionEvent.Ready) {
+        trace("source_resolved", "attempt=${event.index + 1}")
         resolvedUrl = event.url
         subtitleCoordinator.onNewSource()
         val source = event.source
@@ -464,6 +466,7 @@ class PlayerViewModel @Inject constructor(
         if (earlyPreparationPending === player) {
             earlyPreparationPending = null
             player.prepare()
+            trace("player_prepared")
         }
         player.playWhenReady = !spanishOnly || sourceFailover.spanishChecked
     }
@@ -484,8 +487,10 @@ class PlayerViewModel @Inject constructor(
         if (!playbackVisible || generation != playerGeneration) return
         earlyPreparationPending = null
         earlyFrameRate = if (matchContentFrameRate) frameRateProbe.probe(url) else null
+        if (matchContentFrameRate) trace("frame_rate_probe_finished", "rate=$earlyFrameRate")
         if (!playbackVisible || generation != playerGeneration) return
         val player = media3Factory.createPlayer(policy)
+        trace("player_created")
         if (matchContentFrameRate) {
             // PlayerScreen coordinates non-seamless Activity and surface display-mode changes.
             player.setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
@@ -538,6 +543,10 @@ class PlayerViewModel @Inject constructor(
         trackSelectionToRestore?.let { player.trackSelectionParameters = it }
         player.addListener(
             object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    trace("first_frame")
+                }
+
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_BUFFERING) {
                         diagnostics.onBuffering(player.currentPosition)
@@ -610,7 +619,15 @@ class PlayerViewModel @Inject constructor(
         } else {
             player.playWhenReady = !spanishOnly
             player.prepare()
+            trace("player_prepared")
         }
+    }
+
+    private fun trace(stage: String, details: String = "") {
+        val startedAtNs = playbackSnapshot?.requestedAtNs ?: return
+        if (startedAtNs == 0L) return
+        val totalMs = (System.nanoTime() - startedAtNs) / 1_000_000
+        Log.i(STARTUP_TRACE_TAG, "stage=$stage totalMs=$totalMs" + if (details.isEmpty()) "" else " $details")
     }
 
     override fun onCleared() {
@@ -627,6 +644,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private companion object {
+        const val STARTUP_TRACE_TAG = "StartupTrace"
         const val NEXT_UP_COUNTDOWN_MS = 10_000L
         const val NEXT_UP_FALLBACK_MIN_MS = 20_000L
         const val AFTER_CREDITS_SLACK_MS = 30_000L

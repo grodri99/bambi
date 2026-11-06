@@ -1,6 +1,7 @@
 package com.shieldstream.tv.details
 
 import com.shieldstream.tv.domain.CatalogRepository
+import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.MyListRepository
 import com.shieldstream.tv.domain.PrioritizeSourcesUseCase
@@ -25,9 +26,13 @@ import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.rules.TestWatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -35,6 +40,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.Description
@@ -73,7 +80,82 @@ class DetailsViewModelTest {
             flowOf(StreamResults(sources = listOf(source(episode))))
         }
         val holder = SelectedContentHolder().apply { selectItem(item) }
-        val viewModel = DetailsViewModel(
+        val viewModel = viewModel(catalog, holder)
+        testScheduler.advanceUntilIdle()
+        viewModel.playEpisode(seasonOne)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, holder.playback.value?.media?.season)
+
+        viewModel.selectSeason(2)
+        testScheduler.advanceUntilIdle()
+        viewModel.play()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, holder.playback.value?.media?.season)
+        assertEquals(1, holder.playback.value?.media?.episode)
+    }
+
+    @Test
+    fun `continue autoplay prefetches sources in parallel without losing next episode`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.TV,
+            title = "Show",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val target = EpisodeTarget(2, 3)
+        val episode = Episode(2, 3, "Current", "", null, 45)
+        val next = Episode(2, 4, "Next", "", null, 45)
+        val detailsResult = CompletableDeferred<CatalogDetails>()
+        val episodesResult = CompletableDeferred<List<Episode>>()
+        val streamsStarted = CompletableDeferred<Unit>()
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } coAnswers { detailsResult.await() }
+        coEvery { catalog.getEpisodes(item, 2) } coAnswers { episodesResult.await() }
+        every { catalog.getStreams(item, any()) } answers {
+            val requestedEpisode = secondArg<Episode>()
+            assertEquals(target.season, requestedEpisode.season)
+            assertEquals(target.number, requestedEpisode.number)
+            streamsStarted.complete(Unit)
+            flow {
+                val sources = listOf("a", "b", "c").map { id ->
+                    source(episode).copy(id = id, infoHash = "hash-$id")
+                }
+                emit(StreamResults(sources = sources))
+                awaitCancellation()
+            }
+        }
+        val holder = SelectedContentHolder().apply {
+            selectItem(item, target, playImmediately = true)
+        }
+
+        val viewModel = viewModel(catalog, holder)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(streamsStarted.isCompleted)
+        assertEquals(item.title, (viewModel.uiState.value as DetailsUiState.Content).details.item.title)
+        assertNull(holder.playback.value)
+
+        episodesResult.complete(listOf(episode, next))
+        testScheduler.advanceUntilIdle()
+        assertNull(holder.playback.value)
+
+        detailsResult.complete(CatalogDetails(item = item))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(target.season, holder.playback.value?.media?.season)
+        assertEquals(target.number, holder.playback.value?.media?.episode)
+        assertEquals(next.number, holder.playback.value?.next?.episode)
+        verify(exactly = 1) { catalog.getStreams(item, any()) }
+    }
+
+    private fun viewModel(catalog: CatalogRepository, holder: SelectedContentHolder): DetailsViewModel =
+        DetailsViewModel(
             catalogRepository = catalog,
             realDebridRepository = mockk<RealDebridRepository>(relaxed = true),
             prioritizeSourcesUseCase = PrioritizeSourcesUseCase(),
@@ -104,19 +186,6 @@ class DetailsViewModelTest {
             },
             texts = mockk<Texts>(relaxed = true),
         )
-        testScheduler.advanceUntilIdle()
-        viewModel.playEpisode(seasonOne)
-        testScheduler.advanceUntilIdle()
-        assertEquals(1, holder.playback.value?.media?.season)
-
-        viewModel.selectSeason(2)
-        testScheduler.advanceUntilIdle()
-        viewModel.play()
-        testScheduler.advanceUntilIdle()
-
-        assertEquals(2, holder.playback.value?.media?.season)
-        assertEquals(1, holder.playback.value?.media?.episode)
-    }
 
     private fun source(episode: Episode) = StreamSource(
         id = "${episode.season}:${episode.number}",

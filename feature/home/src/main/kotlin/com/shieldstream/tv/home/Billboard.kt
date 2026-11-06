@@ -6,7 +6,6 @@ import com.shieldstream.tv.model.Lang
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -241,7 +240,7 @@ private fun MoreInfoAction(focused: Boolean) {
         Text(
             text = localizedStringResource(StringsR.string.home_more_info),
             color = content,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
@@ -307,7 +306,7 @@ private fun BadgeChip(badge: FeaturedBadge, modifier: Modifier = Modifier) {
         Text(
             text = badge.localizedLabel(),
             color = Color.White,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
@@ -400,19 +399,18 @@ private fun CategoryChip(
                 scaleX = scale
                 scaleY = scale
             }
-            .height(40.dp)
-            .background(if (focused) Color.White else Color.White.copy(alpha = 0.09f), shape)
-            .border(1.dp, Color.White.copy(alpha = if (focused) 0f else 0.1f), shape)
+            .height(36.dp)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.07f), shape)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
             .tvClickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 14.dp),
     ) {
         Text(
             text = category.localizedTitle(),
-            fontSize = 16.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             color = if (focused) Color.Black else Color.White.copy(alpha = 0.9f),
             maxLines = 1,

@@ -5,6 +5,7 @@ import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.PlaybackMedia
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SelectedContentHolderTest {
@@ -20,7 +21,11 @@ class SelectedContentHolderTest {
 
         holder.selectItem(item, target, playImmediately = true)
 
-        assertEquals(DetailsRequest(item, target, playImmediately = true), holder.details.value)
+        val details = holder.details.value
+        assertEquals(item, details?.item)
+        assertEquals(target, details?.target)
+        assertEquals(true, details?.playImmediately)
+        assertTrue(details?.requestedAtNs?.let { it != 0L } == true)
         assertNull(holder.playback.value)
         assertNull(holder.prefetch.value)
     }
@@ -46,6 +51,7 @@ class SelectedContentHolderTest {
         assertEquals(true, playback?.fromStart)
         assertEquals(media, playback?.media)
         assertEquals(next, playback?.next)
+        assertTrue(playback?.requestedAtNs?.let { it != 0L } == true)
         assertEquals(emptyList<Nothing>(), playback?.sources)
     }
 
