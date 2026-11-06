@@ -89,6 +89,13 @@ class SettingsRepositoryImpl @Inject constructor(
         profiles.save(profiles.active.value.copy(experimentalSubtitleSync = enabled))
     }
 
+    override val matchContentFrameRate: Flow<Boolean> = profiles.active
+        .map { it.matchContentFrameRate }.distinctUntilChanged()
+
+    override suspend fun setMatchContentFrameRate(enabled: Boolean) {
+        profiles.save(profiles.active.value.copy(matchContentFrameRate = enabled))
+    }
+
     private val autoNextFlow = MutableStateFlow(prefs.getBoolean(KEY_AUTO_NEXT, true))
     override val autoNextEpisode: Flow<Boolean> = autoNextFlow
 

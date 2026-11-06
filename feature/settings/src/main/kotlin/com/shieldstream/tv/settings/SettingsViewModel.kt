@@ -161,6 +161,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setExperimentalSubtitleSync(enabled) }
     }
 
+    val matchContentFrameRate: StateFlow<Boolean> = settings.matchContentFrameRate
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setMatchContentFrameRate(enabled: Boolean) {
+        viewModelScope.launch { settings.setMatchContentFrameRate(enabled) }
+    }
+
     val subtitleAppearance: StateFlow<SubtitleAppearance> = settings.subtitleAppearance
         .stateIn(viewModelScope, SharingStarted.Eagerly, SubtitleAppearance())
 

@@ -108,6 +108,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
+    val matchContentFrameRate by viewModel.matchContentFrameRate.collectAsStateWithLifecycle()
     Box(
         Modifier
             .fillMaxSize()
@@ -125,6 +126,8 @@ fun SettingsScreen(
                     onDebrid = viewModel::setDebrid,
                     onDeviceOptimization = viewModel::setDeviceOptimization,
                     onExperimentalSync = viewModel::setExperimentalSubtitleSync,
+                    matchContentFrameRate = matchContentFrameRate,
+                    onMatchContentFrameRate = viewModel::setMatchContentFrameRate,
                     subtitleAppearance = subtitleAppearance,
                     onSubtitleAppearance = viewModel::setSubtitleAppearance,
                     onOpenSetup = onOpenSetup,
@@ -156,6 +159,8 @@ private fun SettingsList(
     onDebrid: (DebridService) -> Unit,
     onDeviceOptimization: (DeviceOptimization) -> Unit,
     onExperimentalSync: (Boolean) -> Unit,
+    matchContentFrameRate: Boolean,
+    onMatchContentFrameRate: (Boolean) -> Unit,
     subtitleAppearance: SubtitleAppearance,
     onSubtitleAppearance: (SubtitleAppearance) -> Unit,
     onOpenSetup: () -> Unit,
@@ -252,6 +257,7 @@ private fun SettingsList(
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
+            item { MatchContentFrameRateCard(enabled = matchContentFrameRate, onChange = onMatchContentFrameRate) }
             item { ExperimentalSyncCard(enabled = state.experimentalSubtitleSync, onChange = onExperimentalSync) }
             item {
                 SubtitleAppearanceHeaderCard(
@@ -823,6 +829,45 @@ private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewMode
             }
             Spacer(Modifier.width(24.dp))
             Row(Modifier.background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50)).padding(4.dp)) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MatchContentFrameRateCard(enabled: Boolean, onChange: (Boolean) -> Unit) {
+    FocusCard(
+        onClick = { onChange(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { onChange(true); true }
+                Key.DirectionRight -> { onChange(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_match_content_frame_rate),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_match_content_frame_rate_explanation),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
                 SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }

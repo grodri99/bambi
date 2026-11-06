@@ -63,6 +63,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,7 @@ fun PlayerScreen(
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
     val thumbnailsEnabled by viewModel.seekThumbnails.collectAsStateWithLifecycle()
     val nextUp by viewModel.nextUp.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val skipPrompt by viewModel.skipPrompt.collectAsStateWithLifecycle()
     val texts = rememberTexts()
     LaunchedEffect(Unit) { viewModel.goNext.collect { onBack() } }
@@ -309,14 +311,24 @@ fun PlayerScreen(
             .focusable(),
     ) {
         player?.let { exoPlayer ->
+            val playerView = remember(exoPlayer) {
+                PlayerView(context).apply {
+                    useController = false
+                    keepScreenOn = true
+                    isFocusable = false
+                }
+            }
+            DisposableEffect(playerView, exoPlayer) {
+                val matcher = ContentFrameRateMatcher(
+                    playerView = playerView,
+                    player = exoPlayer,
+                    enabled = viewModel.matchContentFrameRate,
+                )
+                matcher.attach()
+                onDispose { matcher.detach() }
+            }
             AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        useController = false
-                        keepScreenOn = true
-                        isFocusable = false
-                    }
-                },
+                factory = { playerView },
                 update = { view ->
                     view.player = exoPlayer
                     val evaluating = (externalSubs as? ExternalSubsState.Results)?.evaluating == true

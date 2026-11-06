@@ -133,6 +133,7 @@ class PlayerViewModel @Inject constructor(
     private val _subtitleAppearance = MutableStateFlow(profiles.active.value.subtitleAppearance)
     val subtitleAppearance: StateFlow<SubtitleAppearance> = _subtitleAppearance.asStateFlow()
     private val experimentalSubtitleSync = profiles.active.value.experimentalSubtitleSync
+    val matchContentFrameRate = profiles.active.value.matchContentFrameRate
 
     private var started = false
     private var playbackVisible = true
@@ -468,6 +469,10 @@ class PlayerViewModel @Inject constructor(
         )
         if (!playbackVisible || generation != playerGeneration) return
         val player = media3Factory.createPlayer(policy)
+        if (matchContentFrameRate) {
+            // ContentFrameRateMatcher owns Surface.setFrameRate so it can allow non-seamless changes.
+            player.setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
+        }
         if (!playbackVisible || generation != playerGeneration) {
             player.release()
             return

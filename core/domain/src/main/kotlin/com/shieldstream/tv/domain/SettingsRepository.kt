@@ -44,6 +44,9 @@ interface SettingsRepository {
     val experimentalSubtitleSync: Flow<Boolean>
     suspend fun setExperimentalSubtitleSync(enabled: Boolean)
 
+    val matchContentFrameRate: Flow<Boolean>
+    suspend fun setMatchContentFrameRate(enabled: Boolean)
+
     val autoNextEpisode: Flow<Boolean>
     suspend fun setAutoNextEpisode(enabled: Boolean)
 

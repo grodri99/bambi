@@ -13,6 +13,7 @@ data class Profile(
     val subtitlePreference: SubtitlePreference = SubtitlePreference.OFF,
     val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val experimentalSubtitleSync: Boolean = true,
+    val matchContentFrameRate: Boolean = true,
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
 

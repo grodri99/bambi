@@ -44,6 +44,20 @@ class ProfileRepositoryImplTest {
     }
 
     @Test
+    fun `frame rate matching preference persists across repository reloads`() {
+        val cleanup = mockk<ProfileDataCleaner>(relaxed = true)
+        val texts = mockk<Texts>(relaxed = true)
+        val repository = ProfileRepositoryImpl(context, cleanup, texts)
+        val profile = Profile(id = "frames", name = "Frames", avatar = 0, matchContentFrameRate = false)
+        repository.save(profile)
+        repository.select(profile.id)
+
+        val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
+        assertFalse(reloaded.active.value.matchContentFrameRate)
+        assertTrue(Profile(id = "default", name = "Default", avatar = 0).matchContentFrameRate)
+    }
+
+    @Test
     fun `subtitle appearance persists across repository reloads`() {
         val cleanup = mockk<ProfileDataCleaner>(relaxed = true)
         val texts = mockk<Texts>(relaxed = true)

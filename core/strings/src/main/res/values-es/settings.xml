@@ -86,6 +86,8 @@
     <string name="settings_home">Inicio</string>
     <string name="settings_experimental_subtitle_sync">Sincronización experimental de subtítulos</string>
     <string name="settings_sync_demux_explanation">Usa subtítulos incrustados para ajustar las descargas. Desactívalo en dispositivos lentos; el mejor subtítulo seguirá descargándose y aplicándose automáticamente.</string>
+    <string name="settings_match_content_frame_rate">Igualar frecuencia de imagen</string>
+    <string name="settings_match_content_frame_rate_explanation">Reduce los tirones. La pantalla puede quedarse brevemente en negro al iniciar la reproducción o cambiar de fuente.</string>
     <string name="settings_playback">Reproducción</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_in_use">En uso</string>
