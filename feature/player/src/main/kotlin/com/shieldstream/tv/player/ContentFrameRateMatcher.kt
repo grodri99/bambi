@@ -76,7 +76,7 @@ class ContentFrameRateMatcher(
             "FRAME_RATE_MATCH attach enabled=$enabled surface=${playerView.videoSurfaceView?.javaClass?.simpleName} " +
                 "format=${player.videoFormat?.frameRate} initial=$initialFrameRate",
         )
-        if (attached || !enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.R || surfaceView == null) return
+        if (attached || !enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.S || surfaceView == null) return
         attached = true
         contentFrameRate = initialFrameRate?.takeIf { it.isUsable() }
             ?: player.videoFormat?.frameRate
@@ -98,7 +98,7 @@ class ContentFrameRateMatcher(
 
     @Synchronized
     private fun apply() {
-        if (!attached || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (!attached || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val rate = contentFrameRate
         if (!rate.isUsable()) return
         val surface = surfaceView?.holder?.surface ?: return
@@ -123,7 +123,7 @@ class ContentFrameRateMatcher(
         val surface = appliedSurface ?: return
         appliedSurface = null
         appliedFrameRate = NO_FRAME_RATE
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !surface.isValid) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !surface.isValid) return
         runCatching {
             surface.setFrameRate(
                 0f,

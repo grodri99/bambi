@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Build
 import android.util.Log
 import android.view.Display
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -84,6 +85,7 @@ internal class EarlyDisplayModeRequest(
         Log.i(TAG, "WINDOW_MODE restored mode=$original")
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     private fun Display.Mode.toSpec() = DisplayModeSpec(modeId, physicalWidth, physicalHeight, refreshRate)
 
     private companion object {
