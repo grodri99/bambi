@@ -2,9 +2,9 @@ package com.shieldstream.tv.domain
 
 data class IthilConfig(
     val metadataUrl: String,
-    val linkSecret: String,
+    val indexKey: String,
     val archivePrefix: String,
 ) {
     val isConfigured: Boolean
-        get() = metadataUrl.isNotBlank() && linkSecret.isNotBlank() && archivePrefix.isNotBlank()
+        get() = metadataUrl.isNotBlank() && indexKey.isNotBlank() && archivePrefix.isNotBlank()
 }

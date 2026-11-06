@@ -40,7 +40,7 @@ object AppModule {
     fun provideIthilConfig(): IthilConfig =
         IthilConfig(
             BuildConfig.ITHIL_METADATA_URL,
-            BuildConfig.ITHIL_LINK_SECRET,
+            BuildConfig.ITHIL_INDEX_KEY,
             BuildConfig.ITHIL_ARCHIVE_PREFIX,
         )
 

@@ -7,7 +7,7 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 internal class IthilLinkDecoder(config: IthilConfig) {
-    private val keyAndIv = Base64.decode(config.linkSecret, Base64.DEFAULT)
+    private val keyAndIv = Base64.decode(config.indexKey, Base64.DEFAULT)
 
     init {
         require(keyAndIv.size == 48) { "Ithil link secret must decode to 48 bytes" }

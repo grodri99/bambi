@@ -54,7 +54,7 @@ class IthilLibraryRepositoryImplTest {
     fun emptyConfigurationDisablesRepositoryWithoutCreatingDecoder() {
         val unconfigured = IthilLibraryRepositoryImpl(
             context,
-            IthilConfig(metadataUrl = "", linkSecret = "", archivePrefix = ""),
+            IthilConfig(metadataUrl = "", indexKey = "", archivePrefix = ""),
             OkHttpClient(),
         )
 

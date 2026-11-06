@@ -61,6 +61,9 @@ jobs:
           KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           TRAKT_ID: ${{ vars.TRAKT_CLIENT_ID }}
           TRAKT_URI: ${{ vars.TRAKT_REDIRECT_URI }}
+          ITHIL_METADATA: ${{ secrets.ITHIL_METADATA_URL }}
+          ITHIL_KEY: ${{ secrets.ITHIL_INDEX_KEY }}
+          ITHIL_PREFIX: ${{ secrets.ITHIL_ARCHIVE_PREFIX }}
         run: |
           : "${KEYSTORE_BASE64:?Missing RELEASE_KEYSTORE_BASE64}"
           : "${STORE_PASSWORD:?Missing RELEASE_STORE_PASSWORD}"
@@ -68,6 +71,9 @@ jobs:
           : "${KEY_ALIAS:?Missing RELEASE_KEY_ALIAS}"
           : "${TRAKT_ID:?Missing TRAKT_CLIENT_ID variable}"
           : "${TRAKT_URI:?Missing TRAKT_REDIRECT_URI variable}"
+          : "${ITHIL_METADATA:?Missing ITHIL_METADATA_URL secret}"
+          : "${ITHIL_KEY:?Missing ITHIL_INDEX_KEY secret}"
+          : "${ITHIL_PREFIX:?Missing ITHIL_ARCHIVE_PREFIX secret}"
           KEYSTORE="$RUNNER_TEMP/keystore/franklix.keystore"
           mkdir -p "$(dirname "$KEYSTORE")"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
@@ -80,6 +86,9 @@ jobs:
             printf 'releaseKeyPassword=%s\n' "$KEY_PASSWORD"
             printf 'traktClientId=%s\n' "$TRAKT_ID"
             printf 'traktRedirectUri=%s\n' "$TRAKT_URI"
+            printf 'ithilMetadataUrl=%s\n' "$ITHIL_METADATA"
+            printf 'ithilIndexKey=%s\n' "$ITHIL_KEY"
+            printf 'ithilArchivePrefix=%s\n' "$ITHIL_PREFIX"
           } > local.properties
           chmod 600 local.properties "$KEYSTORE"
 
