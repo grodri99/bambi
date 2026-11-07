@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/franklix.png" alt="Franklix logo" width="320">
-</p>
 
 # Franklix
 
