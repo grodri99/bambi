@@ -8,6 +8,7 @@ import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
@@ -33,6 +34,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
     private val settings: SettingsRepository,
     private val tmdb: TmdbApi,
     private val realDebrid: RealDebridApi,
+    private val allDebrid: AllDebridApi,
     private val http: SubtitleHttp,
     private val torrentioApi: TorrentioApi,
     private val texts: Texts,
@@ -66,7 +68,8 @@ class ApiKeysRepositoryImpl @Inject constructor(
                 }
                 ApiService.SUBDL -> checkSubDl(key)
                 ApiService.AIOSTREAMS -> checkAioStreams(key)
-                ApiService.TORBOX, ApiService.PREMIUMIZE, ApiService.ALLDEBRID,
+                ApiService.ALLDEBRID -> checkAllDebrid(key)
+                ApiService.TORBOX, ApiService.PREMIUMIZE,
                 ApiService.DEBRID_LINK, ApiService.OFFCLOUD -> checkViaTorrentio(service, key)
             }
         }.getOrElse { describe(it) }
@@ -77,6 +80,22 @@ class ApiKeysRepositoryImpl @Inject constructor(
         val days = user.premium / 86_400
         val detail = if (user.type == "premium" && user.premium > 0) {
             texts.get(StringsR.string.data_premium_days_left, user.username, days)
+        } else {
+            texts.get(StringsR.string.data_no_premium, user.username)
+        }
+        return KeyCheck.Valid(detail)
+    }
+
+    private suspend fun checkAllDebrid(key: String): KeyCheck {
+        val response = allDebrid.user("Bearer $key")
+        if (response.status != "success") {
+            return KeyCheck.Invalid(response.error?.message ?: texts.get(StringsR.string.data_couldn_t_verify))
+        }
+        val user = response.data?.user
+            ?: return KeyCheck.Invalid(texts.get(StringsR.string.data_couldn_t_verify))
+        val detail = if (user.isPremium) {
+            val secondsLeft = (user.premiumUntil - System.currentTimeMillis() / 1_000).coerceAtLeast(0)
+            texts.get(StringsR.string.data_premium_days_left, user.username, secondsLeft / 86_400)
         } else {
             texts.get(StringsR.string.data_no_premium, user.username)
         }

@@ -8,6 +8,7 @@ import com.shieldstream.tv.model.StreamSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -63,6 +64,83 @@ class ResolveStreamUseCaseTest {
         assertEquals(listOf("https://hoster.test/?abc"), fixture.allDebrid.requests)
         assertTrue(fixture.torrentio.requests.isEmpty())
         assertEquals(ResolveState.Ready("https://cdn.test/video"), states.last())
+    }
+
+    @Test
+    fun `raw magnet uses AllDebrid when it is the selected service`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.ALLDEBRID
+        fixture.allDebridTorrents.currentInfo = info(
+            status = RdTorrentInfo.STATUS_DOWNLOADED,
+            files = listOf(file(id = 1, name = "movie.mkv", selected = true)),
+            links = listOf("alldebrid-link"),
+        )
+
+        val states = fixture.useCase(source()).toList()
+
+        assertEquals(ResolveState.Ready("unrestricted:alldebrid-link"), states.last())
+        assertEquals(1, fixture.allDebridTorrents.addMagnetCalls)
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
+    }
+
+    @Test
+    fun `raw magnet does not fall back to RealDebrid for an unsupported service`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.TORBOX
+
+        val states = fixture.useCase(source()).toList()
+
+        assertEquals(ResolveState.Failed("unsupported TorBox"), states.last())
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
+        assertEquals(0, fixture.allDebridTorrents.addMagnetCalls)
+    }
+
+    @Test
+    fun `AllDebrid season pack selects the requested episode link`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.ALLDEBRID
+        fixture.allDebridTorrents.currentInfo = info(
+            status = RdTorrentInfo.STATUS_DOWNLOADED,
+            files = listOf(
+                file(id = 1, name = "Show.S01E01.mkv", selected = true).copy(link = "ad-e1"),
+                file(id = 2, name = "Show.S01E02.mkv", selected = true).copy(link = "ad-e2"),
+            ),
+        )
+
+        val states = fixture.useCase(source(season = 1, episode = 2)).toList()
+
+        assertEquals(ResolveState.Ready("unrestricted:ad-e2"), states.last())
+    }
+
+    @Test
+    fun `uncached AllDebrid magnet is deleted after the cache timeout`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.ALLDEBRID
+        fixture.allDebridTorrents.currentInfo = info(status = "Downloading", files = emptyList())
+
+        val states = fixture.useCase(source()).toList()
+
+        val failure = states.filterIsInstance<ResolveState.Failed>().single()
+        assertTrue(failure.notCached)
+        assertEquals(listOf("torrent"), fixture.allDebridTorrents.deleted)
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
+    }
+
+    @Test
+    fun `cancelling AllDebrid resolution still deletes the upload`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.ALLDEBRID
+        val pollStarted = CompletableDeferred<Unit>()
+        fixture.allDebridTorrents.currentInfo = info(status = "Downloading", files = emptyList())
+        fixture.allDebridTorrents.onTorrentInfo = { pollStarted.complete(Unit) }
+        val collection = backgroundScope.launch { fixture.useCase(source()).toList() }
+
+        pollStarted.await()
+        collection.cancelAndJoin()
+        advanceUntilIdle()
+
+        assertEquals(listOf("torrent"), fixture.allDebridTorrents.deleted)
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
     }
 
     @Test
@@ -142,9 +220,18 @@ class ResolveStreamUseCaseTest {
 
     private class Fixture {
         val realDebrid = FakeRealDebridRepository()
+        val allDebridTorrents = FakeAllDebridRepository()
         val torrentio = FakeTorrentioLinkResolver()
         val allDebrid = FakeAllDebridLinkResolver()
-        val useCase = ResolveStreamUseCase(realDebrid, torrentio, allDebrid, TestResolveTexts)
+        val selectedDebrid = MutableStateFlow(DebridService.REAL_DEBRID)
+        val useCase = ResolveStreamUseCase(
+            realDebrid,
+            allDebridTorrents,
+            torrentio,
+            allDebrid,
+            selectedDebrid,
+            TestResolveTexts,
+        )
     }
 
     private class FakeAllDebridLinkResolver : AllDebridAuthRepository {
@@ -170,16 +257,15 @@ class ResolveStreamUseCaseTest {
         }
     }
 
-    private class FakeRealDebridRepository : RealDebridRepository {
+    private open class FakeMagnetDebridRepository : MagnetDebridRepository {
         var downloadedId: String? = null
         var currentInfo: RdTorrentInfo? = null
         var onSelectFiles: () -> Unit = {}
+        var onTorrentInfo: () -> Unit = {}
         var addMagnetCalls = 0
         var selectedFiles = listOf<Int>()
         val deleted = mutableListOf<String>()
 
-        override suspend fun validateToken(token: String): Boolean = error("unexpected validateToken")
-        override suspend fun cachedHashes(): Set<String> = error("unexpected cachedHashes")
         override suspend fun findDownloaded(infoHash: String): String? = downloadedId
 
         override suspend fun addMagnet(magnet: String): String {
@@ -187,8 +273,10 @@ class ResolveStreamUseCaseTest {
             return "torrent"
         }
 
-        override suspend fun torrentInfo(torrentId: String): RdTorrentInfo =
-            currentInfo ?: error("torrentInfo was not configured")
+        override suspend fun torrentInfo(torrentId: String): RdTorrentInfo {
+            onTorrentInfo()
+            return currentInfo ?: error("torrentInfo was not configured")
+        }
 
         override suspend fun selectFiles(torrentId: String, fileIds: List<Int>) {
             selectedFiles = fileIds
@@ -202,19 +290,28 @@ class ResolveStreamUseCaseTest {
         override suspend fun unrestrict(link: String): String = "unrestricted:$link"
     }
 
+    private class FakeRealDebridRepository : FakeMagnetDebridRepository(), RealDebridRepository {
+        override suspend fun validateToken(token: String): Boolean = error("unexpected validateToken")
+        override suspend fun cachedHashes(): Set<String> = error("unexpected cachedHashes")
+    }
+
+    private class FakeAllDebridRepository : FakeMagnetDebridRepository(), AllDebridRepository {
+        override val requiresFileSelection: Boolean = false
+    }
+
     private object TestResolveTexts : ResolveStreamTexts {
-        override fun debridService() = "Real-Debrid"
         override fun requestingLink(service: String) = "requesting $service"
-        override fun lookingInLibrary() = "library"
+        override fun lookingInLibrary(service: String) = "library $service"
         override fun unrestrictingLink() = "unrestricting"
-        override fun addingToRealDebrid() = "adding"
-        override fun couldNotReadMagnet() = "magnet error"
+        override fun addingToDebrid(service: String) = "adding $service"
+        override fun couldNotReadMagnet(service: String) = "magnet error $service"
         override fun noVideoFiles() = "no videos"
-        override fun checkingCache() = "checking"
-        override fun sourceNotCached() = "not cached"
-        override fun noLinks() = "no links"
+        override fun checkingCache(service: String) = "checking $service"
+        override fun sourceNotCached(service: String) = "not cached $service"
+        override fun noLinks(service: String) = "no links $service"
+        override fun directMagnetUnsupported(service: String) = "unsupported $service"
         override fun resolutionError() = "resolution error"
-        override fun torrentStatus(status: String) = status
+        override fun torrentStatus(service: String, status: String) = "$service: $status"
     }
 
     private fun source(

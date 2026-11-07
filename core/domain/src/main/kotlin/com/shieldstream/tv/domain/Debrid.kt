@@ -17,6 +17,9 @@ enum class DebridService(
 
     val viaTorrentio: Boolean get() = this != REAL_DEBRID
 
+    /** These services have an in-app magnet resolver; scrapers do not need Torrentio. */
+    val supportsDirectMagnetResolution: Boolean get() = this == REAL_DEBRID || this == ALLDEBRID
+
     companion object {
         fun of(service: ApiService): DebridService? = entries.firstOrNull { it.apiService == service }
     }

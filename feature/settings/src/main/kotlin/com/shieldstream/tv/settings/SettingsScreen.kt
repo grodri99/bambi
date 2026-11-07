@@ -636,48 +636,49 @@ private fun SubtitleColor.shift(colors: List<SubtitleColor>, delta: Int): Subtit
 }
 
 @Composable
-private fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
     FocusCard(modifier = modifier, onClick = onClick) { focused ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ServiceLogo(ui.service)
-            Spacer(Modifier.width(20.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ServiceLogo(ui.service)
+                Spacer(Modifier.width(20.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            localizedStringResource(ui.service.titleResource),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = Color.White,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            when {
+                                ui.service.isDebrid -> localizedStringResource(StringsR.string.settings_in_use)
+                                ui.service.required -> localizedStringResource(StringsR.string.settings_required)
+                                else -> localizedStringResource(StringsR.string.settings_optional)
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Muted,
+                        )
+                    }
+                    Text(localizedStringResource(ui.service.usedForResource), style = MaterialTheme.typography.bodyMedium, color = Muted)
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        localizedStringResource(ui.service.titleResource),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        when {
-                            ui.service.isDebrid -> localizedStringResource(StringsR.string.settings_in_use)
-                            ui.service.required -> localizedStringResource(StringsR.string.settings_required)
-                            else -> localizedStringResource(StringsR.string.settings_optional)
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Muted,
+                        ui.maskedKey ?: localizedStringResource(StringsR.string.settings_no_key),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.45f),
                     )
                 }
-                Text(localizedStringResource(ui.service.usedForResource), style = MaterialTheme.typography.bodyMedium, color = Muted)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    ui.maskedKey ?: localizedStringResource(StringsR.string.settings_no_key),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.45f),
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                StatusPill(ui.status)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.width(16.dp))
                 Text(
                     if (ui.maskedKey == null) localizedStringResource(StringsR.string.settings_ok_to_add) else localizedStringResource(StringsR.string.settings_ok_to_change),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (focused) Color.White else Color.Transparent,
                 )
             }
+            // Status messages can be long: give them their own row so they cannot squeeze the provider details.
+            Spacer(Modifier.height(12.dp))
+            StatusPill(ui.status)
         }
     }
 }
@@ -723,9 +724,7 @@ private fun StatusPill(status: ServiceStatus) {
             text,
             style = MaterialTheme.typography.labelLarge,
             color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = 2.dp),
+            modifier = Modifier.weight(1f, fill = false).padding(end = 2.dp),
         )
     }
 }

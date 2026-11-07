@@ -85,6 +85,8 @@ class AllDebridAuthRepositoryImpl @Inject constructor(
                     notCached = false,
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             DebridLink.Problem(texts.get(StringsR.string.data_couldn_t_unrestrict_the_link), notCached = false)
         }

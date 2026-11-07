@@ -5,6 +5,8 @@ import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.strings.titleResource
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.Lang
 import android.net.Uri
@@ -389,7 +391,15 @@ class CatalogRepositoryImpl @Inject constructor(
         coroutineScope {
             providers.map { p ->
                 launch {
-                    val r = runCatching { withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId, episode) } }
+                    val r = try {
+                        Result.success(withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId, episode) })
+                    } catch (e: TimeoutCancellationException) {
+                        Result.failure(e)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Result.failure(e)
+                    }
                     r.exceptionOrNull()?.let { Log.w("Catalog", "${texts.get(p.titleResource)} falló: ${it.message}") }
                     lock.withLock {
                         done[p] = r
@@ -430,7 +440,7 @@ class CatalogRepositoryImpl @Inject constructor(
         }
 
     private suspend fun scraperStreams(p: SourceProvider, item: CatalogItem, streamId: String): List<StreamSource> {
-        if (settings.debridService.first().viaTorrentio) return emptyList()
+        if (!settings.debridService.first().supportsDirectMagnetResolution) return emptyList()
         val parts = streamId.split(':')
         val season = parts.getOrNull(1)?.toIntOrNull()
         val episode = parts.getOrNull(2)?.toIntOrNull()

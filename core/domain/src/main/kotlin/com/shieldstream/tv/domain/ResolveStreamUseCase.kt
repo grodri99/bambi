@@ -8,27 +8,30 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 interface ResolveStreamTexts {
-    fun debridService(): String
     fun requestingLink(service: String): String
-    fun lookingInLibrary(): String
+    fun lookingInLibrary(service: String): String
     fun unrestrictingLink(): String
-    fun addingToRealDebrid(): String
-    fun couldNotReadMagnet(): String
+    fun addingToDebrid(service: String): String
+    fun couldNotReadMagnet(service: String): String
     fun noVideoFiles(): String
-    fun checkingCache(): String
-    fun sourceNotCached(): String
-    fun noLinks(): String
+    fun checkingCache(service: String): String
+    fun sourceNotCached(service: String): String
+    fun noLinks(service: String): String
+    fun directMagnetUnsupported(service: String): String
     fun resolutionError(): String
-    fun torrentStatus(status: String): String
+    fun torrentStatus(service: String, status: String): String
 }
 
 class ResolveStreamUseCase(
     private val realDebrid: RealDebridRepository,
+    private val allDebridTorrents: AllDebridRepository,
     private val torrentio: TorrentioLinkResolver,
     private val allDebrid: AllDebridAuthRepository,
+    private val selectedDebrid: Flow<DebridService>,
     private val texts: ResolveStreamTexts,
 ) {
     operator fun invoke(source: StreamSource): Flow<ResolveState> = flow {
@@ -38,7 +41,7 @@ class ResolveStreamUseCase(
         }
 
         source.resolveUrl?.let { url ->
-            val service = source.debrid ?: texts.debridService()
+            val service = source.debrid ?: selectedDebrid.first().title
             emit(ResolveState.Progress(texts.requestingLink(service)))
             val result = if (source.debrid == ITHIL_ALLDEBRID) {
                 allDebrid.unlock(url)
@@ -52,50 +55,59 @@ class ResolveStreamUseCase(
             return@flow
         }
 
-        emit(ResolveState.Progress(texts.lookingInLibrary()))
-        val existingId = realDebrid.findDownloaded(source.infoHash)
+        val service = selectedDebrid.first()
+        val debrid = when (service) {
+            DebridService.REAL_DEBRID -> realDebrid
+            DebridService.ALLDEBRID -> allDebridTorrents
+            else -> error(texts.directMagnetUnsupported(service.title))
+        }
+
+        emit(ResolveState.Progress(texts.lookingInLibrary(service.title)))
+        val existingId = debrid.findDownloaded(source.infoHash)
         if (existingId != null) {
-            val info = realDebrid.torrentInfo(existingId)
+            val info = debrid.torrentInfo(existingId)
             val link = pickFile(info.files, source)?.let { info.linkFor(it) }
             if (link != null) {
                 emit(ResolveState.Progress(texts.unrestrictingLink()))
-                emit(ResolveState.Ready(realDebrid.unrestrict(link)))
+                emit(ResolveState.Ready(debrid.unrestrict(link)))
                 return@flow
             }
         }
 
-        emit(ResolveState.Progress(texts.addingToRealDebrid()))
-        val torrentId = realDebrid.addMagnet(source.magnet)
+        emit(ResolveState.Progress(texts.addingToDebrid(service.title)))
+        val torrentId = debrid.addMagnet(source.magnet)
         var keep = false
         try {
-            val converted = poll(torrentId, MAGNET_TIMEOUT_MS) {
-                it.status == RdTorrentInfo.STATUS_WAITING_SELECTION ||
-                    it.status == RdTorrentInfo.STATUS_DOWNLOADED
-            } ?: error(texts.couldNotReadMagnet())
+            if (debrid.requiresFileSelection) {
+                val converted = poll(debrid, service.title, torrentId, MAGNET_TIMEOUT_MS) {
+                    it.status == RdTorrentInfo.STATUS_WAITING_SELECTION ||
+                        it.status == RdTorrentInfo.STATUS_DOWNLOADED
+                } ?: error(texts.couldNotReadMagnet(service.title))
 
-            if (converted.status == RdTorrentInfo.STATUS_WAITING_SELECTION) {
-                val target = pickFile(converted.files, source)
-                    ?: error(texts.noVideoFiles())
-                realDebrid.selectFiles(torrentId, listOf(target.id))
+                if (converted.status == RdTorrentInfo.STATUS_WAITING_SELECTION) {
+                    val target = pickFile(converted.files, source)
+                        ?: error(texts.noVideoFiles())
+                    debrid.selectFiles(torrentId, listOf(target.id))
+                }
             }
 
-            emit(ResolveState.Progress(texts.checkingCache()))
-            val ready = poll(torrentId, CACHE_TIMEOUT_MS) { it.status == RdTorrentInfo.STATUS_DOWNLOADED }
+            emit(ResolveState.Progress(texts.checkingCache(service.title)))
+            val ready = poll(debrid, service.title, torrentId, CACHE_TIMEOUT_MS) { it.status == RdTorrentInfo.STATUS_DOWNLOADED }
             if (ready == null) {
-                emit(ResolveState.Failed(texts.sourceNotCached(), notCached = true))
+                emit(ResolveState.Failed(texts.sourceNotCached(service.title), notCached = true))
                 return@flow
             }
 
             val link = pickFile(ready.files, source)?.let { ready.linkFor(it) }
                 ?: ready.links.firstOrNull()
-                ?: error(texts.noLinks())
+                ?: error(texts.noLinks(service.title))
 
             emit(ResolveState.Progress(texts.unrestrictingLink()))
-            val url = realDebrid.unrestrict(link)
+            val url = debrid.unrestrict(link)
             keep = true
             emit(ResolveState.Ready(url))
         } finally {
-            if (!keep) withContext(NonCancellable) { realDebrid.deleteTorrent(torrentId) }
+            if (!keep) withContext(NonCancellable) { debrid.deleteTorrent(torrentId) }
         }
     }.catch { e ->
         emit(
@@ -128,6 +140,8 @@ class ResolveStreamUseCase(
     }
 
     private suspend fun poll(
+        debrid: MagnetDebridRepository,
+        service: String,
         torrentId: String,
         timeoutMs: Long,
         done: (RdTorrentInfo) -> Boolean,
@@ -135,9 +149,9 @@ class ResolveStreamUseCase(
         val attempts = (timeoutMs / POLL_INTERVAL_MS).toInt() + 1
         repeat(attempts) { attempt ->
             if (attempt > 0) delay(POLL_INTERVAL_MS)
-            val info = realDebrid.torrentInfo(torrentId)
+            val info = debrid.torrentInfo(torrentId)
             if (info.status in RdTorrentInfo.STATUS_FAILED) {
-                error(texts.torrentStatus(info.status))
+                error(texts.torrentStatus(service, info.status))
             }
             if (done(info)) return info
         }

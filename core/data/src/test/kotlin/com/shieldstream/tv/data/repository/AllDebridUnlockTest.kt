@@ -5,9 +5,14 @@ import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridLink
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.network.api.AllDebridApi
+import com.shieldstream.tv.network.api.AllDebridFilesDataDto
+import com.shieldstream.tv.network.api.AllDebridMessageDto
 import com.shieldstream.tv.network.api.AllDebridPinCheckDto
 import com.shieldstream.tv.network.api.AllDebridPinDto
 import com.shieldstream.tv.network.api.AllDebridResponse
+import com.shieldstream.tv.network.api.AllDebridStatusDataDto
+import com.shieldstream.tv.network.api.AllDebridUploadDataDto
+import com.shieldstream.tv.network.api.AllDebridUserDataDto
 import com.shieldstream.tv.network.api.AllDebridUnlockDto
 import com.shieldstream.tv.strings.Texts
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +66,11 @@ class AllDebridLinkResolverImplTest {
 
         override suspend fun getPin(): AllDebridResponse<AllDebridPinDto> = error("unused")
         override suspend fun checkPin(pin: String, check: String): AllDebridResponse<AllDebridPinCheckDto> = error("unused")
+        override suspend fun user(authorization: String): AllDebridResponse<AllDebridUserDataDto> = error("unused")
+        override suspend fun uploadMagnet(authorization: String, magnet: String): AllDebridResponse<AllDebridUploadDataDto> = error("unused")
+        override suspend fun magnetStatus(authorization: String, id: String): AllDebridResponse<AllDebridStatusDataDto> = error("unused")
+        override suspend fun magnetFiles(authorization: String, id: String): AllDebridResponse<AllDebridFilesDataDto> = error("unused")
+        override suspend fun deleteMagnet(authorization: String, id: String): AllDebridResponse<AllDebridMessageDto> = error("unused")
     }
 
     private class FakeKeys : ApiKeysRepository {

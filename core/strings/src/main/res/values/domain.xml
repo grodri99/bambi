@@ -37,14 +37,15 @@
     <string name="provider_ithil">Ithil</string>
     <string name="resolve_debrid_service">the debrid service</string>
     <string name="resolve_requesting_link">Requesting the link from %1$s…</string>
-    <string name="resolve_looking_library">Looking in your Real-Debrid library…</string>
+    <string name="resolve_looking_library">Looking in your %1$s library…</string>
     <string name="resolve_unrestricting">Unrestricting link…</string>
-    <string name="resolve_adding">Adding to Real-Debrid…</string>
-    <string name="resolve_read_magnet_failed">Real-Debrid couldn\'t read the magnet</string>
+    <string name="resolve_adding">Adding to %1$s…</string>
+    <string name="resolve_read_magnet_failed">%1$s couldn\'t read the magnet</string>
     <string name="resolve_no_video_files">The torrent has no video files</string>
-    <string name="resolve_checking_cache">Checking Real-Debrid cache…</string>
-    <string name="resolve_not_cached">This source isn\'t cached on Real-Debrid. Try another.</string>
-    <string name="resolve_no_links">Real-Debrid returned no links</string>
+    <string name="resolve_checking_cache">Checking %1$s cache…</string>
+    <string name="resolve_not_cached">This source isn\'t cached on %1$s. Try another.</string>
+    <string name="resolve_no_links">%1$s returned no links</string>
+    <string name="resolve_direct_magnet_unsupported">Direct magnet playback isn\'t supported with %1$s. Choose Real-Debrid or AllDebrid, or use a provider configured for this service.</string>
     <string name="resolve_error">Error resolving the source</string>
-    <string name="resolve_torrent_status">Real-Debrid marked the torrent as \'%1$s\'</string>
+    <string name="resolve_torrent_status">%1$s marked the torrent as \'%2$s\'</string>
 </resources>

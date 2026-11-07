@@ -151,7 +151,7 @@
     <string name="settings_off_25e189">Off</string>
     <string name="settings_the_main_finder_like_in_stremio">The main finder, like in Stremio.</string>
     <string name="settings_spanish_torrents_from_spanish_sites_dontorrent_mejortorrent">Spanish torrents from Spanish sites (DonTorrent, MejorTorrent, Wolfmax4k…) plus some in English. Real-Debrid only.</string>
-    <string name="settings_franklix_s_own_finders_together_the_pirate">Franklix\'s own finders together: The Pirate Bay, Knaben (1337x, Nyaa…) and Nyaa (anime). Real-Debrid only.</string>
+    <string name="settings_franklix_s_own_finders_together_the_pirate">Franklix\'s own finders together: The Pirate Bay, Knaben (1337x, Nyaa…) and Nyaa (anime). Real-Debrid or AllDebrid.</string>
     <string name="settings_own_anime_finder_cocoscrapers_real_debrid_only">Own anime finder (CocoScrapers). Real-Debrid only.</string>
     <string name="settings_comet_with_your_real_debrid_token_sent">Comet with your Real-Debrid token (sent to comet.elfhosted.com, like Umbrella).</string>
     <string name="settings_any_stremio_addon_aiostreams_comet_mediafusion_paste">Any Stremio addon (AIOStreams, Comet, MediaFusion…). Paste its manifest URL in Other services → Stremio addon.</string>

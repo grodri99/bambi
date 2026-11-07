@@ -8,6 +8,7 @@ data class RdTorrentInfo(
     val links: List<String>,
 ) {
     fun linkFor(file: RdTorrentFile): String? {
+        file.link?.let { return it }
         val index = files.filter { it.selected }.indexOfFirst { it.id == file.id }
         return if (index >= 0) links.getOrNull(index) else null
     }

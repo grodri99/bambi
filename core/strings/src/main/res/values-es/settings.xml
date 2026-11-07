@@ -151,7 +151,7 @@
     <string name="settings_off_25e189">Desactivado</string>
     <string name="settings_the_main_finder_like_in_stremio">El buscador principal, como en Stremio.</string>
     <string name="settings_spanish_torrents_from_spanish_sites_dontorrent_mejortorrent">Torrents en castellano de webs españolas (DonTorrent, MejorTorrent, Wolfmax4k…) y algunos en inglés. Solo con Real-Debrid.</string>
-    <string name="settings_franklix_s_own_finders_together_the_pirate">Buscadores propios de Franklix, juntos: The Pirate Bay, Knaben (1337x, Nyaa…) y Nyaa (anime). Solo con Real-Debrid.</string>
+    <string name="settings_franklix_s_own_finders_together_the_pirate">Buscadores propios de Franklix, juntos: The Pirate Bay, Knaben (1337x, Nyaa…) y Nyaa (anime). Con Real-Debrid o AllDebrid.</string>
     <string name="settings_own_anime_finder_cocoscrapers_real_debrid_only">Buscador propio de anime (CocoScrapers). Solo con Real-Debrid.</string>
     <string name="settings_comet_with_your_real_debrid_token_sent">Comet con tu token de Real-Debrid (se envía a comet.elfhosted.com, como en Umbrella).</string>
     <string name="settings_any_stremio_addon_aiostreams_comet_mediafusion_paste">Cualquier addon de Stremio (AIOStreams, Comet, MediaFusion…). Pega la URL de su manifiesto en Otros servicios → Addon de Stremio.</string>
