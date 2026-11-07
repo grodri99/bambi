@@ -354,9 +354,6 @@ fun PlayerScreen(
         }
 
         if (state == PlayerUiState.Playing) {
-            if (playback.buffering) {
-                CircularProgressIndicator(color = AppColors.Accent, modifier = Modifier.align(Alignment.Center).size(48.dp))
-            }
             AnimatedVisibility(visible = controlsVisible && !syncOpen, enter = fadeIn(), exit = fadeOut()) {
                 ControlsOverlay(
                     title = title,
@@ -477,7 +474,6 @@ private fun seekStepMs(repeatCount: Int): Long = when {
 @Stable
 private class PlaybackState {
     var isPlaying by mutableStateOf(false)
-    var buffering by mutableStateOf(false)
     var positionMs by mutableLongStateOf(0L)
     var durationMs by mutableLongStateOf(0L)
     var bufferedMs by mutableLongStateOf(0L)
@@ -492,9 +488,6 @@ private fun rememberPlaybackState(player: ExoPlayer?): PlaybackState {
                 state.isPlaying = isPlaying
             }
 
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                state.buffering = playbackState == Player.STATE_BUFFERING
-            }
         }
         player?.addListener(listener)
         state.isPlaying = player?.isPlaying == true
