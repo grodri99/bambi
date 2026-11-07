@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.15] - 2026-11-07
+
+### Added
+
+- **Navigation rail:** move the main destinations into a dedicated left rail for clearer TV navigation.
+- **Backdrop controls:** optional soft backgrounds and high-resolution artwork settings for Home.
+
+### Improved
+
+- **Franklix artwork:** new minimalist launcher icon and Android TV banner.
+- **Profile avatars:** muted two-color gradients inspired by forest, sea, and other natural tones.
+- **Visual consistency:** refined typography, icons, badges, cards, and surfaces across Home, Details, playback, setup, and Settings.
+- **Home artwork:** centralized backdrop selection and added focused regression coverage.
+
+### Fixed
+
+- Preserve the selected source when resuming playback.
+
 ## [1.0.14] - 2026-11-06
 
 ### Improved

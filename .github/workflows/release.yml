@@ -107,13 +107,22 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Franklix.apk"
           test -s "$RUNNER_TEMP/release-artifact/Franklix.apk"
 
+      - name: Prepare curated release notes
+        run: |
+          awk -v heading="## [${RELEASE_TAG#v}]" '
+            index($0, heading) == 1 { in_release = 1; next }
+            in_release && /^## \[/ { exit }
+            in_release { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          grep -q . "$RUNNER_TEMP/release-notes.md"
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Franklix.apk" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "$RELEASE_TAG" \
-            --generate-notes \
+            --title "Franklix ${RELEASE_TAG#v}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             --latest \
             --verify-tag

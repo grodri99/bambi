@@ -8,7 +8,7 @@ import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.dto.TmdbMovieDto
 import com.shieldstream.tv.network.dto.TmdbPaginated
-import com.shieldstream.tv.strings.ResourceTexts
+import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -34,12 +34,12 @@ class HomeExtrasSourceTest {
             results = listOf(TmdbMovieDto(id = 1, poster_path = "/poster.jpg")),
         )
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val source = HomeExtrasSource(tmdb, context, store, ResourceTexts(context))
+        val source = HomeExtrasSource(tmdb, context, store, mockk<Texts>(relaxed = true))
 
         val rows = source.categoryRows(Category.CLASSICS, HomeFilter.MOVIES)
 
         assertEquals(3, rows.size)
-        assertEquals(listOf("1", "2", "3"), queries.map { it["page"] }.sorted())
+        assertEquals(listOf("1", "2", "3"), queries.map { it.getValue("page") }.sorted())
         queries.forEach { query ->
             assertEquals("false", query["include_adult"])
             assertEquals("popularity.desc", query["sort_by"])
