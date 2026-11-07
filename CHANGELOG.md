@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.17] - 2026-11-07
+
+### Added
+
+- **AllDebrid magnet playback:** use The Pirate Bay, Knaben, and Nyaa with AllDebrid. Upload magnets, check cached availability, select the requested movie or episode, and unlock the playback link directly.
+- **Direct AllDebrid account validation:** verify API keys and premium status through AllDebrid instead of Torrentio.
+
+### Improved
+
+- Keep independent provider results available when another source provider fails.
+- Wrap long service status messages without squeezing or truncating provider details.
+
 ## [1.0.16] - 2026-11-07
 
 ### Added
