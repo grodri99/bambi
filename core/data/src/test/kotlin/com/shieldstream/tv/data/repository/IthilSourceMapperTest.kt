@@ -3,6 +3,7 @@ package com.shieldstream.tv.data.repository
 import com.shieldstream.tv.domain.IthilLibraryInfo
 import com.shieldstream.tv.domain.IthilLibraryRepository
 import com.shieldstream.tv.domain.IthilSource
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HdrType
@@ -31,6 +32,7 @@ class IthilSourceMapperTest {
         val source = episodes.first()
         assertEquals(Quality.FHD_1080, source.quality)
         assertEquals(listOf("ES", "EN"), source.languages)
+        assertEquals(setOf(AudioCodec.DOLBY_DIGITAL), source.audioCodecs)
         assertTrue(source.advertisesSpanishAudio)
         assertEquals(1, source.season)
         assertEquals(1, source.episode)

@@ -15,6 +15,7 @@ data class StreamSource(
     val fileName: String? = null,
     val languages: List<String> = emptyList(),
     val videoCodec: VideoCodec? = null,
+    val audioCodecs: Set<AudioCodec> = emptySet(),
     val softwareDecode: Boolean = false,
     val resolveUrl: String? = null,
     val debrid: String? = null,

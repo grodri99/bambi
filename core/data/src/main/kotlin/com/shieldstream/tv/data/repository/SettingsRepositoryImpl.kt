@@ -12,7 +12,11 @@ import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.enabledSourceProviders
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.DeviceProfile
+import com.shieldstream.tv.model.HdrType
+import com.shieldstream.tv.model.Quality
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -171,6 +175,30 @@ class SettingsRepositoryImpl @Inject constructor(
         providersFlow.value = providers
     }
 
+    private val sourceExclusionsFlow = MutableStateFlow(
+        SourceExclusions(
+            qualities = prefs.getStringSet(KEY_EXCLUDED_QUALITIES, null).orEmpty().mapNotNull { name ->
+                Quality.entries.firstOrNull { it.name == name }
+            }.toSet(),
+            hdrTypes = prefs.getStringSet(KEY_EXCLUDED_HDR_TYPES, null).orEmpty().mapNotNull { name ->
+                HdrType.entries.firstOrNull { it.name == name }
+            }.toSet(),
+            audioCodecs = prefs.getStringSet(KEY_EXCLUDED_AUDIO_CODECS, null).orEmpty().mapNotNull { name ->
+                AudioCodec.entries.firstOrNull { it.name == name }
+            }.toSet(),
+        ),
+    )
+    override val sourceExclusions: Flow<SourceExclusions> = sourceExclusionsFlow
+
+    override suspend fun setSourceExclusions(exclusions: SourceExclusions) {
+        prefs.edit()
+            .putStringSet(KEY_EXCLUDED_QUALITIES, exclusions.qualities.map { it.name }.toSet())
+            .putStringSet(KEY_EXCLUDED_HDR_TYPES, exclusions.hdrTypes.map { it.name }.toSet())
+            .putStringSet(KEY_EXCLUDED_AUDIO_CODECS, exclusions.audioCodecs.map { it.name }.toSet())
+            .apply()
+        sourceExclusionsFlow.value = exclusions
+    }
+
     override suspend fun setDebridService(service: DebridService) {
         prefs.edit().putString(KEY_DEBRID, service.name).apply()
         debridFlow.value = service
@@ -226,6 +254,9 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_HOME_ROW_ITEM_LIMIT = "home_row_item_limit"
         const val KEY_DEBRID = "debrid_service"
         const val KEY_PROVIDERS_OFF = "source_providers_off"
+        const val KEY_EXCLUDED_QUALITIES = "source_excluded_qualities"
+        const val KEY_EXCLUDED_HDR_TYPES = "source_excluded_hdr_types"
+        const val KEY_EXCLUDED_AUDIO_CODECS = "source_excluded_audio_codecs"
         const val MIN_BUFFER = 20
         const val MAX_BUFFER = 100
     }

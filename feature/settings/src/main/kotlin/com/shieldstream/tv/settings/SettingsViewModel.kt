@@ -19,9 +19,13 @@ import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.media.PlaybackPolicyProvider
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.DeviceCapabilities
 import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.MemoryProfile
+import com.shieldstream.tv.model.Quality
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.SubtitleAppearance
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -191,6 +195,33 @@ class SettingsViewModel @Inject constructor(
 
     val providers: StateFlow<Set<SourceProvider>> =
         settings.sourceProviders.stateIn(viewModelScope, SharingStarted.Eagerly, SourceProvider.entries.toSet())
+
+    val sourceExclusions: StateFlow<SourceExclusions> = settings.sourceExclusions
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SourceExclusions())
+
+    fun toggleExcludedQuality(quality: Quality) {
+        viewModelScope.launch {
+            val current = settings.sourceExclusions.first()
+            val qualities = if (quality in current.qualities) current.qualities - quality else current.qualities + quality
+            settings.setSourceExclusions(current.copy(qualities = qualities))
+        }
+    }
+
+    fun toggleExcludedHdrType(hdrType: HdrType) {
+        viewModelScope.launch {
+            val current = settings.sourceExclusions.first()
+            val hdrTypes = if (hdrType in current.hdrTypes) current.hdrTypes - hdrType else current.hdrTypes + hdrType
+            settings.setSourceExclusions(current.copy(hdrTypes = hdrTypes))
+        }
+    }
+
+    fun toggleExcludedAudioCodec(codec: AudioCodec) {
+        viewModelScope.launch {
+            val current = settings.sourceExclusions.first()
+            val audioCodecs = if (codec in current.audioCodecs) current.audioCodecs - codec else current.audioCodecs + codec
+            settings.setSourceExclusions(current.copy(audioCodecs = audioCodecs))
+        }
+    }
 
     fun setExperimentalSubtitleSync(enabled: Boolean) {
         viewModelScope.launch { settings.setExperimentalSubtitleSync(enabled) }

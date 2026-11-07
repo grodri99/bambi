@@ -519,7 +519,9 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
             Text(it, color = Color.White, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.width(14.dp))
         }
-        (state.sources as? SourcesState.Ready)?.sources?.firstOrNull()?.let { best ->
+        (state.sources as? SourcesState.Ready)?.sources?.firstOrNull {
+            !state.sourceExclusions.excludes(it) && (!state.spanishOnly || it.advertisesSpanishAudio)
+        }?.let { best ->
             Badge(best.quality.label)
             if (best.hdrType != HdrType.SDR) {
                 Spacer(Modifier.width(8.dp))
@@ -552,13 +554,15 @@ private fun SourcesStatus(state: DetailsUiState.Content) {
         SourcesState.Loading -> Text(localizedStringResource(StringsR.string.details_finding_sources), color = Grey, style = MaterialTheme.typography.bodyMedium)
         is SourcesState.Error -> Text(s.message, color = Grey, style = MaterialTheme.typography.bodyMedium)
         is SourcesState.Ready -> {
-            val sources = s.sources
+            val sources = state.sourceExclusions.filter(s.sources)
                 .filter { !state.spanishOnly || it.advertisesSpanishAudio }
                 .distinctBy { it.infoHash.lowercase() }
             val scope = state.selectedEpisode?.takeIf { state.isSeries }?.let { localizedStringResource(StringsR.string.details_for_episode, it.localizedCode()) }.orEmpty()
             when {
                 sources.isEmpty() && s.pending.isNotEmpty() -> Text(localizedStringResource(StringsR.string.details_finding_sources), color = Grey, style = MaterialTheme.typography.bodyMedium)
                 sources.isEmpty() && state.spanishOnly -> Text(localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile), color = Grey, style = MaterialTheme.typography.bodyMedium)
+                sources.isEmpty() && s.sources.isNotEmpty() && !state.sourceExclusions.isEmpty ->
+                    Text(localizedStringResource(StringsR.string.details_no_sources_match_exclusions), color = Grey, style = MaterialTheme.typography.bodyMedium)
                 sources.isEmpty() -> Text(localizedStringResource(StringsR.string.details_no_sources_for, scope), color = Grey, style = MaterialTheme.typography.bodyMedium)
                 else -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -811,7 +815,9 @@ private fun SourcesPanel(
     onToggleSpanishOnly: () -> Unit,
 ) {
     val firstRequester = remember { FocusRequester() }
-    val sources = (state.sources as? SourcesState.Ready)?.sources.orEmpty()
+    val allSources = (state.sources as? SourcesState.Ready)?.sources.orEmpty()
+    var showAll by remember { mutableStateOf(false) }
+    val sources = if (showAll) allSources else state.sourceExclusions.filter(allSources)
     val order = SourceProvider.entries.map { localizedStringResource(it.sectionResource) }.distinct()
     val pending = (state.sources as? SourcesState.Ready)?.pending.orEmpty()
     val unavailable = (state.sources as? SourcesState.Ready)?.unavailable.orEmpty() +
@@ -863,6 +869,24 @@ private fun SourcesPanel(
             state.selectedEpisode?.takeIf { state.isSeries }?.let {
                 Text("${it.localizedCode()} · ${it.title}", color = Grey, style = MaterialTheme.typography.bodyMedium)
             }
+            if (state.sources is SourcesState.Ready) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = localizedStringResource(
+                            StringsR.string.details_sources_filtered_count,
+                            sources.count { !spanishOnly || it.advertisesSpanishAudio },
+                            allSources.size,
+                        ),
+                        color = Grey,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!state.sourceExclusions.isEmpty) {
+                        ShowAllChip(showAll = showAll, onClick = { showAll = !showAll })
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
             when (val s = state.sources) {
                 SourcesState.Idle -> Text(localizedStringResource(StringsR.string.details_pick_an_episode_first), color = Grey)
@@ -870,8 +894,12 @@ private fun SourcesPanel(
                 is SourcesState.Error -> Text(s.message, color = Grey)
                 is SourcesState.Ready -> if (groups.all { it.second.isEmpty() } && s.pending.isEmpty()) {
                     Text(
-                        if (spanishOnly) localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile)
-                        else localizedStringResource(StringsR.string.details_no_sources),
+                        when {
+                            spanishOnly -> localizedStringResource(StringsR.string.details_no_spanish_sources_available_for_this_profile)
+                            !showAll && allSources.isNotEmpty() && sources.isEmpty() ->
+                                localizedStringResource(StringsR.string.details_no_sources_match_exclusions)
+                            else -> localizedStringResource(StringsR.string.details_no_sources)
+                        },
                         color = Grey,
                     )
                 } else {
@@ -905,16 +933,36 @@ private fun SourcesPanel(
 
 @Composable
 private fun SpanishOnlyChip(enabled: Boolean, onClick: () -> Unit) {
+    SourcePanelChip(
+        text = if (enabled) "✓ " + localizedStringResource(StringsR.string.details_spanish_only) else localizedStringResource(StringsR.string.details_spanish_only),
+        highlighted = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun ShowAllChip(showAll: Boolean, onClick: () -> Unit) {
+    SourcePanelChip(
+        text = localizedStringResource(
+            if (showAll) StringsR.string.details_hide_excluded else StringsR.string.details_show_all,
+        ),
+        highlighted = showAll,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SourcePanelChip(text: String, highlighted: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Text(
-        text = if (enabled) "✓ " + localizedStringResource(StringsR.string.details_spanish_only) else localizedStringResource(StringsR.string.details_spanish_only),
+        text = text,
         color = if (focused) Color.Black else Color.White,
         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
         modifier = Modifier
             .background(
                 when {
                     focused -> Color.White
-                    enabled -> Color.White.copy(alpha = 0.22f)
+                    highlighted -> Color.White.copy(alpha = 0.22f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
                 AppShapes.Pill,

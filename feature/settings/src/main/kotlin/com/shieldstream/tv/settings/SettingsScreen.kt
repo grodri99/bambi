@@ -21,9 +21,13 @@ import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.DeviceCapabilities
 import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.MemoryProfile
+import com.shieldstream.tv.model.Quality
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitleColor
 import androidx.compose.foundation.background
@@ -111,6 +115,7 @@ fun SettingsScreen(
     val ready = state as? SettingsUiState.Ready
     val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val sourceExclusions by viewModel.sourceExclusions.collectAsStateWithLifecycle()
     val ithilState by viewModel.ithilState.collectAsStateWithLifecycle()
     val ithilUnlocked by viewModel.ithilUnlocked.collectAsStateWithLifecycle()
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
@@ -142,6 +147,10 @@ fun SettingsScreen(
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
                     onToggleProvider = viewModel::toggleProvider,
+                    sourceExclusions = sourceExclusions,
+                    onToggleQuality = viewModel::toggleExcludedQuality,
+                    onToggleHdrType = viewModel::toggleExcludedHdrType,
+                    onToggleAudioCodec = viewModel::toggleExcludedAudioCodec,
                     ithilState = ithilState,
                     ithilUnlocked = ithilUnlocked,
                     onDownloadIthil = viewModel::downloadIthil,
@@ -188,6 +197,10 @@ private fun SettingsList(
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
     onToggleProvider: (SourceProvider) -> Unit,
+    sourceExclusions: SourceExclusions,
+    onToggleQuality: (Quality) -> Unit,
+    onToggleHdrType: (HdrType) -> Unit,
+    onToggleAudioCodec: (AudioCodec) -> Unit,
     ithilState: IthilLibraryState,
     ithilUnlocked: Boolean,
     onDownloadIthil: () -> Unit,
@@ -198,6 +211,9 @@ private fun SettingsList(
     val debridRequester = remember { FocusRequester() }
     var lastEdited by rememberSaveable { mutableStateOf<ApiService?>(null) }
     var subtitleAppearanceExpanded by rememberSaveable { mutableStateOf(false) }
+    var qualityExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
+    var videoExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
+    var audioExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.editor == null) {
         if (state.editor == null) {
             withFrameNanos { }
@@ -285,6 +301,83 @@ private fun SettingsList(
                         state = ithilState,
                         onDownload = onDownloadIthil,
                         onDelete = onDeleteIthil,
+                    )
+                }
+            }
+            item { SectionTitle(localizedStringResource(StringsR.string.settings_source_exclusions)) }
+            item {
+                Text(
+                    localizedStringResource(StringsR.string.settings_source_exclusions_summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                )
+            }
+            item(key = "excluded-quality-header") {
+                SourceExclusionGroupCard(
+                    title = localizedStringResource(StringsR.string.settings_quality),
+                    summary = acceptedSummary(
+                        acceptedLabels = Quality.entries.filterNot { it in sourceExclusions.qualities }.map { qualityLabel(it) },
+                        acceptsAll = sourceExclusions.qualities.isEmpty(),
+                    ),
+                    expanded = qualityExclusionsExpanded,
+                    onClick = { qualityExclusionsExpanded = !qualityExclusionsExpanded },
+                )
+            }
+            if (qualityExclusionsExpanded) {
+                items(Quality.entries, key = { "excluded-quality:${it.name}" }) { quality ->
+                    SourceExclusionCard(
+                        label = qualityLabel(quality),
+                        excluded = quality in sourceExclusions.qualities,
+                        onClick = { onToggleQuality(quality) },
+                    )
+                }
+            }
+            item(key = "excluded-hdr-header") {
+                SourceExclusionGroupCard(
+                    title = localizedStringResource(StringsR.string.settings_video_features),
+                    summary = acceptedSummary(
+                        acceptedLabels = HdrType.entries.filterNot { it in sourceExclusions.hdrTypes }.map { it.label },
+                        acceptsAll = sourceExclusions.hdrTypes.isEmpty(),
+                    ),
+                    expanded = videoExclusionsExpanded,
+                    onClick = { videoExclusionsExpanded = !videoExclusionsExpanded },
+                )
+            }
+            if (videoExclusionsExpanded) {
+                items(HdrType.entries, key = { "excluded-hdr:${it.name}" }) { hdrType ->
+                    SourceExclusionCard(
+                        label = hdrType.label,
+                        excluded = hdrType in sourceExclusions.hdrTypes,
+                        onClick = { onToggleHdrType(hdrType) },
+                    )
+                }
+            }
+            item(key = "excluded-audio-header") {
+                SourceExclusionGroupCard(
+                    title = localizedStringResource(StringsR.string.settings_audio_codecs),
+                    summary = acceptedSummary(
+                        acceptedLabels = AudioCodec.entries.filterNot { it in sourceExclusions.audioCodecs }.map { it.label },
+                        acceptsAll = sourceExclusions.audioCodecs.isEmpty(),
+                    ),
+                    expanded = audioExclusionsExpanded,
+                    onClick = { audioExclusionsExpanded = !audioExclusionsExpanded },
+                )
+            }
+            item {
+                Text(
+                    localizedStringResource(StringsR.string.settings_audio_codec_exclusions_summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+            if (audioExclusionsExpanded) {
+                items(AudioCodec.entries, key = { "excluded-audio:${it.name}" }) { codec ->
+                    SourceExclusionCard(
+                        label = codec.label,
+                        excluded = codec in sourceExclusions.audioCodecs,
+                        onClick = { onToggleAudioCodec(codec) },
                     )
                 }
             }
@@ -1225,6 +1318,69 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
             ) {
                 AppLanguage.entries.forEach { SegmentOption(it.label, selected = it == pending) }
             }
+        }
+    }
+}
+
+@Composable
+private fun qualityLabel(quality: Quality): String = if (quality == Quality.UNKNOWN) {
+    localizedStringResource(StringsR.string.settings_unknown_quality)
+} else {
+    quality.label
+}
+
+@Composable
+private fun acceptedSummary(acceptedLabels: List<String>, acceptsAll: Boolean): String = when {
+    acceptedLabels.isEmpty() -> localizedStringResource(StringsR.string.settings_accepts_none)
+    acceptsAll -> localizedStringResource(StringsR.string.settings_accepts_all)
+    else -> localizedStringResource(StringsR.string.settings_accepts_values, acceptedLabels.joinToString(" · "))
+}
+
+@Composable
+private fun SourceExclusionGroupCard(title: String, summary: String, expanded: Boolean, onClick: () -> Unit) {
+    FocusCard(onClick = onClick) { focused ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color.White,
+                )
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Text(
+                text = if (expanded) "▾" else "▸",
+                style = MaterialTheme.typography.headlineSmall,
+                color = if (focused) Color.White else Muted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SourceExclusionCard(label: String, excluded: Boolean, onClick: () -> Unit) {
+    FocusCard(onClick = onClick) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(24.dp))
+            SegmentOption(
+                localizedStringResource(
+                    if (excluded) StringsR.string.settings_excluded else StringsR.string.settings_shown,
+                ),
+                selected = excluded,
+            )
         }
     }
 }

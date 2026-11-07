@@ -50,4 +50,8 @@
     <string name="details_watched_count">%1$d / %2$d episodes watched</string>
     <string name="details_watched_count_short">%1$d/%2$d watched</string>
     <string name="details_source_count">%1$d sources</string>
+    <string name="details_sources_filtered_count">%1$d shown · %2$d total</string>
+    <string name="details_show_all">Show all</string>
+    <string name="details_hide_excluded">Apply exclusions</string>
+    <string name="details_no_sources_match_exclusions">No sources match your exclusion settings</string>
 </resources>

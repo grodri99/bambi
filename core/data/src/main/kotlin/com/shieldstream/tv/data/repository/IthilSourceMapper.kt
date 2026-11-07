@@ -3,6 +3,7 @@ package com.shieldstream.tv.data.repository
 import com.shieldstream.tv.domain.ITHIL_ALLDEBRID
 import com.shieldstream.tv.domain.IthilLibraryRepository
 import com.shieldstream.tv.domain.IthilSource
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.HdrType
@@ -47,6 +48,7 @@ private fun IthilSource.toStreamSource(item: CatalogItem, episode: Episode?): St
         season = episode?.season,
         episode = episode?.number,
         languages = audio.toLanguages(),
+        audioCodecs = AudioCodec.parse("$quality $audio $info"),
     )
 }
 

@@ -13,6 +13,7 @@ import com.shieldstream.tv.domain.StreamResults
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.media.DeviceCapabilityDetector
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.DeviceCapabilities
@@ -22,6 +23,7 @@ import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.Season
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.strings.Texts
@@ -269,6 +271,57 @@ class DetailsViewModelTest {
     }
 
     @Test
+    fun `automatic playback excludes configured video and audio sources but manual selection can show all`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.MOVIE,
+            title = "Movie",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val episode = Episode(1, 1, "", "", null, null)
+        val allowed = source(episode).copy(id = "allowed", infoHash = "allowed")
+        val dolbyVision = source(episode).copy(id = "dolby", infoHash = "dolby", hdrType = HdrType.DOLBY_VISION)
+        val uhd = source(episode).copy(id = "uhd", infoHash = "uhd", quality = Quality.UHD_2160)
+        val trueHd = source(episode).copy(
+            id = "truehd",
+            infoHash = "truehd",
+            audioCodecs = setOf(AudioCodec.DOLBY_TRUEHD),
+        )
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
+        every { catalog.getStreams(item, null) } returns flowOf(
+            StreamResults(sources = listOf(allowed, dolbyVision, uhd, trueHd)),
+        )
+        val holder = SelectedContentHolder().apply { selectItem(item) }
+        val viewModel = viewModel(
+            catalog,
+            holder,
+            exclusions = SourceExclusions(
+                qualities = setOf(Quality.UHD_2160),
+                hdrTypes = setOf(HdrType.DOLBY_VISION),
+                audioCodecs = setOf(AudioCodec.DOLBY_TRUEHD),
+            ),
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.play()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf("allowed"), holder.playback.value?.sources?.map { it.id })
+        val ready = (viewModel.uiState.value as DetailsUiState.Content).sources as SourcesState.Ready
+        assertEquals(4, ready.sources.size)
+
+        viewModel.playSource(dolbyVision)
+
+        assertEquals("dolby", holder.playback.value?.sources?.first()?.id)
+    }
+
+    @Test
     fun `Ithil links stay queued for failover without allowing other uncached resolvers`() = runTest {
         val item = CatalogItem(
             id = "424242",
@@ -310,6 +363,7 @@ class DetailsViewModelTest {
         catalog: CatalogRepository,
         holder: SelectedContentHolder,
         watchProgress: WatchProgressRepository? = null,
+        exclusions: SourceExclusions = SourceExclusions(),
     ): DetailsViewModel =
         DetailsViewModel(
             catalogRepository = catalog,
@@ -330,6 +384,7 @@ class DetailsViewModelTest {
             settings = mockk<SettingsRepository>(relaxed = true) {
                 every { spanishFirst } returns flowOf(false)
                 every { spanishOnlySources } returns flowOf(false)
+                every { sourceExclusions } returns flowOf(exclusions)
                 every { deviceOptimization } returns flowOf(DeviceOptimization.AUTOMATIC)
             },
             trakt = mockk<TraktRepository>(relaxed = true),
@@ -341,6 +396,7 @@ class DetailsViewModelTest {
                 every { followedShowIds } returns MutableStateFlow(emptySet())
             },
             texts = mockk<Texts>(relaxed = true),
+            sourceProcessingDispatcher = SourceProcessingDispatcher(mainDispatcher.dispatcher),
         )
 
     private fun source(episode: Episode) = StreamSource(

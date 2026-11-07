@@ -22,6 +22,7 @@ import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.Episode
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.PlaybackMedia
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.strings.Texts
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -70,6 +72,7 @@ sealed interface DetailsUiState {
         val progress: Map<String, WatchProgress> = emptyMap(),
         val spanishFirst: Boolean = false,
         val spanishOnly: Boolean = false,
+        val sourceExclusions: SourceExclusions = SourceExclusions(),
         val inMyList: Boolean = false,
         val following: Boolean = false,
     ) : DetailsUiState {
@@ -87,6 +90,13 @@ sealed interface DetailsEvent {
     data object OpenPlayer : DetailsEvent
 }
 
+private fun DetailsUiState.Content.eligibleSources(
+    sources: List<StreamSource>,
+    includeExcluded: Boolean = false,
+): List<StreamSource> = sources.filter {
+    (includeExcluded || !sourceExclusions.excludes(it)) && (!spanishOnly || it.advertisesSpanishAudio)
+}
+
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
@@ -100,6 +110,7 @@ class DetailsViewModel @Inject constructor(
     private val myList: MyListRepository,
     private val tracking: EpisodeTrackingRepository,
     private val texts: Texts,
+    private val sourceProcessingDispatcher: SourceProcessingDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
@@ -245,6 +256,7 @@ class DetailsViewModel @Inject constructor(
             trace("details_ready")
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
+            val sourceExclusions = settings.sourceExclusions.first()
             if (request.playImmediately) {
                 updateContent {
                     it.copy(
@@ -253,6 +265,7 @@ class DetailsViewModel @Inject constructor(
                         inMyList = myList.contains(details.item.type, details.item.id),
                         spanishFirst = spanishFirst,
                         spanishOnly = spanishOnly,
+                        sourceExclusions = sourceExclusions,
                     )
                 }
             } else {
@@ -262,6 +275,7 @@ class DetailsViewModel @Inject constructor(
                     inMyList = myList.contains(details.item.type, details.item.id),
                     spanishFirst = spanishFirst,
                     spanishOnly = spanishOnly,
+                    sourceExclusions = sourceExclusions,
                 )
             }
             detailsLoaded = true
@@ -387,7 +401,7 @@ class DetailsViewModel @Inject constructor(
             return
         }
         when (val s = c.sources) {
-            is SourcesState.Ready -> if (s.sources.none { !c.spanishOnly || it.advertisesSpanishAudio } && s.pending.isNotEmpty()) {
+            is SourcesState.Ready -> if (c.eligibleSources(s.sources).isEmpty() && s.pending.isNotEmpty()) {
                 pendingFromStart = fromStart
                 updateContent { it.copy(pendingPlay = true) }
             } else {
@@ -407,7 +421,7 @@ class DetailsViewModel @Inject constructor(
         val sameEpisode = c.selectedEpisode == episode
         val ready = c.sources as? SourcesState.Ready
         if (sameEpisode && ready != null) {
-            if (ready.sources.none { !c.spanishOnly || it.advertisesSpanishAudio } && ready.pending.isNotEmpty()) {
+            if (c.eligibleSources(ready.sources).isEmpty() && ready.pending.isNotEmpty()) {
                 updateContent { it.copy(pendingPlay = true) }
                 return
             }
@@ -432,6 +446,7 @@ class DetailsViewModel @Inject constructor(
             startIndex = ready.sources.indexOf(source).coerceAtLeast(0),
             fromStart = false,
             useSavedSource = false,
+            includeExcluded = true,
         )
     }
 
@@ -471,13 +486,20 @@ class DetailsViewModel @Inject constructor(
         sourcesJob = viewModelScope.launch {
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
+            val sourceExclusions = settings.sourceExclusions.first()
             val optimization = settings.deviceOptimization.first()
             val capabilities = deviceCapabilities.capabilities
             val hardwareCodecs = when (optimization) {
                 DeviceOptimization.AUTOMATIC -> capabilities.hardwareVideoCodecs
                 DeviceOptimization.CUSTOM -> emptySet()
             }
-            updateContent { it.copy(spanishFirst = spanishFirst, spanishOnly = spanishOnly) }
+            updateContent {
+                it.copy(
+                    spanishFirst = spanishFirst,
+                    spanishOnly = spanishOnly,
+                    sourceExclusions = sourceExclusions,
+                )
+            }
             var rdCached: Set<String>? = null
             catalogRepository.getStreams(c.details.item, episode)
                 .map { result ->
@@ -495,6 +517,8 @@ class DetailsViewModel @Inject constructor(
                         preferSpanish = spanishFirst,
                     )
                 }
+                // Keep provider parsing, snapshot construction, enrichment and sorting off the UI thread.
+                .flowOn(sourceProcessingDispatcher.dispatcher)
                 .catch { e ->
                     updateContent {
                         it.copy(
@@ -518,9 +542,7 @@ class DetailsViewModel @Inject constructor(
         val c = content() ?: return
         if (!c.pendingPlay || !detailsLoaded) return
         val ready = c.sources as? SourcesState.Ready ?: return
-        val enoughCached = ready.sources.count {
-            it.isCached && (!c.spanishOnly || it.advertisesSpanishAudio)
-        } >= MIN_CACHED_TO_START
+        val enoughCached = c.eligibleSources(ready.sources).count { it.isCached } >= MIN_CACHED_TO_START
         if (!enoughCached && ready.pending.isNotEmpty()) return
         updateContent { it.copy(pendingPlay = false) }
         startPlayback(ready.sources, startIndex = 0, fromStart = pendingFromStart)
@@ -531,6 +553,7 @@ class DetailsViewModel @Inject constructor(
         startIndex: Int,
         fromStart: Boolean,
         useSavedSource: Boolean = true,
+        includeExcluded: Boolean = false,
     ) {
         val c = content() ?: return
         val item = c.details.item
@@ -547,8 +570,7 @@ class DetailsViewModel @Inject constructor(
         } else {
             sorted
         }
-        val queue = ordered.drop(startIndex)
-            .filter { !c.spanishOnly || it.advertisesSpanishAudio }
+        val queue = c.eligibleSources(ordered.drop(startIndex), includeExcluded)
             .distinctBy { it.infoHash.lowercase() }
             .filterIndexed { index, s ->
                 index == 0 || s.resolveUrl == null || s.isCached || s.debrid == ITHIL_ALLDEBRID
@@ -557,9 +579,12 @@ class DetailsViewModel @Inject constructor(
         if (queue.isEmpty()) {
             updateContent {
                 it.copy(
-                    message = if (c.spanishOnly)
-                        texts.get(StringsR.string.details_no_spanish_sources_available_for_this_profile_7dd7b1)
-                    else texts.get(StringsR.string.details_no_sources_available_for_this_right_now),
+                    message = when {
+                        c.spanishOnly -> texts.get(StringsR.string.details_no_spanish_sources_available_for_this_profile_7dd7b1)
+                        !includeExcluded && sorted.isNotEmpty() && c.eligibleSources(sorted).isEmpty() ->
+                            texts.get(StringsR.string.details_no_sources_match_exclusions)
+                        else -> texts.get(StringsR.string.details_no_sources_available_for_this_right_now)
+                    },
                     pendingPlay = false,
                 )
             }

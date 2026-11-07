@@ -2,6 +2,7 @@ package com.shieldstream.tv.domain
 
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.DeviceOptimization
+import com.shieldstream.tv.model.SourceExclusions
 import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitlePreference
 import kotlinx.coroutines.flow.Flow
@@ -71,6 +72,9 @@ interface SettingsRepository {
 
     val sourceProviders: Flow<Set<SourceProvider>>
     suspend fun setSourceProviders(providers: Set<SourceProvider>)
+
+    val sourceExclusions: Flow<SourceExclusions>
+    suspend fun setSourceExclusions(exclusions: SourceExclusions)
 
     /** Servicio debrid en uso (AllDebrid por defecto). */
     val debridService: Flow<DebridService>

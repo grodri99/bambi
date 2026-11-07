@@ -23,6 +23,7 @@ import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.SettingsRepository
 import kotlinx.coroutines.flow.first
+import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
@@ -680,6 +681,7 @@ class CatalogRepositoryImpl @Inject constructor(
             fileName = fileName,
             languages = parseLanguages("$name\n$text"),
             videoCodec = if (isAv1) VideoCodec.AV1 else null,
+            audioCodecs = AudioCodec.parse("$name $text ${fileName.orEmpty()}"),
             softwareDecode = isAv1,
         )
     }

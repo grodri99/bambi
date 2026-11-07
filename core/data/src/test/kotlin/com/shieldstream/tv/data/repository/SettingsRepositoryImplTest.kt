@@ -6,7 +6,11 @@ import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.model.AppLanguage
+import com.shieldstream.tv.model.AudioCodec
+import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.Profile
+import com.shieldstream.tv.model.Quality
+import com.shieldstream.tv.model.SourceExclusions
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +58,22 @@ class SettingsRepositoryImplTest {
 
         repository.setHomeRowItemLimit(1_000)
         assertEquals(SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT, repository.homeRowItemLimit.first())
+    }
+
+    @Test
+    fun `source exclusions default empty and persist across reloads`() = runTest {
+        assertEquals(SourceExclusions(), repository().sourceExclusions.first())
+        val exclusions = SourceExclusions(
+            qualities = setOf(Quality.UHD_2160, Quality.SD),
+            hdrTypes = setOf(HdrType.DOLBY_VISION),
+            audioCodecs = setOf(AudioCodec.DOLBY_TRUEHD, AudioCodec.DTS),
+        )
+
+        val settings = repository()
+        settings.setSourceExclusions(exclusions)
+
+        assertEquals(exclusions, settings.sourceExclusions.first())
+        assertEquals(exclusions, repository().sourceExclusions.first())
     }
 
     @Test
