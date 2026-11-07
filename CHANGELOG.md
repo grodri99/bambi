@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.16] - 2026-11-07
+
+### Added
+
+- **Android TV integration:** publish resumable movies and episodes to Play Next and a dedicated Franklix Continue Watching channel, with profile-aware resume links and high-resolution landscape artwork.
+- **Source exclusions:** filter sources by quality, video features, and advertised audio codecs. Use Show all in the source list for a temporary override.
+
+### Improved
+
+- Use the current Franklix logo on profile, setup, and phone-configuration screens.
+- Remove the redundant centered buffering indicator during playback.
+
 ## [1.0.15] - 2026-11-07
 
 ### Added

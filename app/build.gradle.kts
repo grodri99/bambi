@@ -32,8 +32,8 @@ android {
         applicationId = "com.shieldstream.tv"
         minSdk = 21
         targetSdk = 35
-        versionCode = 115
-        versionName = "1.0.15"
+        versionCode = 116
+        versionName = "1.0.16"
         manifestPlaceholders["appLabel"] = "@string/app_name"
 
         buildConfigField("String", "RD_TOKEN", "\"$rdToken\"")
