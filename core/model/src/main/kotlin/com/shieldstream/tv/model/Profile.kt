@@ -43,17 +43,17 @@ object ProfileManagement {
 }
 
 object ProfileAvatars {
-    val colors: List<Pair<Long, Long>> = listOf(
-        0xFFE50914 to 0xFF8C0610, // rojo
-        0xFF2F80ED to 0xFF1B4C95, // azul
-        0xFF27AE60 to 0xFF14683A, // verde
-        0xFFF2C94C to 0xFFC08A12, // amarillo
-        0xFF9B51E0 to 0xFF5B2A8C, // morado
-        0xFFF2994A to 0xFFB45A17, // naranja
-        0xFF56CCF2 to 0xFF2179A0, // celeste
-        0xFFEB5794 to 0xFF9B2459, // rosa
-        0xFF6FCF97 to 0xFF2F7F57, // menta
-        0xFF828282 to 0xFF3D3D3D, // gris
+    val colors: List<Triple<Long, Long, Long>> = listOf(
+        Triple(0xFFFF6B6B, 0xFFE11D48, 0xFF881337), // rojo
+        Triple(0xFF60A5FA, 0xFF2563EB, 0xFF1E3A8A), // azul
+        Triple(0xFF6EE7B7, 0xFF059669, 0xFF065F46), // verde
+        Triple(0xFFFBBF24, 0xFFD97706, 0xFF78350F), // amarillo
+        Triple(0xFFC4B5FD, 0xFF8B5CF6, 0xFF5B21B6), // morado
+        Triple(0xFFFDBA74, 0xFFF97316, 0xFFC2410C), // naranja
+        Triple(0xFF67E8F9, 0xFF0891B2, 0xFF155E75), // celeste
+        Triple(0xFFF9A8D4, 0xFFEC4899, 0xFF9D174D), // rosa
+        Triple(0xFF99F6E4, 0xFF14B8A6, 0xFF0F766E), // menta
+        Triple(0xFFCBD5E1, 0xFF64748B, 0xFF1E293B), // gris
     )
 
     fun safe(index: Int): Int = index.mod(colors.size)
