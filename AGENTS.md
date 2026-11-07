@@ -115,16 +115,3 @@ ANDROID_HOME="$HOME/Library/Android/sdk" bash ./gradlew test :app:assembleReleas
 Unit tests exist mainly in `core:model`, `core:domain`, `core:data`, and `core:media`. Add focused tests there for pure rules, persistence mappings, date filtering, and source/playback policy. There is no comprehensive Compose/UI or end-to-end suite. Compilation and unit tests do not validate D-pad focus, direct playback, notification delivery, or setup layout; verify those on a device.
 
 Before changing code, inspect `git status` and relevant diffs. Multiple agents may edit this tree; do not revert unrelated work. Keep one measurable change per test build when evaluating performance.
-
-## Measuring UI performance
-
-Use the same screen and warmed-up remote-key sequence for A/B comparisons. Billboard navigation and poster-row navigation are different workloads. Cold startup and first-time image decoding create misleading outliers.
-
-```bash
-adb -s 192.168.0.174:5555 shell dumpsys gfxinfo com.shieldstream.tv reset
-# Perform the fixed navigation sequence.
-adb -s 192.168.0.174:5555 shell dumpsys gfxinfo com.shieldstream.tv \
-  | rg -A11 -B2 'Total frames rendered|Janky frames|50th percentile|90th percentile|Number Slow'
-```
-
-Small samples are noisy. Keep changes only when they produce a repeatable improvement on the physical box. Row navigation still has a known performance gap; prioritize focus/render cost and input latency over release-build tweaks.
