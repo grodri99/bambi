@@ -1,5 +1,6 @@
 package com.shieldstream.tv.watchnext
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.os.Build
@@ -110,6 +111,7 @@ class WatchNextManager @Inject constructor(
         continueWatchingChannel.sync(candidateIds, loaded)
     }
 
+    @SuppressLint("RestrictedApi") // Documented WatchNextProgram cursor mapping inherits restricted getters.
     @RequiresApi(Build.VERSION_CODES.O)
     private fun readExistingPrograms(): List<ExistingProgram> {
         val programs = mutableListOf<ExistingProgram>()
@@ -147,6 +149,7 @@ class WatchNextManager @Inject constructor(
         internal fun internalId(profileId: String, entry: ContinueEntry): String =
             launcherInternalId(profileId, entry)
 
+        @SuppressLint("RestrictedApi") // Google's Watch Next builder API triggers inherited-method lint errors.
         @RequiresApi(Build.VERSION_CODES.O)
         internal fun programValues(
             profileId: String,

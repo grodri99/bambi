@@ -1,5 +1,6 @@
 package com.shieldstream.tv.watchnext
 
+import android.annotation.SuppressLint
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -146,6 +147,7 @@ class ContinueWatchingChannel @Inject constructor(
         return null
     }
 
+    @SuppressLint("RestrictedApi") // Documented PreviewProgram cursor mapping inherits restricted getters.
     @RequiresApi(Build.VERSION_CODES.O)
     private fun readPrograms(channelId: Long): List<ExistingPreviewProgram> {
         val programs = mutableListOf<ExistingPreviewProgram>()
@@ -184,6 +186,7 @@ class ContinueWatchingChannel @Inject constructor(
         private const val PREFERENCES_NAME = "android_tv_channels"
         private const val KEY_VISIBILITY_REQUESTED = "continue_watching_visibility_requested"
 
+        @SuppressLint("RestrictedApi") // Google's preview-program builder API triggers inherited-method lint errors.
         @RequiresApi(Build.VERSION_CODES.O)
         internal fun programValues(
             channelId: Long,
