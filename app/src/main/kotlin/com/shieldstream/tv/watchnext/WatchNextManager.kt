@@ -33,6 +33,7 @@ class WatchNextManager @Inject constructor(
     private val profiles: ProfileRepository,
     private val watchProgress: WatchProgressRepository,
     private val catalog: CatalogRepository,
+    private val continueWatchingChannel: ContinueWatchingChannel,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var syncJob: Job? = null
@@ -40,6 +41,7 @@ class WatchNextManager @Inject constructor(
     @OptIn(FlowPreview::class)
     fun start() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || syncJob != null) return
+        scope.launch { runCatching { continueWatchingChannel.ensureChannel() } }
         syncJob = scope.launch {
             combine(profiles.active, watchProgress.progress) { profile, progress ->
                 WatchNextSnapshot(
@@ -56,15 +58,17 @@ class WatchNextManager @Inject constructor(
         }
     }
 
+    fun onForeground() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        scope.launch { runCatching { continueWatchingChannel.requestBrowsable() } }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun sync(snapshot: WatchNextSnapshot) {
-        val candidateIds = snapshot.entries.mapTo(mutableSetOf()) { internalId(snapshot.profileId, it) }
+        val candidateIds = snapshot.entries.mapTo(mutableSetOf()) { launcherInternalId(snapshot.profileId, it) }
         val loaded = snapshot.entries.mapConcurrent(concurrency = 4) { entry ->
             runCatching { catalog.getItem(entry.type, entry.id) }.getOrNull()?.let { item ->
-                DesiredProgram(
-                    internalId = internalId(snapshot.profileId, entry),
-                    values = programValues(snapshot.profileId, item, entry),
-                )
+                LauncherEntry(snapshot.profileId, item, entry)
             }
         }.filterNotNull()
 
@@ -87,20 +91,23 @@ class WatchNextManager @Inject constructor(
 
         loaded.forEach { desired ->
             val current = existingByInternalId[desired.internalId]
+            val values = programValues(snapshot.profileId, desired.item, desired.entry)
             if (current == null) {
                 context.contentResolver.insert(
                     TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                    desired.values,
+                    values,
                 )
             } else {
                 context.contentResolver.update(
                     TvContractCompat.buildWatchNextProgramUri(current.providerId),
-                    desired.values,
+                    values,
                     null,
                     null,
                 )
             }
         }
+
+        continueWatchingChannel.sync(candidateIds, loaded)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -128,11 +135,6 @@ class WatchNextManager @Inject constructor(
         val entries: List<ContinueEntry>,
     )
 
-    private data class DesiredProgram(
-        val internalId: String,
-        val values: android.content.ContentValues,
-    )
-
     private data class ExistingProgram(
         val providerId: Long,
         val internalId: String?,
@@ -142,13 +144,8 @@ class WatchNextManager @Inject constructor(
         private const val MAX_PROGRAMS = 10
         private const val SYNC_QUIET_PERIOD_MS = 15_000L
 
-        internal fun internalId(profileId: String, entry: ContinueEntry): String = buildString {
-            append(profileId)
-            append(':').append(entry.type.name)
-            append(':').append(entry.id)
-            entry.season?.let { append(':').append(it) }
-            entry.episode?.let { append(':').append(it) }
-        }
+        internal fun internalId(profileId: String, entry: ContinueEntry): String =
+            launcherInternalId(profileId, entry)
 
         @RequiresApi(Build.VERSION_CODES.O)
         internal fun programValues(
@@ -156,18 +153,6 @@ class WatchNextManager @Inject constructor(
             item: CatalogItem,
             entry: ContinueEntry,
         ): android.content.ContentValues {
-            val deepLink = Uri.Builder()
-                .scheme("shieldstream")
-                .authority("resume")
-                .appendPath(item.type.name.lowercase())
-                .appendPath(item.id)
-                .appendQueryParameter("profile", profileId)
-                .apply {
-                    entry.season?.let { appendQueryParameter("season", it.toString()) }
-                    entry.episode?.let { appendQueryParameter("episode", it.toString()) }
-                }
-                .build()
-
             return WatchNextProgram.Builder()
                 .setType(
                     if (item.type == MediaType.MOVIE) {
@@ -179,13 +164,16 @@ class WatchNextManager @Inject constructor(
                 .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
                 .setTitle(item.title)
                 .setDescription(item.overview)
-                .setIntentUri(deepLink)
+                .setIntentUri(LauncherEntry(profileId, item, entry).deepLink())
                 .setInternalProviderId(internalId(profileId, entry))
                 .setLastEngagementTimeUtcMillis(entry.progress.updatedAt)
                 .setLastPlaybackPositionMillis(entry.progress.positionMs.asProviderMillis())
                 .setDurationMillis(entry.progress.durationMs.asProviderMillis())
+                .setPosterArtAspectRatio(TvContractCompat.WatchNextPrograms.ASPECT_RATIO_2_3)
+                .setThumbnailAspectRatio(TvContractCompat.WatchNextPrograms.ASPECT_RATIO_16_9)
                 .apply {
                     item.posterUrl?.takeIf { it.isNotBlank() }?.let { setPosterArtUri(Uri.parse(it)) }
+                    item.backdropUrl?.takeIf { it.isNotBlank() }?.let { setThumbnailUri(Uri.parse(it)) }
                     entry.season?.let(::setSeasonNumber)
                     entry.episode?.let(::setEpisodeNumber)
                 }

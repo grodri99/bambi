@@ -17,6 +17,7 @@ import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import com.shieldstream.tv.ui.theme.LocalSoftBackdrops
 import com.shieldstream.tv.ui.theme.LocalHighResBackdrops
 import com.shieldstream.tv.ui.theme.FranklixTheme
+import com.shieldstream.tv.watchnext.WatchNextManager
 import com.shieldstream.tv.watchnext.WatchNextRequest
 import com.shieldstream.tv.watchnext.parseWatchNextRequest
 import dagger.hilt.android.AndroidEntryPoint
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var settings: SettingsRepository
+
+    @Inject
+    lateinit var watchNext: WatchNextManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,6 +86,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        watchNext.onForeground()
         trakt.syncActive()
         updates.check(manual = false)
         lifecycleScope.launch { ithilUpdates.checkForUpdates() }
