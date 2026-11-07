@@ -1,6 +1,7 @@
 package com.shieldstream.tv
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -29,12 +30,43 @@ import com.shieldstream.tv.settings.phoneconfig.PhoneConfigMode
 import com.shieldstream.tv.settings.phoneconfig.PhoneConfigScreen
 import com.shieldstream.tv.settings.update.UpdatePrompt
 import com.shieldstream.tv.ui.component.restartApp
+import com.shieldstream.tv.watchnext.WatchNextNavigationViewModel
+import com.shieldstream.tv.watchnext.WatchNextRequest
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
-fun AppNavHost(holder: SelectedContentHolder, onExit: () -> Unit) {
+fun AppNavHost(
+    holder: SelectedContentHolder,
+    onExit: () -> Unit,
+    watchNextRequest: StateFlow<WatchNextRequest?>,
+    onWatchNextHandled: (WatchNextRequest) -> Unit,
+) {
     val navController = rememberNavController()
     val gate: SetupGateViewModel = hiltViewModel()
+    val watchNextNavigation: WatchNextNavigationViewModel = hiltViewModel()
     val start = remember { if (gate.needsSetup) "setup" else "profiles" }
+    val request by watchNextRequest.collectAsState()
+    val currentEntry by navController.currentBackStackEntryFlow.collectAsState(initial = null)
+
+    LaunchedEffect(request?.requestedAtNs) {
+        if (request != null && navController.currentDestination?.route in WATCH_NEXT_INTERRUPT_ROUTES) {
+            navController.popBackStack("main", inclusive = false)
+        }
+    }
+
+    LaunchedEffect(request, currentEntry?.destination?.route) {
+        val pending = request ?: return@LaunchedEffect
+        if (currentEntry?.destination?.route != "main") return@LaunchedEffect
+
+        val resolved = watchNextNavigation.resolve(pending)
+        if (resolved != null) {
+            holder.selectItem(resolved.item, resolved.target, playImmediately = true)
+            onWatchNextHandled(pending)
+            navController.navigate("details") { launchSingleTop = true }
+        } else {
+            onWatchNextHandled(pending)
+        }
+    }
     val toMainFresh = {
         navController.navigate("main") { popUpTo(navController.graph.id) { inclusive = true } }
     }
@@ -165,5 +197,7 @@ fun AppNavHost(holder: SelectedContentHolder, onExit: () -> Unit) {
         }
     }
 }
+
+private val WATCH_NEXT_INTERRUPT_ROUTES = setOf("details", "player", "settings")
 
 private fun NavBackStackEntry.isVisible() = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)

@@ -1,5 +1,6 @@
 package com.shieldstream.tv
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,12 +17,17 @@ import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import com.shieldstream.tv.ui.theme.LocalSoftBackdrops
 import com.shieldstream.tv.ui.theme.LocalHighResBackdrops
 import com.shieldstream.tv.ui.theme.FranklixTheme
+import com.shieldstream.tv.watchnext.WatchNextRequest
+import com.shieldstream.tv.watchnext.parseWatchNextRequest
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val watchNextRequest = MutableStateFlow<WatchNextRequest?>(null)
 
     @Inject
     lateinit var holder: SelectedContentHolder
@@ -40,6 +46,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            watchNextRequest.value = parseWatchNextRequest(intent)
+        }
         setContent {
             val lightweightUi by settings.lightweightUi.collectAsState(initial = settings.lightweightUiEnabled)
             val softBackdrops by settings.softBackdrops.collectAsState(initial = settings.softBackdropsEnabled)
@@ -50,10 +59,25 @@ class MainActivity : ComponentActivity() {
                 LocalHighResBackdrops provides highResBackdrops,
             ) {
                 FranklixTheme {
-                    AppNavHost(holder = holder, onExit = { finish() })
+                    AppNavHost(
+                        holder = holder,
+                        onExit = { finish() },
+                        watchNextRequest = watchNextRequest,
+                        onWatchNextHandled = { handled ->
+                            if (watchNextRequest.value?.requestedAtNs == handled.requestedAtNs) {
+                                watchNextRequest.value = null
+                            }
+                        },
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        watchNextRequest.value = parseWatchNextRequest(intent)
     }
 
     override fun onStart() {
