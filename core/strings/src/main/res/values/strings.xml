@@ -107,6 +107,7 @@
     <string name="featured_rising">Trending this week</string>
     <string name="featured_acclaimed">Critically acclaimed</string>
     <string name="category_acclaimed">Critically acclaimed</string>
+    <string name="category_classics">Classic movies</string>
     <string name="category_dramas">Dramas</string>
     <string name="category_thrillers">Thrillers</string>
     <string name="category_horror">Horror</string>

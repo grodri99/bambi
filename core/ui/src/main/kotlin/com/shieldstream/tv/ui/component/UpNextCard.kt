@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,11 +28,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
@@ -54,6 +53,7 @@ fun UpNextCard(
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
+    highlightBadge: Boolean = true,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale = if (focused) 1.04f else 1f
@@ -105,16 +105,12 @@ fun UpNextCard(
                     ),
                 ),
         )
-        Text(
+        StatusPill(
             text = badgeText,
-            color = Color.White,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
+            dot = highlightBadge,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(8.dp)
-                .background(AppColors.Alert, AppShapes.Badge)
-                .padding(horizontal = 5.dp, vertical = 2.dp),
+                .padding(8.dp),
         )
         Column(
             Modifier
@@ -125,8 +121,7 @@ fun UpNextCard(
             Text(
                 text = item.title,
                 color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -134,8 +129,7 @@ fun UpNextCard(
             Text(
                 text = label,
                 color = Color.White.copy(alpha = 0.78f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
+                style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -144,7 +138,7 @@ fun UpNextCard(
                 Text(
                     text = releaseLabel,
                     color = Color.White.copy(alpha = 0.58f),
-                    fontSize = 10.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

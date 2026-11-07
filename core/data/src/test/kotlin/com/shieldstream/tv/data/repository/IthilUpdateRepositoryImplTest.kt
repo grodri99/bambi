@@ -11,7 +11,6 @@ import com.shieldstream.tv.network.api.IthilApi
 import com.shieldstream.tv.network.api.IthilContentDto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -44,7 +43,7 @@ class IthilUpdateRepositoryImplTest {
     }
 
     @Test
-    fun unchangedShaSkipsDownload() = runTest {
+    fun unchangedShaSkipsDownloadAndReportsUpToDate() = runTest {
         library.current = library.current.copy(sourceSha = "old")
         api.entries = listOf(remote.copy(sha = "old"))
 
@@ -52,17 +51,21 @@ class IthilUpdateRepositoryImplTest {
 
         assertEquals(library.current, result)
         assertEquals(0, library.installCalls)
-        assertTrue(repository.state.value is IthilLibraryState.Ready)
+        assertTrue(repository.state.value is IthilLibraryState.UpToDate)
     }
 
     @Test
-    fun changedShaInstallsAndMissingLibraryDoesNothing() = runTest {
+    fun changedShaReportsAvailableAndThrottlesChecks() = runTest {
         api.entries = listOf(remote.copy(name = "fixture_3_3_10.zm3", sha = "older"), remote)
 
-        val result = repository.checkForUpdates()
+        repository.checkForUpdates()
 
-        assertEquals("new", result?.sourceSha)
-        assertEquals(1, library.installCalls)
+        val available = repository.state.value as IthilLibraryState.Available
+        assertEquals("new", available.update.sha)
+        assertEquals("3.3.11", available.update.version)
+        assertEquals(0, library.installCalls)
+        repository.checkForUpdates()
+        assertEquals(1, api.calls)
         library.ready = false
         repository.checkForUpdates()
         assertEquals(1, api.calls)
@@ -74,8 +77,8 @@ class IthilUpdateRepositoryImplTest {
         var now = 1_000L
         repository.clock = { now }
 
-        assertNull(repository.checkForUpdates())
-        assertNull(repository.checkForUpdates())
+        repository.checkForUpdates()
+        repository.checkForUpdates()
         assertEquals(1, api.calls)
 
         now += 60L * 60L * 1000L

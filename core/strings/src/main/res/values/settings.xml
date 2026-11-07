@@ -108,6 +108,10 @@
     <string name="settings_sources_and_links_through_torrentio">Sources and links through Torrentio.</string>
     <string name="settings_direct_connection_to_real_debrid">Direct connection to Real-Debrid.</string>
     <string name="settings_lightweight_ui">Lightweight UI</string>
+    <string name="settings_soft_backdrops">Soft backgrounds</string>
+    <string name="settings_soft_backdrops_summary">Blurs the artwork behind the Home rows so titles stand out.</string>
+    <string name="settings_high_res_backdrops">High-resolution backgrounds</string>
+    <string name="settings_high_res_backdrops_summary">Sharper full-screen artwork on Home. Uses more data and image memory; ignored with Lightweight UI.</string>
     <string name="settings_smaller_backdrops_no_automatic_rotation_or_focus">Smaller backdrops, no automatic rotation or focus animations. For low-power TV boxes.</string>
     <string name="settings_on">On</string>
     <string name="settings_off_9847b4">Off</string>
@@ -148,6 +152,10 @@
     <string name="settings_ithil_downloading">Downloading library… %1$d%%</string>
     <string name="settings_ithil_indexing">Building the local index…</string>
     <string name="settings_ithil_ready">Ready · %1$d movie links · %2$d episode links</string>
+    <string name="settings_ithil_up_to_date">Already up to date · no download needed</string>
+    <string name="settings_ithil_update_available">Version %1$s is ready to download</string>
+    <string name="settings_ithil_update_available_title">Ithil library %1$s is available</string>
+    <string name="settings_ithil_update_available_message">Download the new source index now? Your current library stays active until the replacement is ready.</string>
     <string name="settings_ithil_error">Library operation failed: %1$s</string>
     <string name="settings_ithil_unlocked">Ithil sources enabled</string>
     <string name="settings_player_buffer">Player buffer</string>

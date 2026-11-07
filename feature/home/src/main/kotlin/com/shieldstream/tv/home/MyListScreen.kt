@@ -74,7 +74,7 @@ fun MyListScreen(
             Text(
                 localizedStringResource(StringsR.string.home_my_list),
                 color = Color.White,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
             )
             Spacer(Modifier.width(24.dp))
             val current = when (val s = state) {

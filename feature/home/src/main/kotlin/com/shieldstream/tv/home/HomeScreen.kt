@@ -58,14 +58,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.CatalogRow
 import com.shieldstream.tv.model.Category
@@ -90,10 +88,15 @@ import com.shieldstream.tv.ui.component.loopingItems
 import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.RailCollapsedWidth
 import com.shieldstream.tv.ui.component.RailContentStart
+import com.shieldstream.tv.ui.component.SoftBackdropImage
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.shouldLoop
-import com.shieldstream.tv.ui.theme.DisplayFont
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import com.shieldstream.tv.ui.theme.LocalSoftBackdrops
+import com.shieldstream.tv.ui.theme.LocalHighResBackdrops
+import com.shieldstream.tv.model.BackdropUrls
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
@@ -413,9 +416,12 @@ internal fun RowsBrowser(
                 header?.let {
                     Text(
                         text = it.uppercase(Lang.locale),
-                        fontFamily = DisplayFont,
-                        fontSize = 30.sp,
-                        color = AppColors.Accent,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.12.em,
+                        ),
+                        color = AppColors.Highlight,
+                        modifier = Modifier.padding(bottom = 6.dp),
                     )
                 }
                 HeroInfo(item = hero)
@@ -605,7 +611,8 @@ private fun CatalogRowView(
                 LazyRow(
                     state = rememberLoopingRowState(row.items.size),
                     contentPadding = PaddingValues(horizontal = contentStart, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 16.dp),
+                    // Top 10 needs at least 12 dp so the previous card ends inside the opaque part of the rail scrim.
+                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 12.dp else 16.dp),
                 ) {
                     loopingItems(row.items) { virtual, index, item ->
                         val itemModifier = if (keyOf(row, virtual) == focusKey) Modifier.focusRequester(restoreRequester) else Modifier
@@ -690,6 +697,7 @@ private fun CatalogRowView(
                                         },
                                         onLongClick = { onUpNextMenu(virtual, item, episode) },
                                         onFocused = { onFocused(virtual) },
+                                        highlightBadge = upNextBadge(info) != UpNextBadge.UP_NEXT,
                                         modifier = itemModifier,
                                     )
                                 }
@@ -713,19 +721,20 @@ private fun CatalogRowView(
 @Composable
 private fun HeroBackdrop(item: CatalogItem) {
     Box(Modifier.fillMaxSize()) {
-        val area = Modifier.fillMaxSize()
-        val backdropUrl = if (LocalLightweightUi.current) {
-            item.backdropUrl?.replace("/w1280/", "/w780/")
-        } else {
-            item.backdropUrl
-        }
-        if (backdropUrl != null) {
-            AsyncImage(
-                model = backdropUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = area,
-            )
+        // Softened by default so the rows, not the artwork, carry the screen. The featured carousel
+        // stays sharp either way.
+        item.backdropUrl?.let { url ->
+            if (LocalSoftBackdrops.current) {
+                SoftBackdropImage(url = url, modifier = Modifier.fillMaxSize())
+            } else {
+                AsyncImage(
+                    // The soft path decodes at 320 px, so resolution only matters for sharp backdrops.
+                    model = BackdropUrls.fullScreen(url, lightweight = false, highRes = LocalHighResBackdrops.current),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         Box(
             Modifier.fillMaxSize().background(

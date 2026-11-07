@@ -71,7 +71,7 @@ internal fun HomeCategoriesDialog(
                 .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
                 .padding(28.dp),
         ) {
-            Text(localizedStringResource(StringsR.string.settings_home_categories), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(localizedStringResource(StringsR.string.settings_home_categories), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
                 localizedStringResource(StringsR.string.settings_ok_shows_or_hides_each_one_back),
@@ -128,7 +128,7 @@ private fun CategoryToggle(category: Category, shown: Boolean, onClick: () -> Un
                 .background(if (shown) Selected else Color.Transparent, AppShapes.Badge)
                 .border(2.dp, if (shown) Selected else Color.White.copy(alpha = 0.4f), AppShapes.Badge),
         ) {
-            if (shown) Text("✓", color = AppColors.OnAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            if (shown) Text("✓", color = AppColors.OnAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(12.dp))
         Text(

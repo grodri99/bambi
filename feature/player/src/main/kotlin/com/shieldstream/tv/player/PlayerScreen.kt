@@ -27,19 +27,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -607,18 +604,11 @@ internal fun seekFraction(ms: Long, durationMs: Long): Float? =
 private fun SeekBar(playback: PlaybackState, positionMs: Long) {
     val played = seekFraction(positionMs, playback.durationMs)
     val buffered = seekFraction(playback.bufferedMs, playback.durationMs)
-    BoxWithConstraints(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.CenterStart) {
+    Box(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.CenterStart) {
         Box(Modifier.fillMaxWidth().height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.25f)))
         if (played != null && buffered != null) {
             Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(AppShapes.Pill).background(Color.White.copy(alpha = 0.45f)))
             Box(Modifier.fillMaxWidth(played).height(4.dp).clip(AppShapes.Pill).background(AppColors.Accent))
-            Box(
-                Modifier
-                    .offset(x = maxWidth * played - 7.dp)
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.Accent),
-            )
         }
     }
 }

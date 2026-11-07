@@ -11,6 +11,7 @@ import com.shieldstream.tv.model.SubtitleColor
 val Category.titleResource: Int
     get() = when (this) {
         Category.ACCLAIMED -> R.string.category_acclaimed
+        Category.CLASSICS -> R.string.category_classics
         Category.DRAMAS -> R.string.category_dramas
         Category.THRILLERS -> R.string.category_thrillers
         Category.HORROR -> R.string.category_horror

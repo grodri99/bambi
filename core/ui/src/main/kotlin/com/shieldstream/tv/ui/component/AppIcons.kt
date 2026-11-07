@@ -2,6 +2,8 @@ package com.shieldstream.tv.ui.component
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
@@ -94,5 +96,50 @@ object AppIcons {
         ).addPath(
             pathData = addPathNodes(path),
             fill = SolidColor(Color.White),
+        ).build()
+}
+
+/**
+ * Outline icons for the navigation rail. Drawn as strokes on a 24-unit grid so they read as thin
+ * lines next to the filled icons used inside screens.
+ */
+object LineIcons {
+    val Search = line("line_search", "M17,11A6,6 0,1 1,5,11A6,6 0,1 1,17,11Z M15.5,15.5L20,20")
+    val Home = line("line_home", "M4,10.5L12,4L20,10.5V19a1,1 0,0 1,-1,1H15V14H9v6H5a1,1 0,0 1,-1,-1Z")
+    val Movie = line(
+        "line_movie",
+        "M5,4H19a1,1 0,0 1,1,1V19a1,1 0,0 1,-1,1H5a1,1 0,0 1,-1,-1V5a1,1 0,0 1,1,-1Z " +
+            "M8,4V20 M16,4V20 M4,9H8 M4,15H8 M16,9H20 M16,15H20",
+    )
+    val Tv = line(
+        "line_tv",
+        "M4,5H20a1,1 0,0 1,1,1V16a1,1 0,0 1,-1,1H4a1,1 0,0 1,-1,-1V6a1,1 0,0 1,1,-1Z M8,20H16 M12,17V20",
+    )
+    val Episodes = line(
+        "line_episodes",
+        "M9,4H19a1,1 0,0 1,1,1V14a1,1 0,0 1,-1,1H9a1,1 0,0 1,-1,-1V5a1,1 0,0 1,1,-1Z " +
+            "M4,8V19a1,1 0,0 0,1,1H16 M12.25,6.75L16.5,9.5L12.25,12.25Z",
+    )
+    val Bookmark = line("line_bookmark", "M7,4H17a1,1 0,0 1,1,1V20L12,16L6,20V5a1,1 0,0 1,1,-1Z")
+    val Settings = line(
+        "line_settings",
+        "M4,7H12 M16,7H20 M16,7A2,2 0,1 1,12,7A2,2 0,1 1,16,7Z " +
+            "M4,17H7 M11,17H20 M11,17A2,2 0,1 1,7,17A2,2 0,1 1,11,17Z",
+    )
+
+    private fun line(name: String, path: String): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(
+            pathData = addPathNodes(path),
+            fill = null,
+            stroke = SolidColor(Color.White),
+            strokeLineWidth = 1.6f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
         ).build()
 }

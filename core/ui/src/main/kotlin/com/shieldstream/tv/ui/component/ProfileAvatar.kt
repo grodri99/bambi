@@ -27,37 +27,21 @@ fun ProfileAvatar(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(size * 0.14f),
 ) {
-    val (start, middle, end) = ProfileAvatars.colors[ProfileAvatars.safe(avatar)]
-    val gradient = remember(start, middle, end) {
-        Brush.linearGradient(
-            colorStops = arrayOf(
-                0f to Color(start),
-                0.52f to Color(middle),
-                1f to Color(end),
-            ),
-        )
-    }
-    val shading = remember {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0f to Color.White.copy(alpha = 0.16f),
-                0.42f to Color.Transparent,
-                1f to Color.Black.copy(alpha = 0.16f),
-            ),
-        )
+    val (start, end) = ProfileAvatars.colors[ProfileAvatars.safe(avatar)]
+    val gradient = remember(start, end) {
+        Brush.linearGradient(listOf(Color(start), Color(end)))
     }
     Box(
         modifier
             .size(size)
             .background(gradient, shape)
-            .background(shading, shape)
-            .border(1.dp, Color.White.copy(alpha = 0.18f), shape),
+            .border(1.dp, Color.White.copy(alpha = 0.12f), shape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = initial,
             color = Color.White,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.SemiBold,
             fontSize = (size.value * 0.48f).sp,
         )
     }

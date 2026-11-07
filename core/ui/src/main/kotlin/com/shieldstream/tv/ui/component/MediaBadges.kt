@@ -68,7 +68,7 @@ private fun MediaBadge(text: String, icon: ImageVector, accent: Color) {
         Text(
             text = text,
             color = Color.White,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
         )
     }
 }

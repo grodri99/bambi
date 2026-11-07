@@ -20,6 +20,7 @@ data class FeaturedItem(
 
 enum class Category(val forMovies: Boolean = true, val forTv: Boolean = true) {
     ACCLAIMED,
+    CLASSICS(forTv = false),
     DRAMAS,
     THRILLERS,
     HORROR,
@@ -51,7 +52,7 @@ enum class Category(val forMovies: Boolean = true, val forTv: Boolean = true) {
     ;
 
     companion object {
-        val DEFAULT_VISIBLE = setOf(ACCLAIMED, DRAMAS, SPANISH, ACTION, COMEDY, SCIFI, KIDS, FAMILY, DOCUMENTARY)
+        val DEFAULT_VISIBLE = setOf(ACCLAIMED, CLASSICS, DRAMAS, SPANISH, ACTION, COMEDY, SCIFI, KIDS, FAMILY, DOCUMENTARY)
         val DEFAULT_HIDDEN: Set<String> = entries.filterNot { it in DEFAULT_VISIBLE }.map { it.name }.toSet()
 
         val KIDS_SAFE = setOf(KIDS, FAMILY)

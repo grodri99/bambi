@@ -30,7 +30,11 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -53,12 +57,12 @@ val RailContentStart: Dp = RailCollapsedWidth + 24.dp
 private val RailExpandedWidth: Dp = 260.dp
 
 enum class NavTab(val icon: ImageVector) {
-    SEARCH(AppIcons.Search),
-    HOME(AppIcons.Home),
-    MOVIES(AppIcons.Movie),
-    TV(AppIcons.Tv),
-    EPISODES(AppIcons.Episodes),
-    MY_LIST(AppIcons.Bookmark),
+    SEARCH(LineIcons.Search),
+    HOME(LineIcons.Home),
+    MOVIES(LineIcons.Movie),
+    TV(LineIcons.Tv),
+    EPISODES(LineIcons.Episodes),
+    MY_LIST(LineIcons.Bookmark),
 }
 
 @get:StringRes
@@ -99,7 +103,9 @@ fun NavRail(
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .width(if (expanded) RailExpandedWidth else RailCollapsedWidth)
+            // Collapsed, the scrim reaches the content inset so cards scrolled past the first
+            // column fade out instead of showing behind the icons.
+            .width(if (expanded) RailExpandedWidth else RailContentStart)
             // Cache the rail in its own GPU layer: it is static while the rows scroll beneath it,
             // so each frame composites one texture instead of redrawing icons, text and gradient.
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -118,6 +124,7 @@ fun NavRail(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
+                .width(if (expanded) RailExpandedWidth else RailCollapsedWidth)
                 .padding(horizontal = 12.dp, vertical = 28.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -156,19 +163,26 @@ fun NavRail(
                 onClick = onSettings,
                 contentRequester = contentRequester,
                 focusable = focusable,
-            ) { tint -> RailIcon(AppIcons.Settings, settingsLabel.takeUnless { expanded }, tint) }
+            ) { tint -> RailIcon(LineIcons.Settings, settingsLabel.takeUnless { expanded }, tint) }
         }
     }
 }
 
+// Spans RailContentStart (96 dp). Opaque to ~86.5 dp, where the previous card in the tightest row
+// (Top 10, 12 dp gap) ends; transparent from ~90.5 dp, before the scaled focus ring of a focused
+// Continue Watching card (~91 dp). 0.94 alpha still left a visible ghost of bright posters.
 private val CollapsedScrim = Brush.horizontalGradient(
-    0f to Color.Black.copy(alpha = 0.7f),
-    1f to Color.Transparent,
+    0f to Color.Black,
+    0.90f to Color.Black,
+    0.94f to Color.Transparent,
 )
 private val ExpandedScrim = Brush.horizontalGradient(
     0f to Color.Black.copy(alpha = 0.96f),
     1f to Color.Black.copy(alpha = 0.82f),
 )
+
+private val MarkerWidth = 3.dp
+private val MarkerHeight = 18.dp
 
 @Composable
 private fun RailIcon(icon: ImageVector, contentDescription: String?, tint: Color) {
@@ -194,16 +208,26 @@ private fun RailItem(
         else -> Color.White.copy(alpha = 0.6f)
     }
     // Draw the shaped background directly instead of clipping; some TV render paths drop clips.
-    val background = when {
-        focused -> Color.White
-        selected -> Color.White.copy(alpha = 0.14f)
-        else -> Color.Transparent
-    }
+    // Focus inverts to a white pill; the selected tab only gets a small accent marker.
+    val background = if (focused) Color.White else Color.Transparent
+    val marker = selected && !focused
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
             .background(background, AppShapes.Pill)
+            .drawBehind {
+                if (marker) {
+                    val width = MarkerWidth.toPx()
+                    val height = MarkerHeight.toPx()
+                    drawRoundRect(
+                        color = AppColors.Highlight,
+                        topLeft = Offset(0f, (size.height - height) / 2f),
+                        size = Size(width, height),
+                        cornerRadius = CornerRadius(width / 2f),
+                    )
+                }
+            }
             .focusProperties {
                 canFocus = focusable
                 right = contentRequester
@@ -221,7 +245,7 @@ private fun RailItem(
                         .align(Alignment.TopEnd)
                         .offset(x = 3.dp, y = (-3).dp)
                         .size(8.dp)
-                        .background(AppColors.Alert, CircleShape),
+                        .background(AppColors.Highlight, CircleShape),
                 )
             }
         }
@@ -240,10 +264,10 @@ private fun RailItem(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (focused) Color.White else Color.Black,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier
-                        .background(AppColors.Alert, AppShapes.Pill)
+                        .background(if (focused) Color.Black else AppColors.Highlight, AppShapes.Pill)
                         .padding(horizontal = 6.dp, vertical = 1.dp),
                 )
             }

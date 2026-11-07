@@ -102,7 +102,7 @@ fun ProfileEditScreen(
                 if (editing.isNew) localizedStringResource(StringsR.string.settings_add_profile) else localizedStringResource(StringsR.string.settings_edit_profile),
                 color = Color.White,
                 fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(18.dp))
             Row {
@@ -293,7 +293,7 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
         value = value,
         onValueChange = { onValueChange(it.replace("\n", "")) },
         singleLine = true,
-        textStyle = TextStyle(color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
+        textStyle = TextStyle(color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold),
         cursorBrush = SolidColor(Color.White),
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.Words,
@@ -414,11 +414,11 @@ private fun TraktCard(
             Modifier.size(44.dp).background(TraktRed, AppShapes.Pill),
             contentAlignment = Alignment.Center,
         ) {
-            Text("t", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text("t", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(18.dp))
         Column {
-            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = if (state.confirmDisconnect) AppColors.Warning else ProfileMuted, fontSize = 15.sp)
         }
     }

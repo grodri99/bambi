@@ -56,6 +56,26 @@ class SettingsRepositoryImplTest {
         assertEquals(SettingsRepository.MAX_HOME_ROW_ITEM_LIMIT, repository.homeRowItemLimit.first())
     }
 
+    @Test
+    fun `soft backdrops default on and persist across reloads`() = runTest {
+        assertEquals(true, repository().softBackdrops.first())
+
+        repository().setSoftBackdrops(false)
+
+        assertEquals(false, repository().softBackdrops.first())
+        assertEquals(false, repository().softBackdropsEnabled)
+    }
+
+    @Test
+    fun `high resolution backdrops default off and persist across reloads`() = runTest {
+        assertEquals(false, repository().highResBackdrops.first())
+
+        repository().setHighResBackdrops(true)
+
+        assertEquals(true, repository().highResBackdrops.first())
+        assertEquals(true, repository().highResBackdropsEnabled)
+    }
+
     private fun repository(): SettingsRepositoryImpl {
         val tokenStore = mockk<TokenStore> { every { token } returns null }
         val profiles = mockk<ProfileRepository> {

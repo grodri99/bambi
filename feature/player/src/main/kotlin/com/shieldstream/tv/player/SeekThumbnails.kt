@@ -264,7 +264,7 @@ internal fun SeekThumbnailStrip(
         Text(
             text = formatTime(targetMs),
             color = Color.White,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             modifier = Modifier
                 .background(Color.Black.copy(alpha = 0.65f), AppShapes.Pill)
                 .padding(horizontal = 14.dp, vertical = 4.dp),

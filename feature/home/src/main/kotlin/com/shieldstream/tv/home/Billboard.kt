@@ -73,6 +73,8 @@ import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.tvClickable
 import com.shieldstream.tv.ui.theme.DisplayFont
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import com.shieldstream.tv.ui.theme.LocalHighResBackdrops
+import com.shieldstream.tv.model.BackdropUrls
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -163,12 +165,11 @@ private fun CarouselArrow(text: String, modifier: Modifier) {
 @Composable
 private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean, index: Int, count: Int, contentStart: Dp) {
     val item = featured.item
-    val lightweightUi = LocalLightweightUi.current
-    val backdropUrl = if (lightweightUi) {
-        item.backdropUrl?.replace("/w1280/", "/w780/")
-    } else {
-        item.backdropUrl
-    }
+    val backdropUrl = BackdropUrls.fullScreen(
+        url = item.backdropUrl,
+        lightweight = LocalLightweightUi.current,
+        highRes = LocalHighResBackdrops.current,
+    )
     Box(Modifier.fillMaxSize().background(AppColors.BackgroundRaised)) {
         AsyncImage(
             model = backdropUrl,
@@ -286,7 +287,7 @@ private fun MetaLine(featured: FeaturedItem) {
             Text(
                 text = cert,
                 color = Color.White,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier
                     .background(certificationColor(cert), AppShapes.Badge)
                     .padding(horizontal = 6.dp, vertical = 1.dp),
@@ -328,7 +329,7 @@ private fun BadgeLabel(badge: FeaturedBadge) {
 }
 
 private fun badgeIcon(badge: FeaturedBadge): Pair<ImageVector, Color> = when (badge) {
-    FeaturedBadge.NEW -> AppIcons.Bolt to AppColors.Alert
+    FeaturedBadge.NEW -> AppIcons.Bolt to AppColors.Highlight
     FeaturedBadge.POPULAR -> AppIcons.Trending to Color.White
     FeaturedBadge.RISING -> AppIcons.Trending to Color.White
     FeaturedBadge.SERIES_NOW -> AppIcons.Tv to Color.White

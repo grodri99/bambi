@@ -23,6 +23,16 @@ interface SettingsRepository {
     val lightweightUiEnabled: Boolean
     suspend fun setLightweightUi(enabled: Boolean)
 
+    /** Blur the backdrop behind Home rows. App-wide; on by default. */
+    val softBackdrops: Flow<Boolean>
+    val softBackdropsEnabled: Boolean
+    suspend fun setSoftBackdrops(enabled: Boolean)
+
+    /** Load full-screen backdrops at TMDB's original size. App-wide; off by default. */
+    val highResBackdrops: Flow<Boolean>
+    val highResBackdropsEnabled: Boolean
+    suspend fun setHighResBackdrops(enabled: Boolean)
+
     val seekThumbnails: Flow<Boolean>
     suspend fun setSeekThumbnails(enabled: Boolean)
 

@@ -175,7 +175,7 @@ fun AllDebridQrPanel(
             is AllDebridConnectUiState.ShowPin -> {
                 Text(
                     localizedStringResource(StringsR.string.settings_scan_to_connect_alldebrid),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                 )
@@ -212,7 +212,7 @@ fun AllDebridQrPanel(
 
 @Composable
 private fun PanelMessage(text: String) {
-    Text(text, color = AppColors.Surface, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+    Text(text, color = AppColors.Surface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
 }
 
 @Composable

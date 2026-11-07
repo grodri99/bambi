@@ -162,6 +162,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setLightweightUi(enabled) }
     }
 
+    val softBackdrops: StateFlow<Boolean> =
+        settings.softBackdrops.stateIn(viewModelScope, SharingStarted.Eagerly, settings.softBackdropsEnabled)
+
+    fun setSoftBackdrops(enabled: Boolean) {
+        viewModelScope.launch { settings.setSoftBackdrops(enabled) }
+    }
+
+    val highResBackdrops: StateFlow<Boolean> =
+        settings.highResBackdrops.stateIn(viewModelScope, SharingStarted.Eagerly, settings.highResBackdropsEnabled)
+
+    fun setHighResBackdrops(enabled: Boolean) {
+        viewModelScope.launch { settings.setHighResBackdrops(enabled) }
+    }
+
     val homeRowItemLimit: StateFlow<Int> = settings.homeRowItemLimit
         .stateIn(
             viewModelScope,

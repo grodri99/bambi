@@ -58,10 +58,10 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         Modifier.size(52.dp).background(TraktRed, AppShapes.Pill),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("t", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                        Text("t", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(Modifier.width(18.dp))
-                    Text(localizedStringResource(StringsR.string.settings_connect_trakt), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                    Text(localizedStringResource(StringsR.string.settings_connect_trakt), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(32.dp))
                 when (val s = state) {
@@ -76,7 +76,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                             s.url.removePrefix("https://").removePrefix("www."),
                             color = Color.White,
                             fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(start = 46.dp, top = 4.dp),
                         )
                         Spacer(Modifier.height(24.dp))
@@ -127,7 +127,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                                 localizedStringResource(StringsR.string.settings_trakt_connected_as, s.username),
                                 color = Color.White,
                                 fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                         Spacer(Modifier.height(14.dp))
@@ -172,7 +172,7 @@ fun TraktConnectScreen(onDone: () -> Unit, viewModel: TraktConnectViewModel = hi
                         QrCode(code.url, Modifier.fillMaxSize())
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text(localizedStringResource(StringsR.string.settings_or_scan_it_with_your_phone), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(localizedStringResource(StringsR.string.settings_or_scan_it_with_your_phone), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -186,7 +186,7 @@ private fun Step(number: String, text: String) {
             Modifier.size(32.dp).background(Color.White.copy(alpha = 0.12f), AppShapes.Pill),
             contentAlignment = Alignment.Center,
         ) {
-            Text(number, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(number, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(14.dp))
         Text(text, color = ProfileMuted, fontSize = 21.sp)

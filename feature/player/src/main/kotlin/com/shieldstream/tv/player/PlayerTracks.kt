@@ -259,7 +259,7 @@ private fun ExternalSubtitlesView(
             Text(
                 text = localizedStringResource(StringsR.string.player_external_subtitles),
                 color = Color.White,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
             )
             Text(
                 text = "OpenSubtitles · Podnapisi · SubDL",
@@ -335,7 +335,7 @@ private fun OptionColumn(
         Text(
             text = title,
             color = Color.White,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
         )
         Spacer(Modifier.height(16.dp))
         if (options.isEmpty()) {
@@ -381,7 +381,7 @@ private fun SubtitleAppearanceView(
         Text(
             text = localizedStringResource(StringsR.string.subtitle_appearance),
             color = Color.White,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
         )
         Spacer(Modifier.height(4.dp))
         AppearanceControlRow(
@@ -476,7 +476,7 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
         Text(
             text = if (option.selected) "✓" else "",
             color = if (focused) Color.Black else AppColors.Accent,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             modifier = Modifier.width(28.dp),
         )
         Column(Modifier.weight(1f)) {
@@ -484,7 +484,7 @@ private fun OptionRow(option: TrackOption, onClick: () -> Unit, modifier: Modifi
                 text = option.title,
                 color = fg,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = if (option.selected) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = if (option.selected) FontWeight.SemiBold else FontWeight.Normal,
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

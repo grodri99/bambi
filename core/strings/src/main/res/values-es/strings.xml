@@ -107,6 +107,7 @@
     <string name="featured_rising">Arrasa esta semana</string>
     <string name="featured_acclaimed">Aclamada por la crítica</string>
     <string name="category_acclaimed">Aclamadas</string>
+    <string name="category_classics">Películas clásicas</string>
     <string name="category_dramas">Dramas</string>
     <string name="category_thrillers">Thrillers</string>
     <string name="category_horror">Terror</string>

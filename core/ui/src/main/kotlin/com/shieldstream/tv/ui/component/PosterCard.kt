@@ -107,16 +107,11 @@ fun PosterCard(
             }
             overlay()
             if (newEpisodeCount > 0) {
-                Text(
+                StatusPill(
                     text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .background(AppColors.Alert, AppShapes.Badge)
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                        .padding(6.dp),
                 )
             }
         }
@@ -224,33 +219,20 @@ fun ContinueCard(
                 ),
         )
         if (label.isNotEmpty()) {
-            Text(
+            StatusPill(
                 text = label,
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = false,
+                dot = false,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.58f), AppShapes.Pill)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(8.dp),
             )
         }
         if (newEpisodeCount > 0) {
-            Text(
+            StatusPill(
                 text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                softWrap = false,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .background(AppColors.Alert, AppShapes.Badge)
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                    .padding(8.dp),
             )
         }
         Text(
@@ -275,7 +257,7 @@ fun ContinueCard(
                 Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                    .background(AppColors.Accent),
+                    .background(AppColors.Highlight),
             )
         }
     }
@@ -298,20 +280,16 @@ fun NewEpisodeCard(
         onFocused = onFocused,
         onLongClick = onLongClick,
         overlay = {
-            Text(
+            StatusPill(
                 text = if (count == 0) {
                     localizedStringResource(R.string.coming_soon)
                 } else {
                     localizedPluralResource(R.plurals.new_episode_count, count, count)
                 },
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
+                dot = count > 0,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(6.dp)
-                    .background(AppColors.Alert, AppShapes.Badge)
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                    .padding(6.dp),
             )
         },
         caption = {

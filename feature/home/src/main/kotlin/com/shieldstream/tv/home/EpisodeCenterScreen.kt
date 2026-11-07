@@ -41,7 +41,7 @@ fun EpisodeCenterScreen(
         Text(
             text = localizedStringResource(StringsR.string.home_episodes),
             color = Color.White,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
         )
         Spacer(Modifier.height(16.dp))
         when (val s = state) {

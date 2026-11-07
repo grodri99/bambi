@@ -18,6 +18,9 @@
     <string name="data_sci_fi">Sci-fi</string>
     <string name="data_comedies">Comedies</string>
     <string name="data_acclaimed_movies">Acclaimed movies</string>
+    <string name="data_classic_movies">Classic movies</string>
+    <string name="data_more_classic_movies">More classic movies</string>
+    <string name="data_classics_to_discover">More classics to discover</string>
     <string name="data_acclaimed_tv_shows">Acclaimed TV shows</string>
     <string name="data_popular">Popular</string>
     <string name="data_horror">Horror</string>

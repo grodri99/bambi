@@ -41,18 +41,24 @@ class IthilUpdateRepositoryImpl @Inject constructor(
         val best = entries.mapNotNull { entry ->
             val match = libraryName.matchEntire(entry.name) ?: return@mapNotNull null
             val version = match.groupValues.drop(1).map(String::toInt)
-            Triple(version, entry, match)
-        }.maxWithOrNull(compareBy({ it.first[0] }, { it.first[1] }, { it.first[2] }))?.second
+            version to entry
+        }.maxWithOrNull(compareBy({ it.first[0] }, { it.first[1] }, { it.first[2] }))
         require(best != null) { "No Ithil library was found" }
-        require(best.download_url.startsWith("https://")) { "Invalid Ithil library download URL" }
-        return IthilRemoteLibrary(best.name, best.sha, best.download_url)
+        val remote = best.second
+        require(remote.download_url.startsWith("https://")) { "Invalid Ithil library download URL" }
+        return IthilRemoteLibrary(
+            name = remote.name,
+            version = best.first.joinToString("."),
+            sha = remote.sha,
+            downloadUrl = remote.download_url,
+        )
     }
 
     override suspend fun downloadNow(): IthilLibraryInfo {
         try {
             val remote = remoteLibrary()
             library.info()?.takeIf { it.sourceSha == remote.sha }?.let { current ->
-                mutableState.value = IthilLibraryState.Ready(current)
+                mutableState.value = IthilLibraryState.UpToDate(current)
                 clearFailure()
                 return current
             }
@@ -74,9 +80,24 @@ class IthilUpdateRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun checkForUpdates(): IthilLibraryInfo? {
-        if (!library.isReady() || clock() < prefs.getLong(KEY_NEXT_CHECK, 0L)) return null
-        return runCatching { downloadNow() }.getOrNull()
+    override suspend fun checkForUpdates() {
+        if (!library.isReady() || clock() < prefs.getLong(KEY_NEXT_CHECK, 0L)) return
+        try {
+            val remote = remoteLibrary()
+            val current = library.info() ?: return
+            mutableState.value = if (current.sourceSha == remote.sha) {
+                IthilLibraryState.UpToDate(current)
+            } else {
+                IthilLibraryState.Available(current, remote)
+            }
+            prefs.edit()
+                .remove(KEY_FAILURES)
+                .putLong(KEY_NEXT_CHECK, clock() + TimeUnit.HOURS.toMillis(AUTOMATIC_CHECK_INTERVAL_HOURS))
+                .apply()
+        } catch (e: Exception) {
+            mutableState.value = IthilLibraryState.Error(e.message ?: e.javaClass.simpleName)
+            recordFailure()
+        }
     }
 
     override suspend fun delete() {
@@ -104,5 +125,6 @@ class IthilUpdateRepositoryImpl @Inject constructor(
         const val KEY_FAILURES = "failures"
         const val BASE_BACKOFF_HOURS = 1L
         const val MAX_BACKOFF_HOURS = 24L
+        const val AUTOMATIC_CHECK_INTERVAL_HOURS = 6L
     }
 }

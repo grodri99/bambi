@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.shieldstream.tv.domain.IthilLibraryInfo
 import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
@@ -54,27 +55,62 @@ fun IthilLibraryCard(
                 color = muted,
             )
             IthilLibraryState.Indexing -> Text(localizedStringResource(StringsR.string.settings_ithil_indexing), color = muted)
-            is IthilLibraryState.Ready -> {
-                Text(
-                    localizedStringResource(
-                        StringsR.string.settings_ithil_ready,
-                        state.info.movieLinks,
-                        state.info.episodeLinks,
-                    ),
-                    color = muted,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row {
-                    TvButton(localizedStringResource(StringsR.string.settings_ithil_update), onClick = onDownload)
-                    Spacer(Modifier.width(12.dp))
-                    TvButton(localizedStringResource(StringsR.string.settings_ithil_delete), onClick = onDelete)
-                }
-            }
+            is IthilLibraryState.Ready -> InstalledLibraryContent(
+                info = state.info,
+                updateText = localizedStringResource(StringsR.string.settings_ithil_update),
+                onUpdate = onDownload,
+                onDelete = onDelete,
+            )
+            is IthilLibraryState.UpToDate -> InstalledLibraryContent(
+                info = state.info,
+                updateText = localizedStringResource(StringsR.string.settings_ithil_update),
+                onUpdate = onDownload,
+                onDelete = onDelete,
+                message = localizedStringResource(StringsR.string.settings_ithil_up_to_date),
+            )
+            is IthilLibraryState.Available -> InstalledLibraryContent(
+                info = state.current,
+                updateText = localizedStringResource(StringsR.string.settings_update),
+                onUpdate = onDownload,
+                onDelete = onDelete,
+                message = localizedStringResource(StringsR.string.settings_ithil_update_available, state.update.version),
+                messageColor = AppColors.Warning,
+            )
             is IthilLibraryState.Error -> {
                 Text(localizedStringResource(StringsR.string.settings_ithil_error, state.message), color = AppColors.Error)
                 Spacer(Modifier.height(12.dp))
                 TvButton(localizedStringResource(StringsR.string.settings_retry), onClick = onDownload)
             }
         }
+    }
+}
+
+@Composable
+private fun InstalledLibraryContent(
+    info: IthilLibraryInfo,
+    updateText: String,
+    onUpdate: () -> Unit,
+    onDelete: () -> Unit,
+    message: String? = null,
+    messageColor: Color = AppColors.Success,
+) {
+    val muted = Color.White.copy(alpha = 0.6f)
+    Text(
+        localizedStringResource(
+            StringsR.string.settings_ithil_ready,
+            info.movieLinks,
+            info.episodeLinks,
+        ),
+        color = muted,
+    )
+    if (message != null) {
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = messageColor)
+    }
+    Spacer(Modifier.height(12.dp))
+    Row {
+        TvButton(updateText, onClick = onUpdate)
+        Spacer(Modifier.width(12.dp))
+        TvButton(localizedStringResource(StringsR.string.settings_ithil_delete), onClick = onDelete)
     }
 }

@@ -18,6 +18,9 @@
     <string name="data_sci_fi">Ciencia ficción</string>
     <string name="data_comedies">Comedias</string>
     <string name="data_acclaimed_movies">Películas aclamadas</string>
+    <string name="data_classic_movies">Películas clásicas</string>
+    <string name="data_more_classic_movies">Más películas clásicas</string>
+    <string name="data_classics_to_discover">Más clásicos por descubrir</string>
     <string name="data_acclaimed_tv_shows">Series aclamadas</string>
     <string name="data_popular">Populares</string>
     <string name="data_horror">Terror</string>

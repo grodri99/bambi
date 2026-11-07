@@ -5,8 +5,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * Shared colour tokens. The palette is monochrome: white is the only accent.
- * Hue is reserved for meaning (alerts, status, age ratings, third-party brands).
+ * Shared colour tokens. The palette is monochrome: white carries focus and selection, and
+ * [Highlight] is the single accent for small details. Other hues are reserved for meaning
+ * (status, age ratings, third-party brands).
  */
 object AppColors {
     /** Full-screen canvas. */
@@ -33,8 +34,17 @@ object AppColors {
     /** Content drawn on [Accent]. */
     val OnAccent = Color.Black
 
-    /** "New" badges and counts only. Not a general accent. */
+    /**
+     * The single accent: "new" dots and counts, progress bars, the active rail marker and small
+     * section labels. Keep it to small details; large accent areas compete with the artwork.
+     */
+    val Highlight = Color(0xFFF2B65A)
+
+    /** Restricted age ratings only. */
     val Alert = Color(0xFFE50914)
+
+    /** Translucent backing for pills drawn over artwork. */
+    val PillScrim = Color.Black.copy(alpha = 0.62f)
 
     val Success = Color(0xFF46D369)
     val Warning = Color(0xFFF5B83D)

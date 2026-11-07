@@ -98,7 +98,7 @@ fun PinDialog(
         ) {
             Icon(AppIcons.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(10.dp))
-            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(subtitle, color = ProfileMuted, fontSize = 15.sp)
             Spacer(Modifier.height(18.dp))

@@ -107,7 +107,7 @@ fun ProfilePickerScreen(
         ) {
             Image(painterResource(R.drawable.franklix_logo), contentDescription = "Franklix", modifier = Modifier.size(40.dp))
             Spacer(Modifier.width(12.dp))
-            Text("Franklix", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Franklix", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Column(
@@ -118,7 +118,7 @@ fun ProfilePickerScreen(
                 if (manage) localizedStringResource(StringsR.string.settings_manage_profiles) else localizedStringResource(StringsR.string.settings_who_s_watching),
                 color = Color.White,
                 fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(44.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(26.dp), verticalAlignment = Alignment.Top) {
@@ -250,7 +250,7 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
             profile.name,
             color = if (focused) Color.White else ProfileMuted,
             fontSize = 20.sp,
-            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -305,7 +305,7 @@ private fun AddTile(onClick: () -> Unit) {
             localizedStringResource(StringsR.string.settings_add_profile),
             color = if (focused) Color.White else ProfileMuted,
             fontSize = 20.sp,
-            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium,
         )
     }
 }

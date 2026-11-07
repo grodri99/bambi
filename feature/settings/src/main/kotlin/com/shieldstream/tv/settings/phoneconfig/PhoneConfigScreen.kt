@@ -107,7 +107,7 @@ fun PhoneConfigScreen(
                     is PhoneConfigUiState.Ready -> {
                         Text(
                             localizedStringResource(StringsR.string.settings_phone_config_scan),
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                             color = Color.White,
                         )
                         Spacer(Modifier.height(12.dp))
@@ -123,7 +123,7 @@ fun PhoneConfigScreen(
                             color = if (setupComplete || configurationSaved) AppColors.Success else PhoneMuted,
                         )
                         Spacer(Modifier.height(20.dp))
-                        Text(s.connection.displayUrl, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(s.connection.displayUrl, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(20.dp))
                         Text(
                             localizedStringResource(StringsR.string.settings_phone_config_privacy),

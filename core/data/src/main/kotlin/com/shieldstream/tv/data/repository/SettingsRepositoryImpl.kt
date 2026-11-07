@@ -55,6 +55,26 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_LIGHTWEIGHT_UI, enabled).apply()
         lightweightUiFlow.value = enabled
     }
+
+    private val softBackdropsFlow = MutableStateFlow(prefs.getBoolean(KEY_SOFT_BACKDROPS, true))
+    override val softBackdrops: Flow<Boolean> = softBackdropsFlow
+    override val softBackdropsEnabled: Boolean get() = softBackdropsFlow.value
+
+    override suspend fun setSoftBackdrops(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SOFT_BACKDROPS, enabled).apply()
+        softBackdropsFlow.value = enabled
+    }
+
+    // Off by default: original images are several times larger to download and, decoded at 1080p,
+    // take a third of the Nokia's 24 MB image memory cache each.
+    private val highResBackdropsFlow = MutableStateFlow(prefs.getBoolean(KEY_HIGH_RES_BACKDROPS, false))
+    override val highResBackdrops: Flow<Boolean> = highResBackdropsFlow
+    override val highResBackdropsEnabled: Boolean get() = highResBackdropsFlow.value
+
+    override suspend fun setHighResBackdrops(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HIGH_RES_BACKDROPS, enabled).apply()
+        highResBackdropsFlow.value = enabled
+    }
     override val spanishFirst: Flow<Boolean> = profiles.active
         .map { it.spanishFirst || it.spanishOnlySources }.distinctUntilChanged()
 
@@ -199,6 +219,8 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_BUFFER = "max_buffer_seconds"
         const val KEY_SEEK_THUMBNAILS = "seek_thumbnails"
         const val KEY_LIGHTWEIGHT_UI = "lightweight_ui"
+        const val KEY_SOFT_BACKDROPS = "soft_backdrops"
+        const val KEY_HIGH_RES_BACKDROPS = "high_res_backdrops"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
         const val KEY_AUTO_NEXT = "auto_next_episode"
         const val KEY_HOME_ROW_ITEM_LIMIT = "home_row_item_limit"

@@ -49,13 +49,20 @@ private val Muted = Color.White.copy(alpha = 0.6f)
 private val Progress = AppColors.Accent
 
 @Composable
-fun UpdatePrompt(viewModel: UpdateViewModel = hiltViewModel()) {
+fun UpdatePrompt(
+    viewModel: UpdateViewModel = hiltViewModel(),
+    ithilViewModel: IthilUpdateViewModel = hiltViewModel(),
+) {
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
         viewModel.onResumed()
         onPauseOrDispose { }
     }
-    val visible = prompt as? UpdatePromptUiState.Visible ?: return
+    val visible = prompt as? UpdatePromptUiState.Visible
+    if (visible == null) {
+        IthilUpdatePrompt(ithilViewModel)
+        return
+    }
     val context = LocalContext.current
     Dialog(
         onDismissRequest = viewModel::later,
@@ -118,8 +125,39 @@ fun UpdatePrompt(viewModel: UpdateViewModel = hiltViewModel()) {
 }
 
 @Composable
+fun IthilUpdatePrompt(viewModel: IthilUpdateViewModel = hiltViewModel()) {
+    val prompt by viewModel.prompt.collectAsStateWithLifecycle()
+    val available = prompt ?: return
+    Dialog(
+        onDismissRequest = viewModel::later,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .width(620.dp)
+                .background(Panel, AppShapes.Panel)
+                .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
+                .padding(32.dp),
+        ) {
+            UpdateBody(
+                title = localizedStringResource(StringsR.string.settings_ithil_update_available_title, available.update.version),
+                subtitle = localizedStringResource(StringsR.string.settings_ithil_update_available_message),
+                update = null,
+            ) {
+                Buttons(
+                    primary = localizedStringResource(StringsR.string.settings_update),
+                    onPrimary = viewModel::update,
+                    secondary = localizedStringResource(StringsR.string.settings_not_now),
+                    onSecondary = viewModel::later,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun UpdateBody(title: String, subtitle: String, update: AppUpdate?, actions: @Composable () -> Unit) {
-    Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+    Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
     Text(subtitle, color = Muted, fontSize = 17.sp)
     val notes = update?.notes?.let(::cleanNotes).orEmpty()
@@ -217,7 +255,7 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
             .padding(horizontal = 24.dp, vertical = 18.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             if (subtitle.isNotEmpty()) Text(subtitle, color = Muted, fontSize = 15.sp)
         }
         if (state !is UpdateState.Unsupported) {

@@ -235,6 +235,7 @@ class HomeExtrasSource @Inject constructor(
 
     private fun spec(category: Category): Spec = when (category) {
         Category.ACCLAIMED -> Spec(Query(), Query())
+        Category.CLASSICS -> Spec(Query(), null)
         Category.DRAMAS -> Spec(Query("18"), Query("18"))
         Category.THRILLERS -> Spec(Query("53"), Query("9648"))
         Category.CRIME -> Spec(Query("80"), Query("80"))
@@ -269,6 +270,7 @@ class HomeExtrasSource @Inject constructor(
         val loaders: List<Pair<String, suspend () -> List<CatalogItem>>> = when (category) {
             Category.MOODS -> moodRows(filter)
             Category.ACCLAIMED -> acclaimedRows(filter)
+            Category.CLASSICS -> classicRows(filter)
             else -> standardRows(category, filter)
         }
         loaders.mapIndexed { index, (title, load) ->
@@ -301,6 +303,15 @@ class HomeExtrasSource @Inject constructor(
             texts.get(StringsR.string.data_acclaimed_tv_shows) to suspend { series(Query(), acclaimed(150)) },
             texts.get(StringsR.string.data_more_acclaimed_tv_shows) to suspend { series(Query(), acclaimed(150), page = 2) },
             texts.get(StringsR.string.data_gems_to_discover) to suspend { series(Query(), acclaimed(150), page = 3) },
+        )
+    }
+
+    private fun classicRows(filter: HomeFilter): List<Pair<String, suspend () -> List<CatalogItem>>> {
+        if (filter == HomeFilter.TV) return emptyList()
+        return listOf(
+            texts.get(StringsR.string.data_classic_movies) to suspend { movies(Query(), CLASSIC_MOVIES) },
+            texts.get(StringsR.string.data_more_classic_movies) to suspend { movies(Query(), CLASSIC_MOVIES, page = 2) },
+            texts.get(StringsR.string.data_classics_to_discover) to suspend { movies(Query(), CLASSIC_MOVIES, page = 3) },
         )
     }
 
@@ -449,5 +460,11 @@ class HomeExtrasSource @Inject constructor(
 
     private companion object {
         val POPULAR = mapOf("sort_by" to "popularity.desc", "vote_count.gte" to "30")
+        val CLASSIC_MOVIES = mapOf(
+            "sort_by" to "popularity.desc",
+            "primary_release_date.lte" to "1999-12-31",
+            "vote_average.gte" to "8.0",
+            "vote_count.gte" to "500",
+        )
     }
 }

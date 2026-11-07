@@ -302,7 +302,7 @@ private fun RowScope.WelcomeTile(number: String, title: String, subtitle: String
         StepNumber(number)
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
+            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Muted)
         }
     }
@@ -621,13 +621,13 @@ private fun ConfiguredRow(service: ApiService, maskedKey: String?, detail: Strin
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(28.dp).background(Green, CircleShape)) {
-            Text("✓", color = Color.Black, fontWeight = FontWeight.Bold)
+            Text("✓", color = Color.Black, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(14.dp))
         Column {
             Text(
                 localizedStringResource(SR.setup_service_configured, localizedStringResource(service.titleResource)),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White,
             )
             Text(
@@ -739,7 +739,7 @@ private fun QrPanel(url: String) {
         Spacer(Modifier.height(12.dp))
         Text(
             localizedStringResource(SR.setup_scan_qr),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
             color = Color.White,
             textAlign = TextAlign.Center,
         )
@@ -791,7 +791,7 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
         modifier = Modifier.fillMaxWidth().weight(1f),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp).background(Green, CircleShape)) {
-            Text("✓", color = Color.Black, fontSize = 44.sp, fontWeight = FontWeight.Bold)
+            Text("✓", color = Color.Black, fontSize = 44.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(16.dp))
         Text(localizedStringResource(SR.setup_all_set), fontFamily = DisplayFont, fontSize = 48.sp, color = Color.White)
@@ -859,7 +859,7 @@ private fun SummaryRow(label: String, ok: Boolean, required: Boolean) {
             .background(Panel, AppShapes.Control)
             .padding(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        Text(mark, color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.width(24.dp))
+        Text(mark, color = color, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.width(24.dp))
         Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
         Text(note, style = MaterialTheme.typography.bodyMedium, color = color)
     }

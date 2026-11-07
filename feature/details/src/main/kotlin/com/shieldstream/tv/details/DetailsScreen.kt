@@ -309,7 +309,7 @@ private fun InfoBlock(
         } else {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -502,7 +502,7 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
             Text(
                 text = localizedStringResource(StringsR.string.details_rating, (it * 10).toInt()),
                 color = Green,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
             )
             Spacer(Modifier.width(14.dp))
         }
@@ -534,7 +534,7 @@ private fun Badge(text: String) {
     Text(
         text = text,
         color = Color.White,
-        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
         modifier = Modifier
             .border(1.dp, Color.White.copy(alpha = 0.6f), AppShapes.Badge)
             .padding(horizontal = 6.dp, vertical = 1.dp),
@@ -750,7 +750,7 @@ private fun EpisodeCard(
                         .background(Color.Black.copy(alpha = 0.75f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("✓", color = Green, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text("✓", color = Green, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
                 }
             } else if (progress != null && progress.fraction > 0.01f) {
                 WatchBar(
@@ -855,7 +855,7 @@ private fun SourcesPanel(
                 Text(
                     text = localizedStringResource(StringsR.string.details_choose_a_source),
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.weight(1f),
                 )
                 SpanishOnlyChip(enabled = spanishOnly, onClick = onToggleSpanishOnly)
@@ -938,7 +938,7 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
             .tvClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+        Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
         val secondary = if (focused) Color.Black.copy(alpha = 0.7f) else Grey
         Text(
             note ?: localizedStringResource(StringsR.string.details_source_count, count),

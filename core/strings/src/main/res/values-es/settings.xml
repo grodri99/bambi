@@ -108,6 +108,10 @@
     <string name="settings_sources_and_links_through_torrentio">Fuentes y enlaces a través de Torrentio.</string>
     <string name="settings_direct_connection_to_real_debrid">Conexión directa con Real-Debrid.</string>
     <string name="settings_lightweight_ui">Interfaz ligera</string>
+    <string name="settings_soft_backdrops">Fondos suaves</string>
+    <string name="settings_soft_backdrops_summary">Difumina la imagen de fondo detrás de las filas de Inicio para que destaquen los títulos.</string>
+    <string name="settings_high_res_backdrops">Fondos en alta resolución</string>
+    <string name="settings_high_res_backdrops_summary">Imágenes de fondo más nítidas en Inicio. Usa más datos y memoria de imágenes; se ignora con la interfaz ligera.</string>
     <string name="settings_smaller_backdrops_no_automatic_rotation_or_focus">Fondos más pequeños, sin rotación automática ni animaciones de foco. Para TV boxes de baja potencia.</string>
     <string name="settings_on">Sí</string>
     <string name="settings_off_9847b4">No</string>
@@ -148,6 +152,10 @@
     <string name="settings_ithil_downloading">Descargando librería… %1$d%%</string>
     <string name="settings_ithil_indexing">Creando el índice local…</string>
     <string name="settings_ithil_ready">Lista · %1$d enlaces de películas · %2$d enlaces de episodios</string>
+    <string name="settings_ithil_up_to_date">Ya está actualizada · no hay nada que descargar</string>
+    <string name="settings_ithil_update_available">La versión %1$s está lista para descargar</string>
+    <string name="settings_ithil_update_available_title">La librería de Ithil %1$s está disponible</string>
+    <string name="settings_ithil_update_available_message">¿Quieres descargar el nuevo índice de fuentes? La librería actual seguirá activa hasta que la sustitución esté lista.</string>
     <string name="settings_ithil_error">Error en la librería: %1$s</string>
     <string name="settings_ithil_unlocked">Fuentes de Ithil activadas</string>
     <string name="settings_player_buffer">Búfer del reproductor</string>

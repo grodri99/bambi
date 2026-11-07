@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 data class IthilRemoteLibrary(
     val name: String,
+    val version: String,
     val sha: String,
     val downloadUrl: String,
 )
@@ -13,6 +14,11 @@ sealed interface IthilLibraryState {
     data class Downloading(val progress: Float) : IthilLibraryState
     data object Indexing : IthilLibraryState
     data class Ready(val info: IthilLibraryInfo) : IthilLibraryState
+    data class UpToDate(val info: IthilLibraryInfo) : IthilLibraryState
+    data class Available(
+        val current: IthilLibraryInfo,
+        val update: IthilRemoteLibrary,
+    ) : IthilLibraryState
     data class Error(val message: String) : IthilLibraryState
 }
 
@@ -23,7 +29,7 @@ interface IthilUpdateRepository {
 
     suspend fun downloadNow(): IthilLibraryInfo
 
-    suspend fun checkForUpdates(): IthilLibraryInfo?
+    suspend fun checkForUpdates()
 
     suspend fun delete()
 }

@@ -87,13 +87,13 @@ internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifie
             Text(
                 text = localizedStringResource(StringsR.string.player_sync_subtitles),
                 color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
             )
             Spacer(Modifier.width(24.dp))
             Text(
                 text = timing.describe(texts),
                 color = AppColors.Accent,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
             )
         }
         val statusText = status.describe(texts)
