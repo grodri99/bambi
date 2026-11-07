@@ -89,6 +89,7 @@
     <string name="common_movies">Películas</string>
     <string name="common_settings">Ajustes</string>
     <string name="common_my_list">Mi lista</string>
+    <string name="common_switch_profile">Cambiar perfil</string>
     <string name="episode_code">T%1$d:E%2$d</string>
     <string name="coming_soon">PRÓXIMAMENTE</string>
     <plurals name="poster_new_episodes">

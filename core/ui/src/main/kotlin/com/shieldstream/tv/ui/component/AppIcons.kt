@@ -42,6 +42,15 @@ object AppIcons {
         "list",
         "M3,13h2v-2H3v2zM3,17h2v-2H3v2zM3,9h2V7H3v2zM7,13h14v-2H7v2zM7,17h14v-2H7v2zM7,7v2h14V7H7z",
     )
+    val Bookmark = icon(
+        "bookmark",
+        "M17,3H7c-1.1,0 -1.99,0.9 -1.99,2L5,21l7,-3 7,3V5c0,-1.1 -0.9,-2 -2,-2zM17,18l-5,-2.18L7,18V5h10v13z",
+    )
+    val Episodes = icon(
+        "video_library",
+        "M4,6H2v14c0,1.1 0.9,2 2,2h14v-2H4V6zM20,2H8c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V4" +
+            "c0,-1.1 -0.9,-2 -2,-2zM12,14.5v-9l6,4.5 -6,4.5z",
+    )
     val Bolt = icon("bolt", "M7,2v11h3v9l7,-12h-4l4,-8z")
     val Backspace = icon(
         "backspace",

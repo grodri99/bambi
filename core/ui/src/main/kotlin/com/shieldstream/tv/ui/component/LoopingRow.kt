@@ -6,9 +6,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 
-const val LOOP_MIN_ITEMS = 8
-
-fun shouldLoop(size: Int): Boolean = size >= LOOP_MIN_ITEMS
+// Rows no longer wrap around: with the left navigation rail, D-pad Left on the first item must
+// leave the row and reach the rail. The virtual-index helpers stay so focus keys remain stable.
+@Suppress("UNUSED_PARAMETER")
+fun shouldLoop(size: Int): Boolean = false
 
 fun loopStartIndex(size: Int): Int {
     if (size <= 0) return 0

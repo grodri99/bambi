@@ -89,33 +89,14 @@ class SharedComponentsLocaleTest {
     }
 
     @Test
-    fun `top navigation renders Spanish labels`() {
-        Lang.current = AppLanguage.ES
-        renderTopBar()
-
-        composeRule.onNodeWithText("Inicio").assertExists()
-        composeRule.onNodeWithText("Episodios").assertExists()
-        composeRule.onNodeWithText("Series").assertExists()
-        composeRule.onNodeWithText("Mi lista").assertExists()
-    }
-
-    @Test
-    fun `top navigation renders English labels`() {
-        Lang.current = AppLanguage.EN
-        renderTopBar()
-
-        composeRule.onNodeWithText("Home").assertExists()
-        composeRule.onNodeWithText("Episodes").assertExists()
-        composeRule.onNodeWithText("TV Shows").assertExists()
-        composeRule.onNodeWithText("My list").assertExists()
-    }
-
-    @Test
     fun `rail icons expose Spanish accessibility labels`() {
         Lang.current = AppLanguage.ES
         renderRail()
 
         composeRule.onNodeWithContentDescription("Inicio").assertExists()
+        composeRule.onNodeWithContentDescription("Episodios").assertExists()
+        composeRule.onNodeWithContentDescription("Series").assertExists()
+        composeRule.onNodeWithContentDescription("Mi lista").assertExists()
         composeRule.onNodeWithContentDescription("Ajustes").assertExists()
     }
 
@@ -125,6 +106,9 @@ class SharedComponentsLocaleTest {
         renderRail()
 
         composeRule.onNodeWithContentDescription("Home").assertExists()
+        composeRule.onNodeWithContentDescription("Episodes").assertExists()
+        composeRule.onNodeWithContentDescription("TV Shows").assertExists()
+        composeRule.onNodeWithContentDescription("My list").assertExists()
         composeRule.onNodeWithContentDescription("Settings").assertExists()
     }
 
@@ -200,22 +184,12 @@ class SharedComponentsLocaleTest {
         }
     }
 
-    private fun renderTopBar() {
-        composeRule.setContent {
-            TopBar(
-                selected = TopTab.HOME,
-                onSelect = {},
-                onSettings = {},
-                selectedRequester = FocusRequester(),
-            )
-        }
-    }
-
     private fun renderRail() {
         composeRule.setContent {
             NavRail(
-                selected = RailDestination.HOME,
+                selected = NavTab.HOME,
                 onSelect = {},
+                onSettings = {},
                 selectedRequester = FocusRequester(),
             )
         }
