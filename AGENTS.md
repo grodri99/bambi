@@ -116,35 +116,6 @@ Unit tests exist mainly in `core:model`, `core:domain`, `core:data`, and `core:m
 
 Before changing code, inspect `git status` and relevant diffs. Multiple agents may edit this tree; do not revert unrelated work. Keep one measurable change per test build when evaluating performance.
 
-## Nokia production install
-
-Use `/Users/javimolina/github/bambi-fork`, not the older checkout. The box is `192.168.0.174:5555` (Android 14, `armeabi-v7a` userspace).
-
-```bash
-adb connect 192.168.0.174:5555
-adb -s 192.168.0.174:5555 shell getprop ro.product.model
-adb -s 192.168.0.174:5555 shell dumpsys package com.shieldstream.tv \
-  | rg 'versionCode|versionName'
-```
-
-The new APK's `versionCode` must be equal to or newer than the installed one. Do not force a downgrade with `adb install -d`. Verify the release certificate matches the stable app; the expected SHA-256 is `10f85fc97479af56ae45f6bc9545c9a3d6d23676d87f796533887d97fc69f764`.
-
-```bash
-ANDROID_HOME="$HOME/Library/Android/sdk" bash ./gradlew test :app:assembleRelease
-adb -s 192.168.0.174:5555 install -r app/build/outputs/apk/release/app-release.apk
-adb -s 192.168.0.174:5555 shell am broadcast \
-  -a androidx.profileinstaller.action.INSTALL_PROFILE \
-  com.shieldstream.tv/androidx.profileinstaller.ProfileInstallReceiver
-adb -s 192.168.0.174:5555 shell cmd package compile \
-  -m speed-profile -f com.shieldstream.tv
-adb -s 192.168.0.174:5555 shell am start \
-  -a android.intent.action.MAIN \
-  -c android.intent.category.LEANBACK_LAUNCHER \
-  -n com.shieldstream.tv/.MainActivity
-```
-
-Check `pidof com.shieldstream.tv` and launch logs for fatal exceptions. Do not clear application data merely to reach setup; use Settings → Setup guide.
-
 ## Measuring UI performance
 
 Use the same screen and warmed-up remote-key sequence for A/B comparisons. Billboard navigation and poster-row navigation are different workloads. Cold startup and first-time image decoding create misleading outliers.
