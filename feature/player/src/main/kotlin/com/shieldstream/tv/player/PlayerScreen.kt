@@ -199,8 +199,52 @@ fun PlayerScreen(
 
     fun handleKey(event: KeyEvent): Boolean {
         if (event.type != KeyEventType.KeyDown) return false
-        if (tracksOpen) return false
+        if (event.key == Key.MediaStop) {
+            if (event.nativeKeyEvent.repeatCount == 0) onBack()
+            return true
+        }
         val p = player ?: return false
+
+        fun seekDirectly(stepMs: Long) {
+            val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+            p.seekTo((p.currentPosition + stepMs).coerceIn(0L, duration))
+            seekFeedback = if (stepMs < 0) "« ${-stepMs / 1000} s" else "${stepMs / 1000} s »"
+            showControls()
+        }
+
+        if (tracksOpen || syncOpen) {
+            return when (event.key) {
+                Key.DirectionLeft -> if (syncOpen) {
+                    viewModel.adjustSubtitleOffset(-100)
+                    true
+                } else false
+                Key.DirectionRight -> if (syncOpen) {
+                    viewModel.adjustSubtitleOffset(100)
+                    true
+                } else false
+                Key.DirectionDown -> if (syncOpen) {
+                    viewModel.adjustSubtitleOffset(-1_000)
+                    true
+                } else false
+                Key.DirectionUp -> if (syncOpen) {
+                    viewModel.adjustSubtitleOffset(1_000)
+                    true
+                } else false
+                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> if (syncOpen) {
+                    viewModel.autoSyncNow()
+                    true
+                } else false
+                Key.MediaPlayPause, Key.Spacebar -> {
+                    if (p.isPlaying) p.pause() else p.play()
+                    true
+                }
+                Key.MediaPlay -> { p.play(); true }
+                Key.MediaPause -> { p.pause(); true }
+                Key.MediaRewind -> { seekDirectly(-seekStepMs(event.nativeKeyEvent.repeatCount)); true }
+                Key.MediaFastForward -> { seekDirectly(seekStepMs(event.nativeKeyEvent.repeatCount)); true }
+                else -> false
+            }
+        }
         val okKey = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
         if (okKey && nextUp is NextUpUiState.Showing && scrubMs == null && !syncOpen) {
             viewModel.playNextNow()
@@ -209,17 +253,6 @@ fun PlayerScreen(
         if (okKey && skipVisible && scrubMs == null && !syncOpen) {
             viewModel.skipSegment()
             return true
-        }
-        if (syncOpen) {
-            return when (event.key) {
-                Key.DirectionLeft -> { viewModel.adjustSubtitleOffset(-100); true }
-                Key.DirectionRight -> { viewModel.adjustSubtitleOffset(100); true }
-                Key.DirectionDown -> { viewModel.adjustSubtitleOffset(-1_000); true }
-                Key.DirectionUp -> { viewModel.adjustSubtitleOffset(1_000); true }
-                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { viewModel.autoSyncNow(); true }
-                Key.MediaPlayPause, Key.Spacebar -> { if (p.isPlaying) p.pause() else p.play(); true }
-                else -> false
-            }
         }
         fun scrub(deltaMs: Long) {
             val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
@@ -260,9 +293,7 @@ fun PlayerScreen(
                 if (thumbnailsEnabled) {
                     scrub(-step)
                 } else {
-                    p.seekTo((p.currentPosition - step).coerceAtLeast(0L))
-                    seekFeedback = "« ${step / 1000} s"
-                    showControls()
+                    seekDirectly(-step)
                 }
                 true
             }
@@ -271,10 +302,7 @@ fun PlayerScreen(
                 if (thumbnailsEnabled) {
                     scrub(step)
                 } else {
-                    val duration = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
-                    p.seekTo((p.currentPosition + step).coerceAtMost(duration))
-                    seekFeedback = "${step / 1000} s »"
-                    showControls()
+                    seekDirectly(step)
                 }
                 true
             }
