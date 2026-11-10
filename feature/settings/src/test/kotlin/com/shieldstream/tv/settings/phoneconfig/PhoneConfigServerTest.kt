@@ -128,5 +128,6 @@ class PhoneConfigServerTest {
         ),
         providerGroups = listOf(PhoneProviderGroupDto("Torrentio", listOf(SourceProvider.TORRENTIO.name), true)),
         preferences = PhonePreferencesDto(lightweightUi = false, experimentalSubtitleSync = true, autoNextEpisode = true),
+        addons = emptyList(),
     )
 }

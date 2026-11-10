@@ -62,4 +62,6 @@ interface ApiKeysRepository {
     suspend fun set(service: ApiService, value: String?)
 
     suspend fun check(service: ApiService, value: String): KeyCheck
+
+    suspend fun addonMetadata(manifestUrl: String): StremioAddonMetadata? = null
 }

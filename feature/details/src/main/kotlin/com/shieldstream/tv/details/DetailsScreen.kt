@@ -5,6 +5,7 @@ import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.domain.SourceProvider
+import com.shieldstream.tv.domain.TraktRatingTarget
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,8 +60,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -78,7 +88,10 @@ import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
+import com.shieldstream.tv.ui.component.ActionDockCard
 import com.shieldstream.tv.ui.component.AppIcons
+import com.shieldstream.tv.ui.component.BottomActionDialog
+import com.shieldstream.tv.ui.component.LineIcons
 import com.shieldstream.tv.ui.component.SourceMediaBadges
 import com.shieldstream.tv.ui.component.ProvideMinimalScroll
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
@@ -161,11 +174,15 @@ private fun DetailsContent(
 ) {
     var panelOpen by remember { mutableStateOf(false) }
     var actionsOpen by remember { mutableStateOf(false) }
+    var ratingTarget by remember { mutableStateOf<TraktRatingTarget?>(null) }
     BackHandler(enabled = actionsOpen || !panelOpen) {
-        when (detailsBackAction(actionsOpen, panelOpen)) {
-            DetailsBackAction.DISMISS_ACTIONS -> actionsOpen = false
-            DetailsBackAction.DISMISS_SOURCES -> panelOpen = false
-            DetailsBackAction.EXIT_DETAILS -> onBack()
+        when {
+            ratingTarget != null -> ratingTarget = null
+            else -> when (detailsBackAction(actionsOpen, panelOpen)) {
+                DetailsBackAction.DISMISS_ACTIONS -> actionsOpen = false
+                DetailsBackAction.DISMISS_SOURCES -> panelOpen = false
+                DetailsBackAction.EXIT_DETAILS -> onBack()
+            }
         }
     }
 
@@ -257,22 +274,37 @@ private fun DetailsContent(
             )
         }
         if (actionsOpen) {
-            DetailsActions(
-                state = state,
-                onToggleWatched = {
-                    if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched()
-                    actionsOpen = false
-                },
-                onToggleMyList = {
-                    viewModel.toggleMyList()
-                    actionsOpen = false
-                },
-                onToggleFollowing = {
-                    viewModel.toggleFollowing()
-                    actionsOpen = false
-                },
-                onDismiss = { actionsOpen = false },
-            )
+            val target = ratingTarget
+            when {
+                target != null -> RatingPickerDialog(
+                    state = state,
+                    target = target,
+                    ratings = state.ratings,
+                    onSave = { viewModel.setRating(target, it) },
+                    onRetry = viewModel::loadRatings,
+                    onDismiss = { ratingTarget = null },
+                )
+                else -> DetailsActions(
+                    state = state,
+                    onToggleWatched = {
+                        if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched()
+                        actionsOpen = false
+                    },
+                    onToggleMyList = {
+                        viewModel.toggleMyList()
+                        actionsOpen = false
+                    },
+                    onToggleFollowing = {
+                        viewModel.toggleFollowing()
+                        actionsOpen = false
+                    },
+                    onRate = {
+                        ratingTarget = it
+                        viewModel.loadRatings()
+                    },
+                    onDismiss = { actionsOpen = false },
+                )
+            }
         }
     }
 
@@ -416,6 +448,7 @@ private fun DetailsActions(
     onToggleWatched: () -> Unit,
     onToggleMyList: () -> Unit,
     onToggleFollowing: () -> Unit,
+    onRate: (TraktRatingTarget) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val requester = remember { FocusRequester() }
@@ -423,53 +456,237 @@ private fun DetailsActions(
         withFrameNanos { }
         runCatching { requester.requestFocus() }
     }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.82f))
-            .onBackKey(enabled = true, onBack = onDismiss),
-        contentAlignment = Alignment.Center,
+    BottomActionDialog(
+        title = state.details.item.title,
+        onDismiss = onDismiss,
     ) {
-        Column(
-            Modifier
-                .width(360.dp)
-                .background(AppColors.Surface, AppShapes.Control)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = state.details.item.title,
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val watchedLabel = watchedLabel(state)
-            if (watchedLabel != null) {
-                TvButton(
-                    text = watchedLabel,
-                    icon = if (watchedDone(state)) AppIcons.Check else null,
-                    onClick = onToggleWatched,
-                    modifier = Modifier.focusRequester(requester),
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val watchedLabel = watchedLabel(state)
+                if (watchedLabel != null) {
+                    DetailsActionCard(
+                        text = watchedLabel,
+                        icon = if (watchedDone(state)) AppIcons.Check else LineIcons.Eye,
+                        onClick = onToggleWatched,
+                        modifier = Modifier.focusRequester(requester),
+                    )
+                }
+                DetailsActionCard(
+                    text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
+                    icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
+                    onClick = onToggleMyList,
+                    modifier = if (watchedLabel == null) Modifier.focusRequester(requester) else Modifier,
+                )
+                if (state.isSeries) {
+                    DetailsActionCard(
+                        text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
+                        icon = if (state.following) AppIcons.Check else LineIcons.Bookmark,
+                        onClick = onToggleFollowing,
+                    )
+                }
+                val item = state.details.item
+                val ratings = state.ratings as? TraktRatingsState.Ready
+                val overallTarget = if (state.isSeries) {
+                    TraktRatingTarget.Show(item.id)
+                } else {
+                    TraktRatingTarget.Movie(item.id)
+                }
+                DetailsActionCard(
+                    text = ratingTargetLabel(state, overallTarget) + ratingSuffix(ratings?.overallRating),
+                    icon = LineIcons.Star,
+                    onClick = { onRate(overallTarget) },
+                )
+                state.selectedEpisode?.takeIf { state.isSeries }?.let { episode ->
+                    val target = TraktRatingTarget.Episode(item.id, episode.season, episode.number)
+                    DetailsActionCard(
+                        text = ratingTargetLabel(state, target) + ratingSuffix(ratings?.episodeRating),
+                        icon = LineIcons.Star,
+                        onClick = { onRate(target) },
+                    )
+                }
+            }
+    }
+}
+
+@Composable
+private fun DetailsActionCard(
+    text: String,
+    icon: ImageVector?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) = ActionDockCard(text = text, icon = icon, onClick = onClick, modifier = modifier)
+
+@Composable
+private fun RatingPickerDialog(
+    state: DetailsUiState.Content,
+    target: TraktRatingTarget,
+    ratings: TraktRatingsState,
+    onSave: (Int?) -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val ready = ratings as? TraktRatingsState.Ready
+    val currentRating = when (target) {
+        is TraktRatingTarget.Episode -> ready?.episodeRating
+        else -> ready?.overallRating
+    }
+    var selected by remember(target) { mutableIntStateOf(currentRating ?: 8) }
+    LaunchedEffect(target, currentRating) { selected = currentRating ?: 8 }
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(ratings) {
+        withFrameNanos { }
+        runCatching { requester.requestFocus() }
+    }
+    RatingsDialog(title = ratingTargetLabel(state, target), onDismiss = onDismiss) {
+        when (ratings) {
+            TraktRatingsState.Idle, TraktRatingsState.Loading -> {
+                CircularProgressIndicator(
+                    color = AppColors.Accent,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).size(36.dp),
                 )
             }
-            TvButton(
-                text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
-                icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
-                onClick = onToggleMyList,
-                modifier = if (watchedLabel == null) Modifier.focusRequester(requester) else Modifier,
-            )
-            if (state.isSeries) {
+            TraktRatingsState.NotConnected -> {
+                Text(
+                    text = localizedStringResource(StringsR.string.details_trakt_connect_to_rate),
+                    color = Grey,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
                 TvButton(
-                    text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
-                    icon = if (state.following) AppIcons.Check else AppIcons.Add,
-                    onClick = onToggleFollowing,
+                    text = localizedStringResource(StringsR.string.details_cancel),
+                    onClick = onDismiss,
+                    modifier = Modifier.focusRequester(requester).align(Alignment.CenterHorizontally),
                 )
             }
-            TvButton(text = localizedStringResource(StringsR.string.details_cancel), onClick = onDismiss)
+            is TraktRatingsState.Error -> {
+                Text(ratings.message, color = AppColors.Error, style = MaterialTheme.typography.bodyLarge)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    TvButton(
+                        text = localizedStringResource(StringsR.string.details_retry),
+                        onClick = onRetry,
+                        modifier = Modifier.focusRequester(requester),
+                    )
+                    TvButton(text = localizedStringResource(StringsR.string.details_cancel), onClick = onDismiss)
+                }
+            }
+            is TraktRatingsState.Ready -> {
+                Text(
+                    text = localizedStringResource(StringsR.string.details_rating_picker_help),
+                    color = Grey,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                RatingStarsControl(
+                    value = selected,
+                    enabled = !ratings.saving,
+                    onChange = { selected = it },
+                    onSave = { onSave(selected) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally).focusRequester(requester),
+                )
+                ratings.error?.let { Text(it, color = AppColors.Error, style = MaterialTheme.typography.bodyMedium) }
+                if (ratings.saving) {
+                    Text(
+                        text = localizedStringResource(StringsR.string.details_rating_saving),
+                        color = Grey,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    if (currentRating != null) {
+                        TvButton(
+                            text = localizedStringResource(StringsR.string.details_remove_rating),
+                            onClick = { onSave(null) },
+                            enabled = !ratings.saving,
+                        )
+                    }
+                    TvButton(
+                        text = localizedStringResource(StringsR.string.details_cancel),
+                        onClick = onDismiss,
+                        enabled = !ratings.saving,
+                    )
+                }
+            }
         }
     }
 }
+
+@Composable
+private fun RatingsDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) = BottomActionDialog(
+    title = title,
+    onDismiss = onDismiss,
+    scrimAlpha = 0.94f,
+    content = content,
+)
+
+@Composable
+private fun RatingStarsControl(
+    value: Int,
+    enabled: Boolean,
+    onChange: (Int) -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .onFocusChanged { focused = it.isFocused }
+            .onPreviewKeyEvent { event ->
+                if (!enabled || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionLeft -> { onChange((value - 1).coerceAtLeast(1)); true }
+                    Key.DirectionRight -> { onChange((value + 1).coerceAtMost(10)); true }
+                    else -> false
+                }
+            }
+            .clip(AppShapes.Control)
+            .background(if (focused) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+            .border(1.dp, if (focused) Color.White.copy(alpha = 0.65f) else Color.Transparent, AppShapes.Control)
+            .tvClickable(enabled = enabled, onClick = onSave)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (star in 1..10) {
+                Icon(
+                    imageVector = AppIcons.Star,
+                    contentDescription = null,
+                    tint = if (star <= value) AppColors.Accent else Color.White.copy(alpha = 0.20f),
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = localizedStringResource(StringsR.string.details_rating_value, value),
+            color = if (focused) Color.White else Grey,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        )
+    }
+}
+
+@Composable
+private fun ratingTargetLabel(state: DetailsUiState.Content, target: TraktRatingTarget): String = when (target) {
+    is TraktRatingTarget.Movie -> localizedStringResource(StringsR.string.details_rate_movie)
+    is TraktRatingTarget.Show -> localizedStringResource(StringsR.string.details_rate_show)
+    is TraktRatingTarget.Episode -> {
+        val code = state.selectedEpisode
+            ?.takeIf { it.season == target.season && it.number == target.episode }
+            ?.localizedCode() ?: "S${target.season}E${target.episode}"
+        localizedStringResource(StringsR.string.details_rate_episode, code)
+    }
+}
+
+private fun ratingSuffix(rating: Int?): String = rating?.let { " · $it/10" }.orEmpty()
 
 @Composable
 private fun watchedLabel(state: DetailsUiState.Content): String? {

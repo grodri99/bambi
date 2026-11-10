@@ -15,6 +15,7 @@ import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.TraktRepository
+import com.shieldstream.tv.domain.TraktRatingTarget
 import kotlinx.coroutines.flow.first
 import com.shieldstream.tv.media.DeviceCapabilityDetector
 import com.shieldstream.tv.model.DeviceOptimization
@@ -58,6 +59,19 @@ sealed interface EpisodesState {
     data class Error(val message: String) : EpisodesState
 }
 
+sealed interface TraktRatingsState {
+    data object Idle : TraktRatingsState
+    data object Loading : TraktRatingsState
+    data object NotConnected : TraktRatingsState
+    data class Error(val message: String) : TraktRatingsState
+    data class Ready(
+        val overallRating: Int? = null,
+        val episodeRating: Int? = null,
+        val saving: Boolean = false,
+        val error: String? = null,
+    ) : TraktRatingsState
+}
+
 sealed interface DetailsUiState {
     data object Loading : DetailsUiState
     data class Error(val message: String) : DetailsUiState
@@ -75,6 +89,7 @@ sealed interface DetailsUiState {
         val sourceExclusions: SourceExclusions = SourceExclusions(),
         val inMyList: Boolean = false,
         val following: Boolean = false,
+        val ratings: TraktRatingsState = TraktRatingsState.Idle,
     ) : DetailsUiState {
         val isSeries: Boolean get() = details.item.type == MediaType.TV
 
@@ -121,6 +136,7 @@ class DetailsViewModel @Inject constructor(
 
     private var sourcesJob: Job? = null
     private var episodesJob: Job? = null
+    private var ratingsJob: Job? = null
     private var pendingFromStart = false
     private var pendingNext: NextEpisode? = null
     private var requestedAtNs = 0L
@@ -179,6 +195,65 @@ class DetailsViewModel @Inject constructor(
     fun toggleFollowing() {
         val item = content()?.details?.item ?: return
         if (item.type == MediaType.TV) tracking.setFollowing(item.id, !tracking.isFollowing(item.id))
+    }
+
+    fun loadRatings() {
+        val c = content() ?: return
+        val item = c.details.item
+        val overallTarget = if (c.isSeries) {
+            TraktRatingTarget.Show(item.id)
+        } else {
+            TraktRatingTarget.Movie(item.id)
+        }
+        val episodeTarget = c.selectedEpisode?.takeIf { c.isSeries }?.let {
+            TraktRatingTarget.Episode(item.id, it.season, it.number)
+        }
+        ratingsJob?.cancel()
+        updateContent { it.copy(ratings = TraktRatingsState.Loading) }
+        ratingsJob = viewModelScope.launch {
+            if (!trakt.isConnected) {
+                updateContent { it.copy(ratings = TraktRatingsState.NotConnected) }
+                return@launch
+            }
+            val result = runCatching {
+                val overallRating = trakt.getRating(overallTarget)
+                val episodeRating = episodeTarget?.let { trakt.getRating(it) }
+                TraktRatingsState.Ready(
+                    overallRating = overallRating,
+                    episodeRating = episodeRating,
+                )
+            }
+            updateContent {
+                it.copy(
+                    ratings = result.getOrElse {
+                        TraktRatingsState.Error(texts.get(StringsR.string.details_ratings_load_error))
+                    },
+                )
+            }
+        }
+    }
+
+    fun setRating(target: TraktRatingTarget, rating: Int?) {
+        val ready = (content()?.ratings as? TraktRatingsState.Ready) ?: return
+        updateContent { it.copy(ratings = ready.copy(saving = true, error = null)) }
+        ratingsJob = viewModelScope.launch {
+            val result = runCatching { trakt.setRating(target, rating) }
+            updateContent { current ->
+                val state = current.ratings as? TraktRatingsState.Ready ?: return@updateContent current
+                val updated = if (result.isSuccess) {
+                    when (target) {
+                        is TraktRatingTarget.Episode -> state.copy(episodeRating = rating)
+                        else -> state.copy(overallRating = rating)
+                    }
+                } else state
+                current.copy(
+                    ratings = updated.copy(
+                        saving = false,
+                        error = if (result.isFailure) texts.get(StringsR.string.details_rating_save_error) else null,
+                    ),
+                )
+            }
+        }
     }
 
     // ------------------------------------------------------------------ visto / no visto a mano

@@ -120,6 +120,17 @@ object LineIcons {
         "M9,4H19a1,1 0,0 1,1,1V14a1,1 0,0 1,-1,1H9a1,1 0,0 1,-1,-1V5a1,1 0,0 1,1,-1Z " +
             "M4,8V19a1,1 0,0 0,1,1H16 M12.25,6.75L16.5,9.5L12.25,12.25Z",
     )
+    val Eye = line(
+        "line_eye",
+        "M2,12C4.2,7.5 7.7,5 12,5C16.3,5 19.8,7.5 22,12C19.8,16.5 16.3,19 12,19C7.7,19 4.2,16.5 2,12Z " +
+            "M15,12A3,3 0,1 1,9 12A3,3 0,0 1,15 12Z",
+    )
+    val Star = line(
+        "line_star",
+        "M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.46,13.97L5.82,21Z",
+    )
+    val Close = line("line_close", "M6,6L18,18M18,6L6,18")
+    val Exit = line("line_exit", "M10,5H5V19H10M14,8L18,12L14,16M18,12H9")
     val Bookmark = line("line_bookmark", "M7,4H17a1,1 0,0 1,1,1V20L12,16L6,20V5a1,1 0,0 1,1,-1Z")
     val Settings = line(
         "line_settings",

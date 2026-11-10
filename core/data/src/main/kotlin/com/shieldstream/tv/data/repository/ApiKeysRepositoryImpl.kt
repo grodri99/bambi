@@ -8,6 +8,8 @@ import com.shieldstream.tv.domain.ApiKeysRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.domain.StremioAddonMetadata
+import com.shieldstream.tv.domain.StremioAddons
 import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
@@ -25,6 +27,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Request
 import java.io.IOException
+import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +45,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
 ) : ApiKeysRepository {
 
     private val _keys = MutableStateFlow(read())
+    private val addonMetadata = ConcurrentHashMap<String, StremioAddonMetadata>()
     override val keys: StateFlow<Map<ApiService, String?>> = _keys.asStateFlow()
 
     private fun read(): Map<ApiService, String?> = ApiService.entries.associateWith { store.getSecret(it.storeKey) }
@@ -73,6 +78,27 @@ class ApiKeysRepositoryImpl @Inject constructor(
                 ApiService.DEBRID_LINK, ApiService.OFFCLOUD -> checkViaTorrentio(service, key)
             }
         }.getOrElse { describe(it) }
+    }
+
+    override suspend fun addonMetadata(manifestUrl: String): StremioAddonMetadata? = withContext(Dispatchers.IO) {
+        val base = StremioAddons.baseUrl(manifestUrl) ?: return@withContext null
+        addonMetadata[base]?.let { return@withContext it }
+        val metadata = runCatching {
+            val body = torrentioApi.raw("$base/manifest.json").use { it.string() }
+            val manifest = Json.parseToJsonElement(body).jsonObject
+            StremioAddonMetadata(
+                name = manifest["name"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() },
+                logoUrl = manifest["logo"]?.jsonPrimitive?.contentOrNull?.let { resolveAddonLogo(base, it) },
+            )
+        }.getOrNull() ?: return@withContext null
+        addonMetadata[base] = metadata
+        metadata
+    }
+
+    private fun resolveAddonLogo(base: String, raw: String): String? {
+        val value = raw.trim().takeIf { it.isNotEmpty() } ?: return null
+        val resolved = runCatching { URI(base).resolve(value).toString() }.getOrNull() ?: return null
+        return resolved.takeIf { it.startsWith("http://") || it.startsWith("https://") }
     }
 
     private suspend fun checkRealDebrid(token: String): KeyCheck {

@@ -18,6 +18,7 @@ import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.home.MainScreen
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.player.PlayerScreen
+import com.shieldstream.tv.settings.AddonsScreen
 import com.shieldstream.tv.settings.SettingsScreen
 import com.shieldstream.tv.settings.SetupGateViewModel
 import com.shieldstream.tv.settings.SetupScreen
@@ -162,7 +163,11 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenSetup = { navController.navigate("setup_again") },
                 onOpenPhoneConfig = { navController.navigate("phone_config") },
+                onOpenAddons = { navController.navigate("addons") },
             )
+        }
+        composable("addons") { entry ->
+            AddonsScreen(onBack = { if (entry.isVisible()) navController.popBackStack() })
         }
         composable("phone_config") { entry ->
             PhoneConfigScreen(onDone = { if (entry.isVisible()) navController.popBackStack() })

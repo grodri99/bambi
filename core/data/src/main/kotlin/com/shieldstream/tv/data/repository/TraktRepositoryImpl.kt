@@ -14,6 +14,7 @@ import com.shieldstream.tv.domain.ScrobbleAction
 import com.shieldstream.tv.domain.TraktAuthPoll
 import com.shieldstream.tv.domain.TraktCredentials
 import com.shieldstream.tv.domain.TraktDeviceCode
+import com.shieldstream.tv.domain.TraktRatingTarget
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.model.WatchProgress
@@ -69,6 +70,7 @@ class TraktRepositoryImpl @Inject constructor(
     @Volatile private var lastSyncAttempt = 0L
 
     override val isConfigured: Boolean get() = credentials.isConfigured
+    override val isConnected: Boolean get() = session(profiles.active.value.id) != null
 
     init {
         scope.launch {
@@ -163,6 +165,36 @@ class TraktRepositoryImpl @Inject constructor(
         return (response.body as? JsonArray).orEmpty().mapNotNull { element ->
             (element as? JsonObject)?.obj("ids")?.int("tmdb")?.toString()
         }.distinct()
+    }
+
+    override suspend fun getRating(target: TraktRatingTarget): Int? {
+        val token = validToken(profiles.active.value.id) ?: throw TraktHttpException(401)
+        val kind = when (target) {
+            is TraktRatingTarget.Movie -> "movies"
+            is TraktRatingTarget.Show -> "shows"
+            is TraktRatingTarget.Episode -> "episodes"
+        }
+        var page = 1
+        while (true) {
+            val response = client.get("/sync/ratings/$kind?page=$page&limit=$RATINGS_PAGE_LIMIT", token)
+            if (!response.ok) throw TraktHttpException(response.code)
+            val items = (response.body as? JsonArray).orEmpty()
+            for (element in items) {
+                val item = element as? JsonObject ?: continue
+                if (item.matches(target)) return item.int("rating")?.takeIf { it in 1..10 }
+            }
+            if (items.size < RATINGS_PAGE_LIMIT) break
+            page++
+        }
+        return null
+    }
+
+    override suspend fun setRating(target: TraktRatingTarget, rating: Int?) {
+        require(rating == null || rating in 1..10) { "Trakt ratings must be between 1 and 10" }
+        val token = validToken(profiles.active.value.id) ?: throw TraktHttpException(401)
+        val path = if (rating == null) "/sync/ratings/remove" else "/sync/ratings"
+        val response = client.post(path, ratingBody(target, rating), token)
+        if (!response.ok) throw TraktHttpException(response.code)
     }
 
     override fun syncActive(force: Boolean) {
@@ -306,6 +338,54 @@ class TraktRepositoryImpl @Inject constructor(
             runCatching { client.post(path, watchlistBody(listOf(change.type to change.id)), token) }
                 .onSuccess { if (!it.ok) Log.w(TAG, "Watchlist $path: HTTP ${it.code}") }
                 .onFailure { Log.w(TAG, "Watchlist $path fallida: ${it.message}") }
+        }
+    }
+
+    private fun ratingBody(target: TraktRatingTarget, rating: Int?): JsonObject {
+        val ratedAt = rating?.let { TraktClient.formatDate(System.currentTimeMillis()) }
+        fun media(tmdbId: String) = buildJsonObject {
+            put("ids", buildJsonObject { put("tmdb", tmdbId.toIntOrNull() ?: error("Invalid TMDB id")) })
+            rating?.let { put("rating", it) }
+            ratedAt?.let { put("rated_at", it) }
+        }
+        return when (target) {
+            is TraktRatingTarget.Movie -> buildJsonObject {
+                put("movies", buildJsonArray { add(media(target.tmdbId)) })
+            }
+            is TraktRatingTarget.Show -> buildJsonObject {
+                put("shows", buildJsonArray { add(media(target.tmdbId)) })
+            }
+            is TraktRatingTarget.Episode -> buildJsonObject {
+                put("shows", buildJsonArray {
+                    add(buildJsonObject {
+                        put("ids", buildJsonObject {
+                            put("tmdb", target.showTmdbId.toIntOrNull() ?: error("Invalid TMDB id"))
+                        })
+                        put("seasons", buildJsonArray {
+                            add(buildJsonObject {
+                                put("number", target.season)
+                                put("episodes", buildJsonArray {
+                                    add(buildJsonObject {
+                                        put("number", target.episode)
+                                        rating?.let { put("rating", it) }
+                                        ratedAt?.let { put("rated_at", it) }
+                                    })
+                                })
+                            })
+                        })
+                    })
+                })
+            }
+        }
+    }
+
+    private fun JsonObject.matches(target: TraktRatingTarget): Boolean = when (target) {
+        is TraktRatingTarget.Movie -> obj("movie")?.obj("ids")?.int("tmdb")?.toString() == target.tmdbId
+        is TraktRatingTarget.Show -> obj("show")?.obj("ids")?.int("tmdb")?.toString() == target.tmdbId
+        is TraktRatingTarget.Episode -> {
+            val episode = obj("episode")
+            obj("show")?.obj("ids")?.int("tmdb")?.toString() == target.showTmdbId &&
+                episode?.int("season") == target.season && episode.int("number") == target.episode
         }
     }
 
@@ -534,6 +614,7 @@ class TraktRepositoryImpl @Inject constructor(
         const val POST_SPACING_MS = 1_100L
         const val MAX_UPLOAD_RESUMABLE = 20
         const val RECOMMENDATIONS_LIMIT = 40
+        const val RATINGS_PAGE_LIMIT = 1000
     }
 }
 

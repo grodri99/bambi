@@ -40,6 +40,17 @@
     <string name="details_mark_season_watched">Mark S%1$d watched</string>
     <string name="details_remaining">%1$s left</string>
     <string name="details_rating">%1$d%% rating</string>
+    <string name="details_rate_movie">Rate movie</string>
+    <string name="details_rate_show">Rate show</string>
+    <string name="details_rate_episode">Rate episode %1$s</string>
+    <string name="details_rating_picker_help">Left/Right to choose · OK to save</string>
+    <string name="details_rating_value">%1$d / 10</string>
+    <string name="details_remove_rating">Remove rating</string>
+    <string name="details_rating_saving">Saving…</string>
+    <string name="details_rating_save_error">Couldn\'t save the rating. Try again.</string>
+    <string name="details_ratings_load_error">Couldn\'t load Trakt ratings.</string>
+    <string name="details_trakt_connect_to_rate">Connect Trakt in your profile settings to rate titles.</string>
+    <string name="details_retry">Retry</string>
     <string name="details_season_count">%1$d seasons</string>
     <string name="details_for_episode"> for %1$s</string>
     <string name="details_no_sources_for">No sources%1$s</string>

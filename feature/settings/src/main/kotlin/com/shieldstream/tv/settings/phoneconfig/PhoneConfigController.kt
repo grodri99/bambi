@@ -7,6 +7,8 @@ import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SourceProvider
+import com.shieldstream.tv.domain.StremioAddons
+import com.shieldstream.tv.domain.mapConcurrent
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.settings.SetupAudioPreference
@@ -43,6 +45,23 @@ data class PhoneProviderGroupDto(
 )
 
 @Serializable
+data class PhoneAddonDto(
+    val id: String,
+    val title: String,
+    val valid: Boolean,
+    val detail: String? = null,
+    val logoUrl: String? = null,
+)
+
+@Serializable
+data class PhoneAddonUpdateDto(
+    val id: String? = null,
+    val value: String? = null,
+    val remove: Boolean = false,
+    val test: Boolean = false,
+)
+
+@Serializable
 data class PhonePreferencesDto(
     val lightweightUi: Boolean,
     val experimentalSubtitleSync: Boolean,
@@ -64,6 +83,7 @@ data class PhoneConfigDto(
     val keys: List<PhoneKeyDto>,
     val providerGroups: List<PhoneProviderGroupDto>,
     val preferences: PhonePreferencesDto,
+    val addons: List<PhoneAddonDto>,
     val setup: PhoneSetupDto? = null,
 )
 
@@ -82,6 +102,7 @@ data class PhoneConfigUpdateDto(
     val experimentalSubtitleSync: Boolean,
     val autoNextEpisode: Boolean,
     val keys: List<PhoneKeyUpdateDto> = emptyList(),
+    val addons: List<PhoneAddonUpdateDto> = emptyList(),
     val language: String? = null,
     val audio: String? = null,
     val subtitles: String? = null,
@@ -99,6 +120,7 @@ class PhoneConfigController @Inject constructor(
     private val ithilAccess: IthilAccessRepository,
 ) {
     private var selectedSetupLanguage: AppLanguage? = null
+    private val addonTestResults = mutableMapOf<String, String>()
 
     suspend fun snapshot(mode: PhoneConfigMode = PhoneConfigMode.EDIT): PhoneConfigDto {
         val keys = apiKeys.keys.value
@@ -117,6 +139,10 @@ class PhoneConfigController @Inject constructor(
             )
         } else {
             null
+        }
+        val addons = StremioAddons.parse(keys[ApiService.AIOSTREAMS].orEmpty())
+        val metadata = addons.mapConcurrent { addon ->
+            runCatching { apiKeys.addonMetadata(addon.manifestUrl) }.getOrNull()
         }
         return PhoneConfigDto(
             language = (if (mode == PhoneConfigMode.SETUP) selectedSetupLanguage ?: settings.language else settings.language).name.lowercase(),
@@ -151,6 +177,15 @@ class PhoneConfigController @Inject constructor(
                 experimentalSubtitleSync = settings.experimentalSubtitleSync.first(),
                 autoNextEpisode = settings.autoNextEpisode.first(),
             ),
+            addons = addons.mapIndexed { index, addon ->
+                PhoneAddonDto(
+                    id = addon.id,
+                    title = metadata[index]?.name?.takeUnless { it.isBlank() } ?: addon.host,
+                    valid = addon.isValid,
+                    detail = addonTestResults[addon.id],
+                    logoUrl = metadata[index]?.logoUrl?.takeUnless { it.isBlank() },
+                )
+            },
             setup = setup,
         )
     }
@@ -194,6 +229,60 @@ class PhoneConfigController @Inject constructor(
                 !remove && value != null && value.isEmpty() -> errors[service.name] = texts.get(StringsR.string.settings_phone_config_key_required)
             }
         }
+        val updatedAddons = StremioAddons.parse(apiKeys.keys.value[ApiService.AIOSTREAMS].orEmpty()).toMutableList()
+        request.addons.forEachIndexed { index, change ->
+            val errorKey = "addon:$index"
+            val value = change.value?.trim()
+            val existingIndex = change.id?.let { id -> updatedAddons.indexOfFirst { it.id == id } } ?: -1
+            when {
+                change.id != null && existingIndex < 0 -> errors[errorKey] = texts.get(StringsR.string.settings_phone_config_invalid_request)
+                change.remove && (change.id == null || value != null) ->
+                    errors[errorKey] = texts.get(StringsR.string.settings_phone_config_invalid_request)
+                change.test && (change.id == null || change.remove || value != null) ->
+                    errors[errorKey] = texts.get(StringsR.string.settings_phone_config_invalid_request)
+                !change.remove && !change.test && value.isNullOrEmpty() ->
+                    errors[errorKey] = texts.get(StringsR.string.settings_phone_config_key_required)
+            }
+            if (errors.containsKey(errorKey)) return@forEachIndexed
+            if (change.remove) {
+                updatedAddons.removeAt(existingIndex)
+                change.id?.let { addonTestResults.remove(it) }
+                return@forEachIndexed
+            }
+            if (change.test) {
+                val addon = updatedAddons[existingIndex]
+                when (val result = apiKeys.check(ApiService.AIOSTREAMS, addon.manifestUrl)) {
+                    is KeyCheck.Valid -> addonTestResults[addon.id] =
+                        result.detail ?: texts.get(StringsR.string.settings_connected)
+                    is KeyCheck.Invalid -> {
+                        addonTestResults.remove(addon.id)
+                        errors[errorKey] = result.message
+                    }
+                }
+                return@forEachIndexed
+            }
+
+            val candidate = StremioAddons.parse(value.orEmpty()).singleOrNull()
+            if (candidate == null || !candidate.isValid) {
+                errors[errorKey] = texts.get(StringsR.string.settings_phone_config_one_manifest)
+                return@forEachIndexed
+            }
+            if (updatedAddons.any { it.id == candidate.id && it.id != change.id }) {
+                errors[errorKey] = texts.get(StringsR.string.settings_phone_config_addon_exists)
+                return@forEachIndexed
+            }
+            when (val result = apiKeys.check(ApiService.AIOSTREAMS, candidate.manifestUrl)) {
+                is KeyCheck.Valid -> {
+                    change.id?.let { addonTestResults.remove(it) }
+                    if (change.id == null) {
+                        updatedAddons += candidate
+                    } else {
+                        updatedAddons[existingIndex] = candidate
+                    }
+                }
+                is KeyCheck.Invalid -> errors[errorKey] = result.message
+            }
+        }
         if (errors.isNotEmpty()) return PhoneConfigUpdateResult.ValidationFailed(errors)
 
         for ((service, value, remove) in changes) {
@@ -205,11 +294,17 @@ class PhoneConfigController @Inject constructor(
         }
         if (errors.isNotEmpty()) return PhoneConfigUpdateResult.ValidationFailed(errors)
 
+        if (request.keys.isEmpty() && request.addons.isNotEmpty() && request.addons.all { it.test }) {
+            return PhoneConfigUpdateResult.Success(snapshot(mode))
+        }
         for ((service, value, remove) in changes) {
             when {
                 remove -> apiKeys.set(service, null)
                 value != null -> apiKeys.set(service, value)
             }
+        }
+        if (request.addons.any { !it.test }) {
+            apiKeys.set(ApiService.AIOSTREAMS, StremioAddons.serialize(updatedAddons))
         }
         settings.setDebridService(debrid)
         settings.setSourceProviders(providers)

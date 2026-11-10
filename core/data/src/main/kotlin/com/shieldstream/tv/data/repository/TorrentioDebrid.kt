@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import com.shieldstream.tv.domain.DebridLink
 import com.shieldstream.tv.domain.DebridService
+import com.shieldstream.tv.domain.StremioAddons
 import com.shieldstream.tv.domain.TorrentioLinkResolver
 import com.shieldstream.tv.network.dto.TorrentioStreamDto
 import kotlinx.coroutines.Dispatchers
@@ -121,10 +122,6 @@ class TorrentioLinkResolverImpl @Inject constructor(
 }
 
 internal fun aioStreamBases(raw: String): List<String> =
-    raw.split(Regex("[\\s,;]+")).mapNotNull { aioStreamBase(it) }.distinct()
+    StremioAddons.parse(raw).mapNotNull { it.baseUrl }
 
-internal fun aioStreamBase(manifestUrl: String): String? {
-    val u = manifestUrl.trim().replaceFirst("stremio://", "https://")
-    if (!u.startsWith("http") || !u.endsWith("/manifest.json")) return null
-    return u.removeSuffix("/manifest.json")
-}
+internal fun aioStreamBase(manifestUrl: String): String? = StremioAddons.baseUrl(manifestUrl)

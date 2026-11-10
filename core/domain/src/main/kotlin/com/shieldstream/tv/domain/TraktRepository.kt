@@ -29,8 +29,15 @@ sealed interface TraktAuthPoll {
 
 enum class ScrobbleAction { START, PAUSE, STOP }
 
+sealed interface TraktRatingTarget {
+    data class Movie(val tmdbId: String) : TraktRatingTarget
+    data class Show(val tmdbId: String) : TraktRatingTarget
+    data class Episode(val showTmdbId: String, val season: Int, val episode: Int) : TraktRatingTarget
+}
+
 interface TraktRepository {
     val isConfigured: Boolean
+    val isConnected: Boolean
 
     suspend fun requestDeviceCode(): Result<TraktDeviceCode>
 
@@ -39,6 +46,10 @@ interface TraktRepository {
     suspend fun disconnect(profileId: String)
 
     suspend fun recommendations(profileId: String, type: MediaType): List<String>
+
+    suspend fun getRating(target: TraktRatingTarget): Int?
+
+    suspend fun setRating(target: TraktRatingTarget, rating: Int?)
 
     fun syncActive(force: Boolean = false)
 

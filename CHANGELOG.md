@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.18] - 2026-11-10
+
+### Added
+
+- **Trakt ratings:** rate movies, overall shows, and selected episodes with a compact star picker.
+- **Stremio addon manager:** add, replace, remove, and test multiple addons from Android TV or the mobile configuration page, with manifest-provided names and logos.
+- **Compact action menus:** use the new bottom-dock style for Details actions and exit confirmation.
+
+### Improved
+
+- Show manifest URLs while typing in both addon editors.
+- Preserve existing addon configuration and keep unchanged manifest values private during mobile updates.
+
+### Fixed
+
+- Restore D-pad focus after service-key validation errors.
+- Always include the addon list in mobile configuration responses, including when it is empty.
+
 ## [1.0.17] - 2026-11-07
 
 ### Added

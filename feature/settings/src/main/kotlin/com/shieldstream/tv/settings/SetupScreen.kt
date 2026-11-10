@@ -517,6 +517,12 @@ private fun ColumnScope.KeyStep(
             focusRequest++
         }
     }
+    LaunchedEffect(state.checking, state.error, editing) {
+        if (editing && !state.checking && state.error != null) {
+            withFrameNanos { }
+            runCatching { primaryRequester.requestFocus() }
+        }
+    }
 
     Row(Modifier.fillMaxWidth().weight(1f)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {

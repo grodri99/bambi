@@ -11,6 +11,7 @@ import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.StreamResults
 import com.shieldstream.tv.domain.TraktRepository
+import com.shieldstream.tv.domain.TraktRatingTarget
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.media.DeviceCapabilityDetector
 import com.shieldstream.tv.model.AudioCodec
@@ -359,11 +360,101 @@ class DetailsViewModelTest {
         assertEquals(setOf("ithil-1", "ithil-2"), queuedIds.toSet())
     }
 
+    @Test
+    fun `Trakt ratings load and update show and episode independently`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.TV,
+            title = "Show",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val episode = Episode(2, 3, "Episode", "", null, 45)
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(
+            item = item,
+            seasons = listOf(Season(2, "Season 2", 1)),
+        )
+        coEvery { catalog.getEpisodes(item, 2) } returns listOf(episode)
+        every { catalog.getStreams(item, any()) } returns flowOf(StreamResults(sources = emptyList()))
+        val showTarget = TraktRatingTarget.Show(item.id)
+        val episodeTarget = TraktRatingTarget.Episode(item.id, episode.season, episode.number)
+        val trakt = mockk<TraktRepository>()
+        every { trakt.isConnected } returns true
+        coEvery { trakt.getRating(any()) } coAnswers {
+            when (firstArg<TraktRatingTarget>()) {
+                showTarget -> 7
+                episodeTarget -> 9
+                else -> error("Unexpected rating target")
+            }
+        }
+        coEvery { trakt.setRating(showTarget, 8) } returns Unit
+        coEvery { trakt.setRating(episodeTarget, null) } throws IllegalStateException("offline")
+        val viewModel = viewModel(catalog, SelectedContentHolder().apply { selectItem(item) }, trakt = trakt)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.loadRatings()
+        testScheduler.advanceUntilIdle()
+
+        var ratings = ((viewModel.uiState.value as DetailsUiState.Content).ratings as TraktRatingsState.Ready)
+        assertEquals(7, ratings.overallRating)
+        assertEquals(9, ratings.episodeRating)
+
+        viewModel.setRating(showTarget, 8)
+        testScheduler.advanceUntilIdle()
+        ratings = (viewModel.uiState.value as DetailsUiState.Content).ratings as TraktRatingsState.Ready
+        assertEquals(8, ratings.overallRating)
+        assertEquals(9, ratings.episodeRating)
+        assertNull(ratings.error)
+
+        viewModel.setRating(episodeTarget, null)
+        testScheduler.advanceUntilIdle()
+        ratings = (viewModel.uiState.value as DetailsUiState.Content).ratings as TraktRatingsState.Ready
+        assertEquals(8, ratings.overallRating)
+        assertEquals(9, ratings.episodeRating)
+        assertTrue(!ratings.saving)
+        assertTrue(ratings.error != null)
+    }
+
+    @Test
+    fun `Trakt ratings report a disconnected profile`() = runTest {
+        val item = CatalogItem(
+            id = "42",
+            imdbId = "tt42",
+            type = MediaType.MOVIE,
+            title = "Movie",
+            overview = "",
+            posterUrl = null,
+            backdropUrl = null,
+            year = 2020,
+            rating = null,
+        )
+        val catalog = mockk<CatalogRepository>()
+        coEvery { catalog.getDetails(item) } returns CatalogDetails(item)
+        every { catalog.getStreams(item, null) } returns flowOf(StreamResults(sources = emptyList()))
+        val trakt = mockk<TraktRepository> { every { isConnected } returns false }
+        val viewModel = viewModel(catalog, SelectedContentHolder().apply { selectItem(item) }, trakt = trakt)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.loadRatings()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            TraktRatingsState.NotConnected,
+            (viewModel.uiState.value as DetailsUiState.Content).ratings,
+        )
+    }
+
     private fun viewModel(
         catalog: CatalogRepository,
         holder: SelectedContentHolder,
         watchProgress: WatchProgressRepository? = null,
         exclusions: SourceExclusions = SourceExclusions(),
+        trakt: TraktRepository = mockk(relaxed = true),
     ): DetailsViewModel =
         DetailsViewModel(
             catalogRepository = catalog,
@@ -387,7 +478,7 @@ class DetailsViewModelTest {
                 every { sourceExclusions } returns flowOf(exclusions)
                 every { deviceOptimization } returns flowOf(DeviceOptimization.AUTOMATIC)
             },
-            trakt = mockk<TraktRepository>(relaxed = true),
+            trakt = trakt,
             myList = mockk<MyListRepository>(relaxed = true) {
                 every { entries } returns MutableStateFlow(emptyList())
                 every { contains(any(), any()) } returns false

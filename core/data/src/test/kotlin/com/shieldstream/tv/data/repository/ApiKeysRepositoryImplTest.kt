@@ -19,6 +19,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,6 +40,20 @@ class ApiKeysRepositoryImplTest {
         torrentioApi = torrentio,
         texts = texts,
     )
+
+    @Test
+    fun `addon metadata reads name and logo once per manifest`() = runTest {
+        coEvery { torrentio.raw("https://one.example/manifest.json") } returns
+            """{"name":"Local addon","logo":"/icon.png"}""".toResponseBody()
+
+        val first = repository.addonMetadata("https://one.example/manifest.json")
+        val second = repository.addonMetadata("https://one.example/manifest.json")
+
+        assertEquals("Local addon", first?.name)
+        assertEquals("https://one.example/icon.png", first?.logoUrl)
+        assertEquals(first, second)
+        coVerify(exactly = 1) { torrentio.raw("https://one.example/manifest.json") }
+    }
 
     @Test
     fun `AllDebrid validation uses its account API without Torrentio`() = runTest {

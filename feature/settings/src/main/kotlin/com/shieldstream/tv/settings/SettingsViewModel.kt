@@ -18,6 +18,7 @@ import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
+import com.shieldstream.tv.domain.StremioAddons
 import com.shieldstream.tv.media.PlaybackPolicyProvider
 import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.DeviceCapabilities
@@ -125,7 +126,11 @@ class SettingsViewModel @Inject constructor(
                 val key = keys[service]
                 ServiceUi(
                     service = service,
-                    maskedKey = key?.let(::mask),
+                    maskedKey = if (service == ApiService.AIOSTREAMS) {
+                        texts.get(StringsR.string.settings_addons_count, StremioAddons.parse(key.orEmpty()).size)
+                    } else {
+                        key?.let(::mask)
+                    },
                     status = if (key.isNullOrBlank()) ServiceStatus.Missing else status[service] ?: ServiceStatus.Checking,
                 )
             },

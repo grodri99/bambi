@@ -40,6 +40,17 @@
     <string name="details_mark_season_watched">Marcar T%1$d vista</string>
     <string name="details_remaining">Quedan %1$s</string>
     <string name="details_rating">%1$d%% valoración</string>
+    <string name="details_rate_movie">Valorar película</string>
+    <string name="details_rate_show">Valorar serie</string>
+    <string name="details_rate_episode">Valorar episodio %1$s</string>
+    <string name="details_rating_picker_help">Izquierda/Derecha para elegir · OK para guardar</string>
+    <string name="details_rating_value">%1$d / 10</string>
+    <string name="details_remove_rating">Quitar valoración</string>
+    <string name="details_rating_saving">Guardando…</string>
+    <string name="details_rating_save_error">No se pudo guardar la valoración. Inténtalo de nuevo.</string>
+    <string name="details_ratings_load_error">No se pudieron cargar las valoraciones de Trakt.</string>
+    <string name="details_trakt_connect_to_rate">Conecta Trakt en los ajustes de tu perfil para valorar contenido.</string>
+    <string name="details_retry">Reintentar</string>
     <string name="details_season_count">%1$d temporadas</string>
     <string name="details_for_episode"> para %1$s</string>
     <string name="details_no_sources_for">Sin fuentes%1$s</string>

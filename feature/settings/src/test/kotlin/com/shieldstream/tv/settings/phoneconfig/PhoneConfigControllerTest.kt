@@ -7,6 +7,8 @@ import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.IthilAccessRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SourceProvider
+import com.shieldstream.tv.domain.StremioAddonMetadata
+import com.shieldstream.tv.domain.StremioAddons
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.settings.SetupAudioPreference
@@ -60,6 +62,7 @@ class PhoneConfigControllerTest {
         assertEquals("cret", config.keys.first { it.service == ApiService.TMDB.name }.last4)
         assertFalse(encoded.contains("tmdb-complete-secret"))
         assertFalse(encoded.contains("alldebrid-complete-secret"))
+        assertTrue(encoded.contains("\"addons\":[]"))
     }
 
     @Test
@@ -134,6 +137,110 @@ class PhoneConfigControllerTest {
 
         assertTrue(result is PhoneConfigUpdateResult.Success)
         coVerify(exactly = 1) { settings.setSourceProviders(setOf(SourceProvider.TORRENTIO)) }
+    }
+
+    @Test
+    fun `addon snapshot exposes stable metadata but not manifest values`() = runTest {
+        every { apiKeys.keys } returns MutableStateFlow(
+            mapOf(ApiService.AIOSTREAMS to "https://one.example/manifest.json https://two.example/manifest.json"),
+        )
+
+        val first = controller.snapshot()
+        val second = controller.snapshot()
+        val encoded = Json.encodeToString(first)
+
+        assertEquals(listOf("one.example", "two.example"), first.addons.map { it.title })
+        assertEquals(first.addons.map { it.id }, second.addons.map { it.id })
+        assertFalse(encoded.contains("manifest.json"))
+        assertFalse(encoded.contains("one.example/manifest"))
+    }
+
+    @Test
+    fun `addon snapshot includes manifest name and logo metadata`() = runTest {
+        val existing = StremioAddons.parse("https://one.example/manifest.json").first()
+        every { apiKeys.keys } returns MutableStateFlow(mapOf(ApiService.AIOSTREAMS to existing.manifestUrl))
+        coEvery { apiKeys.addonMetadata(existing.manifestUrl) } returns StremioAddonMetadata(
+            name = "Local addon",
+            logoUrl = "https://one.example/icon.png",
+        )
+
+        val addon = controller.snapshot().addons.single()
+
+        assertEquals("Local addon", addon.title)
+        assertEquals("https://one.example/icon.png", addon.logoUrl)
+    }
+
+    @Test
+    fun `adding an addon preserves every existing manifest value`() = runTest {
+        val existing = "stremio://one.example/manifest.json https://two.example/manifest.json"
+        every { apiKeys.keys } returns MutableStateFlow(mapOf(ApiService.AIOSTREAMS to existing))
+        coEvery { apiKeys.check(ApiService.AIOSTREAMS, "https://new.example/manifest.json") } returns KeyCheck.Valid()
+
+        val result = controller.update(
+            update().copy(
+                addons = listOf(PhoneAddonUpdateDto(value = "https://new.example/manifest.json")),
+            ),
+        )
+
+        assertTrue(result is PhoneConfigUpdateResult.Success)
+        coVerify(exactly = 1) {
+            apiKeys.set(ApiService.AIOSTREAMS, "$existing https://new.example/manifest.json")
+        }
+    }
+
+    @Test
+    fun `replace and remove operations leave unmodified addons intact`() = runTest {
+        val first = StremioAddons.parse("https://one.example/manifest.json").first()
+        val second = StremioAddons.parse("https://two.example/manifest.json").first()
+        every { apiKeys.keys } returns MutableStateFlow(
+            mapOf(ApiService.AIOSTREAMS to "${first.manifestUrl} ${second.manifestUrl}"),
+        )
+        coEvery { apiKeys.check(ApiService.AIOSTREAMS, "https://new.example/manifest.json") } returns KeyCheck.Valid()
+
+        val result = controller.update(
+            update().copy(
+                addons = listOf(
+                    PhoneAddonUpdateDto(id = first.id, value = "https://new.example/manifest.json"),
+                    PhoneAddonUpdateDto(id = second.id, remove = true),
+                ),
+            ),
+        )
+
+        assertTrue(result is PhoneConfigUpdateResult.Success)
+        coVerify(exactly = 1) { apiKeys.set(ApiService.AIOSTREAMS, "https://new.example/manifest.json") }
+    }
+
+    @Test
+    fun `invalid addon replacement does not modify existing configuration`() = runTest {
+        val existing = StremioAddons.parse("https://one.example/manifest.json").first()
+        every { apiKeys.keys } returns MutableStateFlow(mapOf(ApiService.AIOSTREAMS to existing.manifestUrl))
+        coEvery { apiKeys.check(ApiService.AIOSTREAMS, "https://bad.example/manifest.json") } returns KeyCheck.Invalid("Offline")
+
+        val result = controller.update(
+            update().copy(
+                addons = listOf(PhoneAddonUpdateDto(id = existing.id, value = "https://bad.example/manifest.json")),
+            ),
+        )
+
+        assertEquals(PhoneConfigUpdateResult.ValidationFailed(mapOf("addon:0" to "Offline")), result)
+        coVerify(exactly = 0) { apiKeys.set(any(), any()) }
+    }
+
+    @Test
+    fun `testing an addon returns its detail without changing configuration`() = runTest {
+        val existing = StremioAddons.parse("https://one.example/manifest.json").first()
+        every { apiKeys.keys } returns MutableStateFlow(mapOf(ApiService.AIOSTREAMS to existing.manifestUrl))
+        coEvery { apiKeys.check(ApiService.AIOSTREAMS, existing.manifestUrl) } returns KeyCheck.Valid("12 sources")
+
+        val result = controller.update(
+            update().copy(addons = listOf(PhoneAddonUpdateDto(id = existing.id, test = true))),
+        )
+
+        assertTrue(result is PhoneConfigUpdateResult.Success)
+        assertEquals("12 sources", (result as PhoneConfigUpdateResult.Success).config.addons.single().detail)
+        coVerify(exactly = 0) { apiKeys.set(any(), any()) }
+        coVerify(exactly = 0) { settings.setDebridService(any()) }
+        coVerify(exactly = 0) { settings.setSourceProviders(any()) }
     }
 
     @Test

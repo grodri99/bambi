@@ -109,6 +109,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit = {},
     onOpenPhoneConfig: () -> Unit = {},
+    onOpenAddons: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,7 +133,9 @@ fun SettingsScreen(
             is SettingsUiState.Ready -> {
                 SettingsList(
                     state = s,
-                    onEditKey = viewModel::openEditor,
+                    onEditKey = { service ->
+                        if (service == ApiService.AIOSTREAMS) onOpenAddons() else viewModel.openEditor(service)
+                    },
                     onBuffer = viewModel::changeBuffer,
                     onSeekMode = viewModel::setSeekThumbnails,
                     onDebrid = viewModel::setDebrid,
@@ -671,7 +674,7 @@ internal fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier 
                 }
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    if (ui.maskedKey == null) localizedStringResource(StringsR.string.settings_ok_to_add) else localizedStringResource(StringsR.string.settings_ok_to_change),
+                    if (ui.status == ServiceStatus.Missing) localizedStringResource(StringsR.string.settings_ok_to_add) else localizedStringResource(StringsR.string.settings_ok_to_change),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (focused) Color.White else Color.Transparent,
                 )
@@ -1543,6 +1546,12 @@ private fun KeyEditorDialog(
     LaunchedEffect(editor.service) {
         withFrameNanos { }
         runCatching { fieldRequester.requestFocus() }
+    }
+    LaunchedEffect(editor.busy, editor.error) {
+        if (!editor.busy && editor.error != null) {
+            withFrameNanos { }
+            runCatching { saveRequester.requestFocus() }
+        }
     }
     Box(
         contentAlignment = Alignment.Center,

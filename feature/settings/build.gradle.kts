@@ -39,6 +39,8 @@ dependencies {
     implementation(project(":core:media"))
     implementation(project(":core:ui"))
     implementation(libs.zxing.core)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
     implementation(libs.nanohttpd)
     implementation(libs.kotlinx.serialization.json)
 
