@@ -20,7 +20,10 @@ class IthilAccessRepositoryImpl @Inject constructor(
     override val isUnlocked: Boolean get() = mutableUnlocked.value
 
     init {
-        val stored = prefs.getBoolean(KEY_UNLOCKED, false)
+        // En Bambi Ithil viene activado de serie (en Franklix se desbloqueaba con un gesto oculto en Ajustes).
+        // Solo funciona si la app se compila con su configuración (ithilMetadataUrl/ithilIndexKey/ithilArchivePrefix)
+        // y hay clave de AllDebrid.
+        val stored = prefs.getBoolean(KEY_UNLOCKED, true)
         val initial = stored || library.isReady()
         if (initial && !stored) prefs.edit().putBoolean(KEY_UNLOCKED, true).apply()
         mutableUnlocked = MutableStateFlow(initial)
