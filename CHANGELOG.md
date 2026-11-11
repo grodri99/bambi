@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.21] - 2026-11-11
+
+### Added
+
+- **My List item actions:** hold OK on a My List poster, either on Home or the full My List screen, to open Details, remove the item, or cancel.
+- **Consistent action menus:** Continue Watching, Up Next, episodes, addons, and exit confirmation now use the same compact bottom action menu.
+
+### Improved
+
+- **Home catalog:** removed the redundant Trending today row from the All tab and corrected the Top 10 labels to describe their weekly TMDB data.
+- **TV focus:** made initial focus and focus restoration more reliable when opening menus, switching views, or removing items.
+
+### Fixed
+
+- Prevent the OK release that opens a long-press menu from accidentally triggering its focused action.
+- Preserve a useful focus destination after removing an item from My List.
+
 ## [1.0.20] - 2026-11-11
 
 ### Fixed
