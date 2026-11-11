@@ -158,7 +158,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private val debridFlow = MutableStateFlow(
         runCatching { DebridService.valueOf(prefs.getString(KEY_DEBRID, null) ?: "") }
-            .getOrDefault(DebridService.ALLDEBRID),
+            .getOrDefault(DebridService.REAL_DEBRID),
     )
     override val debridService: Flow<DebridService> = debridFlow
 

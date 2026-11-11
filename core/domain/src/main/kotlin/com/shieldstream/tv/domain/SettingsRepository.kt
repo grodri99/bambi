@@ -76,7 +76,7 @@ interface SettingsRepository {
     val sourceExclusions: Flow<SourceExclusions>
     suspend fun setSourceExclusions(exclusions: SourceExclusions)
 
-    /** Servicio debrid en uso (AllDebrid por defecto). */
+    /** Servicio debrid en uso (Real-Debrid por defecto). */
     val debridService: Flow<DebridService>
     suspend fun setDebridService(service: DebridService)
 
