@@ -73,7 +73,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-pruebas"
-            manifestPlaceholders["appLabel"] = "Franklix (pruebas)"
+            manifestPlaceholders["appLabel"] = "Bambi (pruebas)"
         }
         release {
             isMinifyEnabled = false
@@ -87,7 +87,7 @@ android {
             isDebuggable = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-benchmark"
-            manifestPlaceholders["appLabel"] = "Franklix (benchmark)"
+            manifestPlaceholders["appLabel"] = "Bambi (benchmark)"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += "release"
         }

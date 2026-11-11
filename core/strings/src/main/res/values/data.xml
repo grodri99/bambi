@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="data_that_s_the_read_access_token_v4">That\'s the \"read access token\" (v4). Franklix uses the \"API Key\" (v3): 32 letters and numbers, on the same TMDB page (Settings → API).</string>
+    <string name="data_that_s_the_read_access_token_v4">That\'s the \"read access token\" (v4). Bambi uses the \"API Key\" (v3): 32 letters and numbers, on the same TMDB page (Settings → API).</string>
     <string name="data_unknown_service">Unknown service</string>
     <string name="data_connected_via_torrentio">Connected (via Torrentio)</string>
     <string name="data_paste_the_manifest_url_ends_in_manifest">Paste the manifest URL (ends in /manifest.json). Several: separated by spaces.</string>
@@ -70,7 +70,7 @@
     <string name="data_real_debrid_returned_no_torrent_id">Real-Debrid returned no torrent id</string>
     <string name="data_couldn_t_unrestrict_the_link">Couldn\'t unrestrict the link</string>
     <string name="data_this_source_is_packed_in_a_rar">This source is packed in a RAR and can\'t be played.</string>
-    <string name="data_trakt_isn_t_set_up_in_this">Trakt isn\'t set up in this build of Franklix.</string>
+    <string name="data_trakt_isn_t_set_up_in_this">Trakt isn\'t set up in this build of Bambi.</string>
     <string name="data_invalid_code_get_a_new_one">Invalid code. Get a new one.</string>
     <string name="data_that_code_was_already_used_get_a">That code was already used. Get a new one.</string>
     <string name="data_empty_response">Empty response</string>

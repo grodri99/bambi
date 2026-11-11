@@ -76,7 +76,7 @@ class AllDebridAuthRepositoryImpl @Inject constructor(
             )
         }
         return try {
-            val response = api.unlock(agent = "Franklix", apiKey = key, link = url)
+            val response = api.unlock(agent = "Bambi", apiKey = key, link = url)
             val unlocked = response.data?.link.orEmpty()
             when {
                 response.status == "success" && unlocked.isNotBlank() -> DebridLink.Ready(unlocked)

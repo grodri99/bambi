@@ -21,15 +21,13 @@ private val DarkColors = darkColorScheme(
     onSurface = Color.White,
 )
 
-// Six sizes and three weights. Inter ships only Regular, Medium and SemiBold; asking for Bold or
-// Black silently renders SemiBold, so use SemiBold explicitly. Material slots that differ only by
-// size map onto the same role.
-private val Display = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.SemiBold, fontSize = 36.sp, lineHeight = 40.sp)
-private val Headline = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 32.sp)
-private val Title = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 26.sp)
-private val Body = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 23.sp)
-private val Small = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
-private val Caption = TextStyle(fontFamily = InterFont, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp)
+// Seis tamaños y tres pesos con la letra del sistema (Roboto), como siempre en Bambi.
+private val Display = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 36.sp, lineHeight = 40.sp)
+private val Headline = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 32.sp)
+private val Title = TextStyle(fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 26.sp)
+private val Body = TextStyle(fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 23.sp)
+private val Small = TextStyle(fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp)
+private val Caption = TextStyle(fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp)
 
 private val AppTypography = Typography(
     displayLarge = Display,
@@ -59,7 +57,7 @@ val LocalSoftBackdrops = staticCompositionLocalOf { true }
 val LocalHighResBackdrops = staticCompositionLocalOf { false }
 
 @Composable
-fun FranklixTheme(
+fun ShieldStreamTheme(
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(

@@ -157,7 +157,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
         val request = Request.Builder()
             .url("https://api.subdl.com/api/v2/subtitles/search?imdb_id=tt0137523&type=movie&languages=ES")
             .header("Authorization", "Bearer $key")
-            .header("User-Agent", "Franklix")
+            .header("User-Agent", "Bambi")
             .build()
         http.client.newCall(request).execute().use { response ->
             if (response.code == 401 || response.code == 403) return KeyCheck.Invalid(texts.get(StringsR.string.data_invalid_key))

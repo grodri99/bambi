@@ -57,7 +57,7 @@ class TorrentioLinkResolverImpl @Inject constructor(
     override suspend fun resolve(url: String, service: String): DebridLink = withContext(Dispatchers.IO) {
         var current = url
         repeat(MAX_HOPS) {
-            val request = Request.Builder().url(current).get().header("User-Agent", "Franklix").header("Range", "bytes=0-0").build()
+            val request = Request.Builder().url(current).get().header("User-Agent", "Bambi").header("Range", "bytes=0-0").build()
             val next: String? = client.newCall(request).execute().use { response ->
                 val location = response.header("Location")
                 when {

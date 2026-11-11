@@ -74,7 +74,7 @@ jobs:
           : "${ITHIL_METADATA:?Missing ITHIL_METADATA_URL secret}"
           : "${ITHIL_KEY:?Missing ITHIL_INDEX_KEY secret}"
           : "${ITHIL_PREFIX:?Missing ITHIL_ARCHIVE_PREFIX secret}"
-          KEYSTORE="$RUNNER_TEMP/keystore/franklix.keystore"
+          KEYSTORE="$RUNNER_TEMP/keystore/bambi.keystore"
           mkdir -p "$(dirname "$KEYSTORE")"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           {
@@ -101,11 +101,11 @@ jobs:
       - name: Run Android lint
         run: ./gradlew --no-daemon lintDebug
 
-      - name: Prepare Franklix.apk
+      - name: Prepare Bambi.apk
         run: |
           mkdir -p "$RUNNER_TEMP/release-artifact"
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Franklix.apk"
-          test -s "$RUNNER_TEMP/release-artifact/Franklix.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/release-artifact/Bambi.apk"
+          test -s "$RUNNER_TEMP/release-artifact/Bambi.apk"
 
       - name: Prepare curated release notes
         run: |
@@ -120,9 +120,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Franklix.apk" \
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release-artifact/Bambi.apk" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Franklix ${RELEASE_TAG#v}" \
+            --title "Bambi ${RELEASE_TAG#v}" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             --latest \
             --verify-tag

@@ -5,13 +5,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * Shared colour tokens. The palette is monochrome: white carries focus and selection, and
- * [Highlight] is the single accent for small details. Other hues are reserved for meaning
- * (status, age ratings, third-party brands).
+ * Colores compartidos con el estilo de Bambi: fondo casi negro, el foco invierte a blanco y el rojo de
+ * Bambi marca progreso, selección, novedades y los indicadores activos.
  */
 object AppColors {
     /** Full-screen canvas. */
-    val Background = Color.Black
+    val Background = Color(0xFF0E0E10)
 
     /** Top stop of subtle full-screen gradients and image placeholders behind backdrops. */
     val BackgroundRaised = Color(0xFF141416)
@@ -28,17 +27,17 @@ object AppColors {
     /** Image and skeleton placeholders. */
     val Placeholder = Color(0xFF232327)
 
-    /** Focus, selection, progress, and active indicators. */
-    val Accent = Color.White
+    /** Rojo de Bambi: progreso, selección e indicadores activos. */
+    val Accent = Color(0xFFE50914)
 
     /** Content drawn on [Accent]. */
-    val OnAccent = Color.Black
+    val OnAccent = Color.White
 
     /**
      * The single accent: "new" dots and counts, progress bars, the active rail marker and small
      * section labels. Keep it to small details; large accent areas compete with the artwork.
      */
-    val Highlight = Color(0xFFF2B65A)
+    val Highlight = Color(0xFFE50914)
 
     /** Restricted age ratings only. */
     val Alert = Color(0xFFE50914)

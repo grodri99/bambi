@@ -16,7 +16,7 @@ import com.shieldstream.tv.domain.UpdateRepository
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import com.shieldstream.tv.ui.theme.LocalSoftBackdrops
 import com.shieldstream.tv.ui.theme.LocalHighResBackdrops
-import com.shieldstream.tv.ui.theme.FranklixTheme
+import com.shieldstream.tv.ui.theme.ShieldStreamTheme
 import com.shieldstream.tv.watchnext.WatchNextManager
 import com.shieldstream.tv.watchnext.WatchNextRequest
 import com.shieldstream.tv.watchnext.parseWatchNextRequest
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
                 LocalSoftBackdrops provides softBackdrops,
                 LocalHighResBackdrops provides highResBackdrops,
             ) {
-                FranklixTheme {
+                ShieldStreamTheme {
                     AppNavHost(
                         holder = holder,
                         onExit = { finish() },

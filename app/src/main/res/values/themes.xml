@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.Franklix" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.ShieldStream" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>

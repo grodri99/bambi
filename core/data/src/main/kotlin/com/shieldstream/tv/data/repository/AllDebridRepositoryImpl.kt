@@ -70,7 +70,7 @@ class AllDebridRepositoryImpl @Inject constructor(
 
     override suspend fun unrestrict(link: String): String {
         return try {
-            val response = api.unlock(agent = "Franklix", apiKey = key(), link = link)
+            val response = api.unlock(agent = "Bambi", apiKey = key(), link = link)
             val unlocked = response.data?.link.orEmpty()
             if (response.status != "success" || unlocked.isBlank()) {
                 throw IOException(

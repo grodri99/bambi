@@ -26,12 +26,12 @@ class AllDebridLinkResolverImplTest {
     private val keys = FakeKeys()
 
     @Test
-    fun unlockUsesFranklixAndTheUsersKey() = runTest {
+    fun unlockUsesBambiAndTheUsersKey() = runTest {
         val resolver = AllDebridAuthRepositoryImpl(api, FakeTexts, keys)
 
         val result = resolver.unlock("https://hoster.test/?abc")
 
-        assertEquals("Franklix", api.agent)
+        assertEquals("Bambi", api.agent)
         assertEquals("user-key", api.key)
         assertEquals("https://hoster.test/?abc", api.link)
         assertEquals(DebridLink.Ready("https://cdn.test/video"), result)

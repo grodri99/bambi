@@ -44,7 +44,7 @@ class PhoneConfigServerTest {
         client.newCall(Request.Builder().url(connection.displayUrl).build()).execute().use { response ->
             assertEquals(200, response.code)
             val html = response.body!!.string()
-            assertTrue(html.contains("Franklix"))
+            assertTrue(html.contains("Bambi"))
             assertTrue(html.contains("src=\"/logo.png\""))
         }
         client.newCall(Request.Builder().url("${connection.displayUrl}/logo.png").build()).execute().use { response ->

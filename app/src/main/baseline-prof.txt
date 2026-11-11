@@ -1,4 +1,4 @@
-# Perfil de arranque/uso de Franklix: Android precompila (AOT) estas clases y métodos al instalar o en segundo plano.
+# Perfil de arranque/uso de Bambi: Android precompila (AOT) estas clases y métodos al instalar o en segundo plano.
 # Sin esto, al instalar por cable/APK el código va interpretado/JIT durante días: en la Shield el Inicio iba a
 # trompicones (7,7 % de fotogramas lentos) y precompilado va fluido (2 %). Las librerías (Compose, Media3…) traen
 # su propio perfil; esto cubre el código de la app en todos sus módulos.

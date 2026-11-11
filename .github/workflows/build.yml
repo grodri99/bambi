@@ -1,4 +1,4 @@
-# Build Franklix on every push and pull request, and manually from the Actions tab.
+# Build Bambi on every push and pull request, and manually from the Actions tab.
 # Without credentials: local.properties is not tracked, so the APK contains no preloaded keys
 # (equivalent to seedKeys=false) and is signed with the debug key. This validates the build; it does not publish it.
 name: Build
@@ -46,6 +46,6 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: Franklix-debug
+          name: Bambi-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14

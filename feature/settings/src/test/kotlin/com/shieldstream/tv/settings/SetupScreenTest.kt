@@ -62,7 +62,7 @@ class SetupScreenTest {
     fun `welcome renders Spanish text`() {
         renderStep(SetupStep.WELCOME, AppLanguage.ES)
 
-        composeRule.onNodeWithText("Vamos a dejar Franklix listo").assertExists()
+        composeRule.onNodeWithText("Vamos a dejar Bambi listo").assertExists()
         composeRule.onNodeWithText("Idioma, audio y subtítulos").assertExists()
         composeRule.onNodeWithText("Empezar").assertExists()
         composeRule.onNodeWithText("Más tarde").assertExists()
@@ -72,7 +72,7 @@ class SetupScreenTest {
     fun `welcome renders English text`() {
         renderStep(SetupStep.WELCOME, AppLanguage.EN)
 
-        composeRule.onNodeWithText("Let's get Franklix ready").assertExists()
+        composeRule.onNodeWithText("Let's get Bambi ready").assertExists()
         composeRule.onNodeWithText("Language, audio & subtitles").assertExists()
         composeRule.onNodeWithText("Start").assertExists()
         composeRule.onNodeWithText("Later").assertExists()

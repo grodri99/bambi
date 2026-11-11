@@ -26,7 +26,7 @@
         android:icon="@drawable/ic_launcher"
         android:label="${appLabel}"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Franklix">
+        android:theme="@style/Theme.ShieldStream">
 
         <provider
             android:name="androidx.startup.InitializationProvider"

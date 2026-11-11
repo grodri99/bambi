@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "franklix"
+rootProject.name = "ShieldStream"
 
 include(":app")
 include(":core:model")
