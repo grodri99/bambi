@@ -258,7 +258,8 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
         if (profile.traktUser != null || profile.kids || profile.locked) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (profile.traktUser != null) {
-                    Text("Trakt ✓", color = TraktRed.copy(alpha = if (focused) 1f else 0.7f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    // Green reads as "linked/OK" here; Trakt's brand red looked like a warning.
+                    Text("Trakt ✓", color = AppColors.Success.copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 if (profile.kids) {
                     Text(localizedStringResource(StringsR.string.settings_kids), color = Color(0xFF56CCF2).copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
