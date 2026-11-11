@@ -44,16 +44,16 @@ object ProfileManagement {
 
 object ProfileAvatars {
     val colors: List<Pair<Long, Long>> = listOf(
-        0xFF587D64 to 0xFF1E3B32, // bosque
-        0xFF4F8896 to 0xFF173E4E, // mar
-        0xFF537A9E to 0xFF21344F, // océano
-        0xFF7C8F67 to 0xFF354D3C, // musgo
-        0xFF4B9087 to 0xFF1C4C4B, // laguna
-        0xFF637E8C to 0xFF293F4C, // fiordo
-        0xFF749B87 to 0xFF304F43, // eucalipto
-        0xFF4A7462 to 0xFF193C32, // pino
-        0xFF7A8D9B to 0xFF364652, // lluvia
-        0xFF4C6076 to 0xFF1D2836, // medianoche
+        0xFFE50914 to 0xFF8C0610, // rojo
+        0xFF2F80ED to 0xFF1B4C95, // azul
+        0xFF27AE60 to 0xFF14683A, // verde
+        0xFFF2C94C to 0xFFC08A12, // amarillo
+        0xFF9B51E0 to 0xFF5B2A8C, // morado
+        0xFFF2994A to 0xFFB45A17, // naranja
+        0xFF56CCF2 to 0xFF2179A0, // celeste
+        0xFFEB5794 to 0xFF9B2459, // rosa
+        0xFF6FCF97 to 0xFF2F7F57, // menta
+        0xFF828282 to 0xFF3D3D3D, // gris
     )
 
     fun safe(index: Int): Int = index.mod(colors.size)
