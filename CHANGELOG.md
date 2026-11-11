@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.19] - 2026-11-11
+
+### Added
+
+- **Per-episode watched state:** the Details action dock can now mark the selected episode as watched or unwatched, without playing it. Previously only a whole season could be toggled from the dock.
+- **Episode options menu:** holding OK on an episode card opens a modal with Play episode, Mark as watched/unwatched, and Cancel. The hint under the episode row documents the gesture.
+
+### Fixed
+
+- Finishing a stream now always marks it watched, including sources whose container reports no duration.
+- The Trakt badge on the profile picker is green instead of Trakt red, so a linked profile no longer reads as a warning.
+- The mobile configuration page serves the current logo instead of the old mascot.
+
+### Improved
+
+- Updated the logo in the repository documentation to the current mark.
+
 ## [1.0.18] - 2026-11-10
 
 ### Added
