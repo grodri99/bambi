@@ -55,7 +55,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -86,7 +85,6 @@ internal fun FeaturedCarousel(
     items: List<FeaturedItem>,
     onOpen: (CatalogItem) -> Unit,
     modifier: Modifier = Modifier,
-    contentStart: Dp = AppSpacing.ScreenEdge,
 ) {
     var index by rememberSaveable { mutableIntStateOf(0) }
     if (index >= items.size) index = 0
@@ -105,16 +103,13 @@ internal fun FeaturedCarousel(
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown || items.size < 2) return@onPreviewKeyEvent false
-                // No wrap-around: Left on the first slide falls through to focus search and reaches the rail.
                 when (event.key) {
-                    Key.DirectionLeft -> if (index > 0) {
-                        index -= 1
+                    Key.DirectionLeft -> {
+                        index = (index - 1 + items.size) % items.size
                         true
-                    } else {
-                        false
                     }
                     Key.DirectionRight -> {
-                        if (index < items.lastIndex) index += 1
+                        index = (index + 1) % items.size
                         true
                     }
                     else -> false
@@ -122,11 +117,9 @@ internal fun FeaturedCarousel(
             }
             .tvClickable { onOpen(current.item) },
     ) {
-        FeaturedSlide(current, focused, index, items.size, contentStart)
-        if (focused && index > 0) {
+        FeaturedSlide(current, focused, index, items.size)
+        if (focused && items.size > 1) {
             CarouselArrow("‹", Modifier.align(Alignment.CenterStart).padding(start = 16.dp))
-        }
-        if (focused && index < items.lastIndex) {
             CarouselArrow("›", Modifier.align(Alignment.CenterEnd).padding(end = 16.dp))
         }
     }
@@ -163,7 +156,7 @@ private fun CarouselArrow(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean, index: Int, count: Int, contentStart: Dp) {
+private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean, index: Int, count: Int) {
     val item = featured.item
     val backdropUrl = BackdropUrls.fullScreen(
         url = item.backdropUrl,
@@ -192,7 +185,7 @@ private fun FeaturedSlide(featured: FeaturedItem, focused: Boolean, index: Int, 
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth(0.65f)
-                .padding(start = contentStart, bottom = 96.dp),
+                .padding(start = AppSpacing.ScreenEdge, bottom = 96.dp),
         ) {
             BadgeLabel(featured.badge)
             Spacer(Modifier.height(14.dp))
@@ -363,11 +356,10 @@ private fun CategoryChipsRow(
 ) {
     val state = rememberLoopingRowState(categories.size)
     var focusedVirtual by rememberSaveable { mutableIntStateOf(state.firstVisibleItemIndex) }
-    val contentStart = LocalContentStart.current
-    ProvidePivotScroll(leading = contentStart) {
+    ProvidePivotScroll(leading = AppSpacing.ScreenEdge) {
         LazyRow(
             state = state,
-            contentPadding = PaddingValues(horizontal = contentStart, vertical = 10.dp),
+            contentPadding = PaddingValues(horizontal = AppSpacing.ScreenEdge, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = modifier
                 .fillMaxWidth()

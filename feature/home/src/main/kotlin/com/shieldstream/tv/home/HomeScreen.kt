@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -90,8 +89,6 @@ import com.shieldstream.tv.ui.component.firstVirtualIndex
 import com.shieldstream.tv.ui.component.formatEpisodeDate
 import com.shieldstream.tv.ui.component.loopingItems
 import com.shieldstream.tv.ui.component.onBackKey
-import com.shieldstream.tv.ui.component.RailCollapsedWidth
-import com.shieldstream.tv.ui.component.RailContentStart
 import com.shieldstream.tv.ui.component.SoftBackdropImage
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.requestFocusWithRetry
@@ -105,13 +102,10 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.snapshots.Snapshot
 import java.util.Locale
 
-/** Start inset for browse content. Home overrides it so content clears the navigation rail. */
-internal val LocalContentStart = staticCompositionLocalOf { AppSpacing.ScreenEdge }
+private val ContentStart = AppSpacing.ScreenEdge
 private val RowBackground = AppColors.Background
 
 internal enum class UpNextBadge { UP_NEXT, NEW_EPISODE, NEW_SEASON }
@@ -131,30 +125,30 @@ fun HomeScreen(
     onUpNextClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onContentReady: () -> Unit = {},
-    onInteractive: () -> Unit = {},
-    railRequester: FocusRequester,
-    focusRail: () -> Unit,
-    preferRailFocus: Boolean,
-    onRailFocusConsumed: () -> Unit,
+    topBar: @Composable (Modifier) -> Unit,
+    topBarRequester: FocusRequester,
+    focusTopBar: () -> Unit,
+    preferTopBarFocus: Boolean,
+    onTopBarFocusConsumed: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(key = "home_${filter.name}"),
 ) {
     LaunchedEffect(filter) { viewModel.load(filter) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val hidden by viewModel.hiddenCategories.collectAsStateWithLifecycle()
 
-    CompositionLocalProvider(LocalContentStart provides RailContentStart) {
     when (val s = state) {
         HomeUiState.Loading -> Column(Modifier.fillMaxSize().background(BillboardBackground)) {
+            topBar(Modifier)
             LaunchedEffect(Unit) {
-                if (preferRailFocus) {
+                if (preferTopBarFocus) {
                     withFrameNanos { }
-                    focusRail()
+                    focusTopBar()
                 }
             }
             BillboardSkeleton()
         }
         is HomeUiState.Error -> Column(Modifier.fillMaxSize().background(BillboardBackground)) {
-            LaunchedEffect(Unit) { onInteractive() }
+            topBar(Modifier)
             HomeError(
                 s.message,
                 onRetry = { viewModel.load(filter, force = true) },
@@ -162,10 +156,7 @@ fun HomeScreen(
             )
         }
         is HomeUiState.Content -> {
-            LaunchedEffect(Unit) {
-                onInteractive()
-                onContentReady()
-            }
+            LaunchedEffect(Unit) { onContentReady() }
             HomeContent(
             rows = s.rows,
             featured = s.featured,
@@ -196,13 +187,13 @@ fun HomeScreen(
             onRemoveMyList = viewModel::removeFromMyList,
             onMarkUpNextWatched = viewModel::markUpNextWatched,
             onRemoveUpNext = viewModel::removeUpNext,
-            railRequester = railRequester,
-            focusRail = focusRail,
-            preferRailFocus = preferRailFocus,
-            onRailFocusConsumed = onRailFocusConsumed,
+            topBar = topBar,
+            topBarRequester = topBarRequester,
+            focusTopBar = focusTopBar,
+            preferTopBarFocus = preferTopBarFocus,
+            onTopBarFocusConsumed = onTopBarFocusConsumed,
             )
         }
-    }
     }
 }
 
@@ -225,17 +216,18 @@ private fun HomeContent(
     onRemoveMyList: (CatalogItem) -> Unit,
     onMarkUpNextWatched: (CatalogItem, Episode) -> Unit,
     onRemoveUpNext: (CatalogItem, Episode) -> Unit,
-    railRequester: FocusRequester,
-    focusRail: () -> Unit,
-    preferRailFocus: Boolean,
-    onRailFocusConsumed: () -> Unit,
+    topBar: @Composable (Modifier) -> Unit,
+    topBarRequester: FocusRequester,
+    focusTopBar: () -> Unit,
+    preferTopBarFocus: Boolean,
+    onTopBarFocusConsumed: () -> Unit,
 ) {
     var inRows by rememberSaveable { mutableStateOf(rows.any { it.style == RowStyle.CONTINUE }) }
     var topFocus by rememberSaveable { mutableStateOf(TopFocus.HERO) }
     val saveable = rememberSaveableStateHolder()
     // Swapping the rows view and the billboard disposes the focused item, and the new view only
     // requests focus a frame later. Park focus on this holder meanwhile; otherwise it falls to the
-    // navigation rail, which expands and collapses visibly.
+    // top bar and the screen jumps.
     var parkingFocus by remember { mutableStateOf(false) }
     val parkingRequester = remember { FocusRequester() }
     fun switchView(change: () -> Unit) {
@@ -282,10 +274,11 @@ private fun HomeContent(
                 onItemClick = onItemClick,
                 onOpenCategory = onOpenCategory,
                 onEnterRows = { if (rows.isNotEmpty()) switchView { inRows = true } },
-                railRequester = railRequester,
-                focusRail = focusRail,
-                preferRailFocus = preferRailFocus,
-                onRailFocusConsumed = onRailFocusConsumed,
+                topBar = topBar,
+                topBarRequester = topBarRequester,
+                focusTopBar = focusTopBar,
+                preferTopBarFocus = preferTopBarFocus,
+                onTopBarFocusConsumed = onTopBarFocusConsumed,
             )
         }
     }
@@ -300,19 +293,21 @@ private fun Billboard(
     onItemClick: (CatalogItem) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onEnterRows: () -> Unit,
-    railRequester: FocusRequester,
-    focusRail: () -> Unit,
-    preferRailFocus: Boolean,
-    onRailFocusConsumed: () -> Unit,
+    topBar: @Composable (Modifier) -> Unit,
+    topBarRequester: FocusRequester,
+    focusTopBar: () -> Unit,
+    preferTopBarFocus: Boolean,
+    onTopBarFocusConsumed: () -> Unit,
 ) {
     val heroRequester = remember { FocusRequester() }
     val chipsRequester = remember { FocusRequester() }
+    var topBarFocused by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         when {
-            preferRailFocus -> {
-                focusRail()
-                onRailFocusConsumed()
+            preferTopBarFocus -> {
+                focusTopBar()
+                onTopBarFocusConsumed()
             }
             initialFocus == TopFocus.HERO && featured.isNotEmpty() -> heroRequester.requestFocusWithRetry()
             else -> chipsRequester.requestFocusWithRetry()
@@ -321,30 +316,40 @@ private fun Billboard(
     Box(
         Modifier
             .fillMaxSize()
-            .background(AppColors.Background),
+            .background(AppColors.Background)
+            .onBackKey(enabled = !topBarFocused) { focusTopBar() },
     ) {
         if (featured.isNotEmpty()) {
-            // The hero starts after the collapsed rail so Left/Right move geometrically between them.
             FeaturedCarousel(
                 items = featured,
                 onOpen = onItemClick,
-                contentStart = RailContentStart - RailCollapsedWidth,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = RailCollapsedWidth)
                     .focusRequester(heroRequester)
                     .focusProperties {
-                        left = railRequester
+                        up = topBarRequester
                         down = chipsRequester
                     }
                     .onFocusChanged { if (it.isFocused) onFocusChange(TopFocus.HERO) },
             )
         }
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(112.dp)
+                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.75f), 1f to Color.Transparent)),
+        )
+        topBar(
+            Modifier
+                .align(Alignment.TopCenter)
+                .onFocusChanged { topBarFocused = it.hasFocus },
+        )
         CategoryChips(
             categories = categories,
             onOpen = onOpenCategory,
             requester = chipsRequester,
-            upRequester = if (featured.isNotEmpty()) heroRequester else FocusRequester.Default,
+            upRequester = if (featured.isNotEmpty()) heroRequester else topBarRequester,
             onFocused = { onFocusChange(TopFocus.CHIPS) },
             onDown = onEnterRows,
             modifier = Modifier
@@ -387,7 +392,6 @@ internal fun RowsBrowser(
         }
     }
 
-    val contentStart = LocalContentStart.current
     val restoreRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         restoreRequester.requestFocusWithRetry()
@@ -420,7 +424,7 @@ internal fun RowsBrowser(
                 Modifier
                     .fillMaxWidth()
                     .height(140.dp)
-                    .padding(start = contentStart, top = 24.dp, end = 320.dp),
+                    .padding(start = ContentStart, top = 24.dp, end = 320.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 header?.let {
@@ -579,11 +583,10 @@ private fun CatalogRowView(
     onUpNextMenu: (Int, CatalogItem, Episode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val contentStart = LocalContentStart.current
     Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.padding(start = contentStart, top = 22.dp),
+            modifier = Modifier.padding(start = ContentStart, top = 22.dp),
         ) {
             Text(
                 text = row.title,
@@ -600,12 +603,11 @@ private fun CatalogRowView(
             }
         }
         key(shouldLoop(row.items.size)) {
-            ProvidePivotScroll(leading = contentStart + 3.dp) {
+            ProvidePivotScroll(leading = ContentStart + 3.dp) {
                 LazyRow(
                     state = rememberLoopingRowState(row.items.size),
-                    contentPadding = PaddingValues(horizontal = contentStart, vertical = 12.dp),
-                    // Top 10 needs at least 12 dp so the previous card ends inside the opaque part of the rail scrim.
-                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 12.dp else 16.dp),
+                    contentPadding = PaddingValues(horizontal = ContentStart, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 16.dp),
                 ) {
                     loopingItems(row.items) { virtual, index, item ->
                         val itemModifier = if (keyOf(row, virtual) == focusKey) Modifier.focusRequester(restoreRequester) else Modifier
@@ -822,7 +824,7 @@ private fun ColumnScope.BillboardSkeleton() {
             .graphicsLayer { this.alpha = alpha }
             .background(Brush.verticalGradient(listOf(AppColors.BackgroundRaised, AppColors.Background))),
     ) {
-        Column(Modifier.align(Alignment.BottomStart).padding(start = LocalContentStart.current, bottom = 40.dp)) {
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 40.dp)) {
             Box(Modifier.width(320.dp).height(42.dp).background(SkeletonColor, AppShapes.Badge))
             Spacer(Modifier.height(14.dp))
             Box(Modifier.width(340.dp).height(16.dp).background(SkeletonColor, AppShapes.Badge))
@@ -834,7 +836,7 @@ private fun ColumnScope.BillboardSkeleton() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = LocalContentStart.current, top = 10.dp, bottom = 16.dp)
+            .padding(start = 48.dp, top = 10.dp, bottom = 16.dp)
             .graphicsLayer { this.alpha = alpha },
     ) {
         repeat(8) { index ->
@@ -850,14 +852,13 @@ private fun ColumnScope.BillboardSkeleton() {
 
 @Composable
 internal fun HomeSkeleton() {
-    val contentStart = LocalContentStart.current
     val alpha = delayedSkeletonAlpha() * skeletonPulse()
     Column(
         Modifier
             .fillMaxSize()
             .background(AppColors.Background)
             .graphicsLayer { this.alpha = alpha }
-            .padding(start = contentStart, top = 140.dp),
+            .padding(start = ContentStart, top = 140.dp),
     ) {
         repeat(2) {
             Box(
