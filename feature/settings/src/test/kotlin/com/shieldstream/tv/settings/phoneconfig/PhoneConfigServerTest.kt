@@ -50,7 +50,14 @@ class PhoneConfigServerTest {
         client.newCall(Request.Builder().url("${connection.displayUrl}/logo.png").build()).execute().use { response ->
             assertEquals(200, response.code)
             assertEquals("image/png", response.header("Content-Type"))
-            assertTrue(response.body!!.bytes().isNotEmpty())
+            val body = response.body!!.bytes()
+            assertTrue(body.isNotEmpty())
+            assertEquals(
+                "The page background is #101119, so the logo must be transparent (RGBA) " +
+                    "instead of an opaque dark tile that disappears into it",
+                6,
+                body.pngColorType(),
+            )
         }
         client.newCall(Request.Builder().url("${connection.displayUrl}/api/config").build()).execute().use { response ->
             assertEquals(401, response.code)
@@ -131,3 +138,6 @@ class PhoneConfigServerTest {
         addons = emptyList(),
     )
 }
+
+/** PNG IHDR colour type: 6 means truecolour with alpha. Read from byte 25 of the file. */
+private fun ByteArray.pngColorType(): Int = this[25].toInt() and 0xFF
