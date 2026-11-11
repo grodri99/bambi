@@ -13,7 +13,6 @@
     <string name="details_following">Siguiendo</string>
     <string name="details_follow">Seguir</string>
     <string name="details_1_season">1 temporada</string>
-    <string name="details_pick_an_episode_or_press_play_hold">Elige un episodio o pulsa Reproducir · mantén OK en un episodio para marcarlo visto</string>
     <string name="details_finding_sources">Buscando fuentes…</string>
     <string name="details_no_spanish_sources_available_for_this_profile">No hay fuentes en español para este perfil</string>
     <string name="details_already_in_your_real_debrid">ya en tu Real-Debrid</string>
@@ -38,6 +37,12 @@
     <string name="details_play_episode">Reproducir%1$s</string>
     <string name="details_season_watched">T%1$d vista</string>
     <string name="details_mark_season_watched">Marcar T%1$d vista</string>
+    <string name="details_episode_watched">%1$s visto</string>
+    <string name="details_mark_episode_watched">Marcar %1$s visto</string>
+    <string name="details_episode_mark_watched">Marcar como visto</string>
+    <string name="details_episode_mark_unwatched">Marcar como no visto</string>
+    <string name="details_episode_play">Reproducir episodio</string>
+    <string name="details_hold_ok_for_episode_options">Mantén OK en un episodio para ver opciones</string>
     <string name="details_remaining">Quedan %1$s</string>
     <string name="details_rating">%1$d%% valoración</string>
     <string name="details_rate_movie">Valorar película</string>

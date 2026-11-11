@@ -127,6 +127,31 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun `reaching the end marks the item watched even without a reported duration`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(players, flowOf(40), SubtitlePreference.OFF)
+        fixture.viewModel.start()
+        yield()
+
+        players.listener(0).onPlaybackStateChanged(Player.STATE_ENDED)
+
+        verify(exactly = 1) { fixture.watchProgress.save("movie:1", 1L, 1L, "source") }
+    }
+
+    @Test
+    fun `reaching the end marks the item watched with the known duration`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(players, flowOf(40), SubtitlePreference.OFF)
+        fixture.viewModel.start()
+        yield()
+        every { players.player(0).duration } returns 120_000L
+
+        players.listener(0).onPlaybackStateChanged(Player.STATE_ENDED)
+
+        verify(exactly = 1) { fixture.watchProgress.save("movie:1", 120_000L, 120_000L, "source") }
+    }
+
+    @Test
     fun `subtitle appearance updates immediately and persists normalized values`() = runBlocking {
         val fixture = fixture(FakePlayers(Tracks.EMPTY), flowOf(40), SubtitlePreference.OFF)
         val requested = SubtitleAppearance(

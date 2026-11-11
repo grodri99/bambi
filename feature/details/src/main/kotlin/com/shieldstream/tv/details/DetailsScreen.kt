@@ -175,9 +175,11 @@ private fun DetailsContent(
     var panelOpen by remember { mutableStateOf(false) }
     var actionsOpen by remember { mutableStateOf(false) }
     var ratingTarget by remember { mutableStateOf<TraktRatingTarget?>(null) }
-    BackHandler(enabled = actionsOpen || !panelOpen) {
+    var episodeMenu by remember { mutableStateOf<Episode?>(null) }
+    BackHandler(enabled = actionsOpen || episodeMenu != null || !panelOpen) {
         when {
             ratingTarget != null -> ratingTarget = null
+            episodeMenu != null -> episodeMenu = null
             else -> when (detailsBackAction(actionsOpen, panelOpen)) {
                 DetailsBackAction.DISMISS_ACTIONS -> actionsOpen = false
                 DetailsBackAction.DISMISS_SOURCES -> panelOpen = false
@@ -191,8 +193,8 @@ private fun DetailsContent(
         withFrameNanos { }
         runCatching { playRequester.requestFocus() }
     }
-    LaunchedEffect(panelOpen, actionsOpen) {
-        if (!panelOpen && !actionsOpen) {
+    LaunchedEffect(panelOpen, actionsOpen, episodeMenu) {
+        if (!panelOpen && !actionsOpen && episodeMenu == null) {
             withFrameNanos { }
             runCatching { playRequester.requestFocus() }
         }
@@ -232,7 +234,7 @@ private fun DetailsContent(
             InfoBlock(
                 details = state.details,
                 state = state,
-                interactive = !panelOpen && !actionsOpen,
+                interactive = !panelOpen && !actionsOpen && episodeMenu == null,
                 playRequester = playRequester,
                 onPlay = { viewModel.play() },
                 onPlayFromStart = { viewModel.play(fromStart = true) },
@@ -248,10 +250,10 @@ private fun DetailsContent(
                 Spacer(Modifier.height(12.dp))
                 SeasonsAndEpisodes(
                     state = state,
-                    interactive = !panelOpen && !actionsOpen,
+                    interactive = !panelOpen && !actionsOpen && episodeMenu == null,
                     onSeason = { viewModel.selectSeason(it) },
                     onEpisode = { viewModel.playEpisode(it) },
-                    onEpisodeLongPress = { viewModel.toggleEpisodeWatched(it) },
+                    onEpisodeLongPress = { episodeMenu = it },
                 )
             }
         }
@@ -286,8 +288,16 @@ private fun DetailsContent(
                 )
                 else -> DetailsActions(
                     state = state,
-                    onToggleWatched = {
-                        if (state.isSeries) viewModel.toggleSeasonWatched() else viewModel.toggleMovieWatched()
+                    onToggleSeasonWatched = {
+                        viewModel.toggleSeasonWatched()
+                        actionsOpen = false
+                    },
+                    onToggleMovieWatched = {
+                        viewModel.toggleMovieWatched()
+                        actionsOpen = false
+                    },
+                    onToggleEpisodeWatched = { episode ->
+                        viewModel.toggleEpisodeWatched(episode)
                         actionsOpen = false
                     },
                     onToggleMyList = {
@@ -305,6 +315,22 @@ private fun DetailsContent(
                     onDismiss = { actionsOpen = false },
                 )
             }
+        }
+
+        episodeMenu?.let { episode ->
+            EpisodeActions(
+                state = state,
+                episode = episode,
+                onPlay = {
+                    episodeMenu = null
+                    viewModel.playEpisode(episode)
+                },
+                onToggleWatched = {
+                    viewModel.toggleEpisodeWatched(episode)
+                    episodeMenu = null
+                },
+                onDismiss = { episodeMenu = null },
+            )
         }
     }
 
@@ -445,7 +471,9 @@ private fun InfoBlock(
 @Composable
 private fun DetailsActions(
     state: DetailsUiState.Content,
-    onToggleWatched: () -> Unit,
+    onToggleSeasonWatched: () -> Unit,
+    onToggleMovieWatched: () -> Unit,
+    onToggleEpisodeWatched: (Episode) -> Unit,
     onToggleMyList: () -> Unit,
     onToggleFollowing: () -> Unit,
     onRate: (TraktRatingTarget) -> Unit,
@@ -461,20 +489,42 @@ private fun DetailsActions(
         onDismiss = onDismiss,
     ) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val watchedLabel = watchedLabel(state)
-                if (watchedLabel != null) {
+                val episodeAction = episodeWatchedAction(state)
+                val seasonLabel = if (state.isSeries) seasonWatchedLabel(state) else null
+                // Exactly one card owns the requester: a FocusRequester attached to two nodes throws.
+                val primary = Modifier.focusRequester(requester)
+                val watchedCardShown = !state.isSeries || episodeAction != null || seasonLabel != null
+                if (state.isSeries) {
+                    if (episodeAction != null) {
+                        DetailsActionCard(
+                            text = episodeWatchedLabel(episodeAction.episode, episodeAction.watched),
+                            icon = if (episodeAction.watched) AppIcons.Check else LineIcons.Eye,
+                            onClick = { onToggleEpisodeWatched(episodeAction.episode) },
+                            modifier = primary,
+                        )
+                    }
+                    if (seasonLabel != null) {
+                        DetailsActionCard(
+                            text = seasonLabel,
+                            icon = if (seasonAllWatched(state)) AppIcons.Check else LineIcons.Eye,
+                            onClick = onToggleSeasonWatched,
+                            modifier = if (episodeAction == null) primary else Modifier,
+                        )
+                    }
+                } else {
+                    val watched = state.mainProgress?.isWatched == true
                     DetailsActionCard(
-                        text = watchedLabel,
-                        icon = if (watchedDone(state)) AppIcons.Check else LineIcons.Eye,
-                        onClick = onToggleWatched,
-                        modifier = Modifier.focusRequester(requester),
+                        text = localizedStringResource(if (watched) StringsR.string.details_watched else StringsR.string.details_mark_watched),
+                        icon = if (watched) AppIcons.Check else LineIcons.Eye,
+                        onClick = onToggleMovieWatched,
+                        modifier = primary,
                     )
                 }
                 DetailsActionCard(
                     text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
                     icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
                     onClick = onToggleMyList,
-                    modifier = if (watchedLabel == null) Modifier.focusRequester(requester) else Modifier,
+                    modifier = if (watchedCardShown) Modifier else primary,
                 )
                 if (state.isSeries) {
                     DetailsActionCard(
@@ -514,6 +564,58 @@ private fun DetailsActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) = ActionDockCard(text = text, icon = icon, onClick = onClick, modifier = modifier)
+
+/**
+ * Long-press on an episode card opens this modal instead of silently toggling the watched flag: the
+ * gesture had no feedback, so an accidental hold could mark or unmark an episode with no way to tell.
+ */
+@Composable
+private fun EpisodeActions(
+    state: DetailsUiState.Content,
+    episode: Episode,
+    onPlay: () -> Unit,
+    onToggleWatched: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { requester.requestFocus() }
+    }
+    val watched = state.progressOf(episode)?.isWatched == true
+    BottomActionDialog(
+        title = listOf(episode.localizedCode(), episode.title).filter { it.isNotBlank() }.joinToString(" · "),
+        onDismiss = onDismiss,
+        scrimAlpha = 0.88f,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TvButton(
+                text = localizedStringResource(StringsR.string.details_episode_play),
+                icon = AppIcons.Play,
+                onClick = onPlay,
+                modifier = Modifier.focusRequester(requester),
+            )
+            TvButton(
+                text = localizedStringResource(
+                    if (episodeMenuTogglesToWatched(state, episode)) {
+                        StringsR.string.details_episode_mark_watched
+                    } else {
+                        StringsR.string.details_episode_mark_unwatched
+                    },
+                ),
+                icon = if (watched) AppIcons.Check else LineIcons.Eye,
+                onClick = onToggleWatched,
+            )
+            TvButton(
+                text = localizedStringResource(StringsR.string.details_cancel),
+                onClick = onDismiss,
+            )
+        }
+    }
+}
 
 @Composable
 private fun RatingPickerDialog(
@@ -688,27 +790,43 @@ private fun ratingTargetLabel(state: DetailsUiState.Content, target: TraktRating
 
 private fun ratingSuffix(rating: Int?): String = rating?.let { " · $it/10" }.orEmpty()
 
-@Composable
-private fun watchedLabel(state: DetailsUiState.Content): String? {
-    if (!state.isSeries) {
-        return localizedStringResource(
-            if (state.mainProgress?.isWatched == true) StringsR.string.details_watched else StringsR.string.details_mark_watched,
-        )
-    }
-    val season = state.selectedSeason
+internal data class EpisodeWatchedAction(val episode: Episode, val watched: Boolean)
+
+/**
+ * The episode the dock can mark watched: the one currently selected. [EpisodeWatchedAction.watched] mirrors
+ * [WatchProgress.isWatched] so the action reads "watched" or "mark watched" for that single episode.
+ */
+internal fun episodeWatchedAction(state: DetailsUiState.Content): EpisodeWatchedAction? {
+    if (!state.isSeries) return null
+    val episode = state.selectedEpisode ?: return null
+    return EpisodeWatchedAction(episode, state.progressOf(episode)?.isWatched == true)
+}
+
+internal fun seasonAllWatched(state: DetailsUiState.Content): Boolean {
     val episodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
-    if (season == null || episodes.isEmpty()) return null
-    return if (episodes.all { state.progressOf(it)?.isWatched == true }) {
+    return episodes.isNotEmpty() && episodes.all { state.progressOf(it)?.isWatched == true }
+}
+
+/** What the long-press modal's toggle will do: unwatched episodes get marked, watched ones unmarked. */
+internal fun episodeMenuTogglesToWatched(state: DetailsUiState.Content, episode: Episode): Boolean =
+    state.progressOf(episode)?.isWatched != true
+
+@Composable
+private fun episodeWatchedLabel(episode: Episode, watched: Boolean): String = localizedStringResource(
+    if (watched) StringsR.string.details_episode_watched else StringsR.string.details_mark_episode_watched,
+    episode.localizedCode(),
+)
+
+@Composable
+private fun seasonWatchedLabel(state: DetailsUiState.Content): String? {
+    val season = state.selectedSeason ?: return null
+    val episodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+    if (episodes.isEmpty()) return null
+    return if (seasonAllWatched(state)) {
         localizedStringResource(StringsR.string.details_season_watched, season)
     } else {
         localizedStringResource(StringsR.string.details_mark_season_watched, season)
     }
-}
-
-private fun watchedDone(state: DetailsUiState.Content): Boolean {
-    if (!state.isSeries) return state.mainProgress?.isWatched == true
-    val episodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
-    return episodes.isNotEmpty() && episodes.all { state.progressOf(it)?.isWatched == true }
 }
 
 @Composable
@@ -869,6 +987,14 @@ private fun SeasonsAndEpisodes(
                     )
                 }
             }
+        }
+        if (loadedEpisodes.isNotEmpty()) {
+            Text(
+                text = localizedStringResource(StringsR.string.details_hold_ok_for_episode_options),
+                color = Color.White.copy(alpha = 0.38f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 56.dp),
+            )
         }
         when (val eps = state.episodes) {
             EpisodesState.Loading -> Text(localizedStringResource(StringsR.string.details_loading_episodes), color = Grey, modifier = Modifier.padding(start = 56.dp))

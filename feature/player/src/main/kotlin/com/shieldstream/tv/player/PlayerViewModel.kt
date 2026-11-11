@@ -393,10 +393,7 @@ class PlayerViewModel @Inject constructor(
         val next = nextSnapshot ?: return
         if (wentNext) return
         wentNext = true
-        progressKey?.let { key ->
-            val duration = _player.value?.duration ?: 0L
-            if (duration > 0) watchProgress.save(key, duration, duration, currentSourceId)
-        }
+        markCurrentFinished()
         scrobble(ScrobbleAction.STOP, fraction = 1f)
         holder.requestNext(next)
         _nextUp.value = NextUpUiState.Hidden
@@ -436,6 +433,19 @@ class PlayerViewModel @Inject constructor(
         val duration = p.duration
         val position = p.currentPosition
         if (duration > 0 && position > 0) watchProgress.save(key, position, duration, currentSourceId)
+    }
+
+    /**
+     * Playback reached the end (or moved on to the next episode), so the item is watched even when the
+     * container reported no usable duration. Falling back to the previous duration (or 1 ms) keeps the saved
+     * `fraction` at 1f, which is what [com.shieldstream.tv.model.WatchProgress.isWatched] reads.
+     */
+    private fun markCurrentFinished() {
+        val key = progressKey ?: return
+        val known = _player.value?.duration?.takeIf { it > 0 }
+            ?: watchProgress.get(key)?.durationMs?.takeIf { it > 1 }
+        val duration = known ?: 1L
+        watchProgress.save(key, duration, duration, currentSourceId)
     }
 
     fun onStop() {
@@ -561,9 +571,7 @@ class PlayerViewModel @Inject constructor(
                         if (checkErrorSlate(player)) return
                     }
                     if (playbackState == Player.STATE_ENDED) {
-                        val key = progressKey ?: return
-                        val duration = player.duration
-                        if (duration > 0) watchProgress.save(key, duration, duration, currentSourceId)
+                        markCurrentFinished()
                         scrobble(ScrobbleAction.STOP, fraction = 1f)
                         if (!nextUpDismissed && autoNext.value) playNextNow()
                     }

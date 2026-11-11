@@ -13,7 +13,6 @@
     <string name="details_following">Following</string>
     <string name="details_follow">Follow</string>
     <string name="details_1_season">1 season</string>
-    <string name="details_pick_an_episode_or_press_play_hold">Pick an episode or press Play · hold OK on an episode to mark it watched</string>
     <string name="details_finding_sources">Finding sources…</string>
     <string name="details_no_spanish_sources_available_for_this_profile">No Spanish sources available for this profile</string>
     <string name="details_already_in_your_real_debrid">already in your Real-Debrid</string>
@@ -38,6 +37,12 @@
     <string name="details_play_episode">Play%1$s</string>
     <string name="details_season_watched">S%1$d watched</string>
     <string name="details_mark_season_watched">Mark S%1$d watched</string>
+    <string name="details_episode_watched">%1$s watched</string>
+    <string name="details_mark_episode_watched">Mark %1$s watched</string>
+    <string name="details_episode_mark_watched">Mark as watched</string>
+    <string name="details_episode_mark_unwatched">Mark as unwatched</string>
+    <string name="details_episode_play">Play episode</string>
+    <string name="details_hold_ok_for_episode_options">Hold OK on an episode for options</string>
     <string name="details_remaining">%1$s left</string>
     <string name="details_rating">%1$d%% rating</string>
     <string name="details_rate_movie">Rate movie</string>
