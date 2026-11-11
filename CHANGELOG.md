@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.20] - 2026-11-11
+
+### Fixed
+
+- **Missing logo:** the logo assets shipped in 1.0.19 were opaque near-black tiles, so they disappeared against the dark backgrounds of the phone configuration page, the setup screens and the profile picker. They are now transparent, so the mark shows wherever it is drawn.
+
 ## [1.0.19] - 2026-11-11
 
 ### Added
