@@ -55,9 +55,9 @@ import com.shieldstream.tv.domain.StremioAddon
 import com.shieldstream.tv.domain.StremioAddonMetadata
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
-import com.shieldstream.tv.ui.component.ActionDockCard
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import com.shieldstream.tv.ui.component.ActionMenuItem
 import com.shieldstream.tv.ui.component.AppIcons
-import com.shieldstream.tv.ui.component.BottomActionDialog
 import com.shieldstream.tv.ui.component.LineIcons
 import com.shieldstream.tv.ui.component.ProvideMinimalScroll
 import com.shieldstream.tv.ui.component.TvButton
@@ -79,16 +79,10 @@ fun AddonsScreen(
     val metadata by viewModel.metadata.collectAsStateWithLifecycle()
     var actionsFor by remember { mutableStateOf<StremioAddon?>(null) }
     val firstRequester = remember { FocusRequester() }
-    val replaceRequester = remember { FocusRequester() }
     LaunchedEffect(actionsFor, editor) {
+        if (actionsFor != null || editor != null) return@LaunchedEffect
         withFrameNanos { }
-        runCatching {
-            when {
-                editor != null -> Unit
-                actionsFor != null -> replaceRequester.requestFocus()
-                else -> firstRequester.requestFocus()
-            }
-        }
+        runCatching { firstRequester.requestFocus() }
     }
     Box(
         Modifier
@@ -145,39 +139,37 @@ fun AddonsScreen(
             }
         }
         actionsFor?.let { addon ->
-            BottomActionDialog(
+            ActionMenuDialog(
                 title = metadata[addon.id]?.name?.takeUnless { it.isBlank() } ?: addon.host,
                 onDismiss = { actionsFor = null },
                 scrimAlpha = 0.94f,
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionDockCard(
+                actions = listOf(
+                    ActionMenuItem(
                         text = localizedStringResource(StringsR.string.settings_test_addon),
                         icon = AppIcons.Bolt,
-                        modifier = Modifier.focusRequester(replaceRequester),
                         onClick = {
                             actionsFor = null
                             viewModel.test(addon.id)
                         },
-                    )
-                    ActionDockCard(
+                    ),
+                    ActionMenuItem(
                         text = localizedStringResource(StringsR.string.settings_replace_manifest),
                         icon = AppIcons.Edit,
                         onClick = {
                             actionsFor = null
                             viewModel.openEditor(addon.id)
                         },
-                    )
-                    ActionDockCard(
+                    ),
+                    ActionMenuItem(
                         text = localizedStringResource(StringsR.string.settings_remove_addon),
-                        icon = LineIcons.Close,
+                        icon = LineIcons.Delete,
                         onClick = {
                             actionsFor = null
                             viewModel.remove(addon.id)
                         },
-                    )
-                }
-            }
+                    ),
+                ),
+            )
         }
         editor?.let { state ->
             AddonEditorDialog(

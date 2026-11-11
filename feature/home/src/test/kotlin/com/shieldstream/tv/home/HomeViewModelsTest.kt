@@ -528,6 +528,29 @@ class HomeViewModelsTest {
     }
 
     @Test
+    fun `home my list row supports item actions and removes the selected item`() = runTest {
+        val movie = item("movie", MediaType.MOVIE, "Movie")
+        val myList = mockk<MyListRepository> {
+            every { entries } returns MutableStateFlow(listOf(MyListEntry(MediaType.MOVIE, movie.id, addedAt = 100)))
+            every { remove(any(), any()) } returns Unit
+        }
+        val viewModel = homeViewModel(
+            catalog = catalog(movie),
+            trakt = mockk(relaxed = true),
+            active = profileFlow(traktUser = null),
+            myList = myList,
+        )
+
+        viewModel.load(HomeFilter.ALL)
+        advanceUntilIdle()
+
+        val row = (viewModel.uiState.value as HomeUiState.Content).rows.single { it.id == "my_list" }
+        assertEquals(RowStyle.MY_LIST, row.style)
+        viewModel.removeFromMyList(movie)
+        verify(exactly = 1) { myList.remove(MediaType.MOVIE, movie.id) }
+    }
+
+    @Test
     fun `up next focus key follows show identity after reordering`() {
         val first = item("first", MediaType.TV, "First")
         val second = item("second", MediaType.TV, "Second")
@@ -634,6 +657,7 @@ class HomeViewModelsTest {
         progress: Map<String, WatchProgress> = emptyMap(),
         watchProgress: WatchProgressRepository? = null,
         episodeTracking: EpisodeTrackingRepository = tracking(),
+        myList: MyListRepository? = null,
         rowItemLimit: MutableStateFlow<Int> = MutableStateFlow(SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT),
     ) = HomeViewModel(
         catalogRepository = catalog,
@@ -641,7 +665,7 @@ class HomeViewModelsTest {
         episodeReleases = mockk(),
         tracking = episodeTracking,
         settings = homeSettings(rowItemLimit),
-        myList = mockk { every { entries } returns MutableStateFlow(emptyList()) },
+        myList = myList ?: mockk { every { entries } returns MutableStateFlow(emptyList()) },
         profiles = mockk { every { this@mockk.active } returns active },
         trakt = trakt,
         texts = mockk(relaxed = true),

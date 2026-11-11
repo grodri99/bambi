@@ -50,6 +50,7 @@ fun CategoryScreen(
                 rows = s.rows,
                 onItemClick = onItemClick,
                 onRemoveContinue = {},
+                onRemoveMyList = {},
                 onExitTop = null,
                 onBack = onBack,
                 header = category.localizedTitle(),

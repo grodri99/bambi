@@ -38,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.CatalogItem
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import com.shieldstream.tv.ui.component.ActionMenuItem
+import com.shieldstream.tv.ui.component.AppIcons
+import com.shieldstream.tv.ui.component.LineIcons
 import com.shieldstream.tv.ui.component.PosterCard
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
@@ -50,6 +54,8 @@ fun MyListScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cardRequester = remember { FocusRequester() }
     var lastCardKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var cardToRestore by remember { mutableStateOf<String?>(null) }
+    var menuItem by remember { mutableStateOf<CatalogItem?>(null) }
     LaunchedEffect(state is MyListUiState.Content) {
         if (state !is MyListUiState.Content || lastCardKey == null) return@LaunchedEffect
         withFrameNanos { }
@@ -58,8 +64,21 @@ fun MyListScreen(
             delay(60)
         }
     }
+    LaunchedEffect(cardToRestore) {
+        if (cardToRestore == null) return@LaunchedEffect
+        withFrameNanos { }
+        repeat(4) {
+            if (runCatching { cardRequester.requestFocus() }.isSuccess) {
+                cardToRestore = null
+                return@LaunchedEffect
+            }
+            delay(60)
+        }
+        cardToRestore = null
+    }
 
-    Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 36.dp, top = 24.dp)) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 36.dp, top = 24.dp)) {
         val currentSort = when (val s = state) {
             is MyListUiState.Content -> s.sort
             is MyListUiState.Empty -> s.sort
@@ -138,7 +157,7 @@ fun MyListScreen(
                         item = item,
                         onClick = { onItemClick(item) },
                         onFocused = { lastCardKey = item.key },
-                        onLongClick = { viewModel.remove(item) },
+                        onLongClick = { menuItem = item },
                         newEpisodeCount = s.newEpisodeCounts[item.key] ?: 0,
                         width = 140.dp,
                         modifier = if (item.key == lastCardKey) Modifier.focusRequester(cardRequester) else Modifier,
@@ -146,8 +165,46 @@ fun MyListScreen(
                 }
             }
         }
+        }
+        menuItem?.let { item ->
+            MyListActions(
+                item = item,
+                onDetails = {
+                    menuItem = null
+                    onItemClick(item)
+                },
+                onRemove = {
+                    val neighbour = (state as? MyListUiState.Content)?.items?.let { items ->
+                        val index = items.indexOfFirst { it.key == item.key }
+                        if (index < 0) null else items.getOrNull(index + 1) ?: items.getOrNull(index - 1)
+                    }
+                    lastCardKey = neighbour?.key
+                    cardToRestore = neighbour?.key
+                    menuItem = null
+                    viewModel.remove(item)
+                },
+                onCancel = { menuItem = null },
+            )
+        }
     }
 }
+
+@Composable
+internal fun MyListActions(
+    item: CatalogItem,
+    onDetails: () -> Unit,
+    onRemove: () -> Unit,
+    onCancel: () -> Unit,
+) = ActionMenuDialog(
+    title = item.title,
+    onDismiss = onCancel,
+    consumeOpeningKeyRelease = true,
+    actions = listOf(
+        ActionMenuItem(localizedStringResource(StringsR.string.home_cancel), LineIcons.Close, onCancel),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_view_details), AppIcons.List, onDetails),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_remove), LineIcons.Delete, onRemove),
+    ),
+)
 
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {

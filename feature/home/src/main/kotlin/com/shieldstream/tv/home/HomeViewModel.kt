@@ -2,6 +2,7 @@ package com.shieldstream.tv.home
 
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.Texts
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
@@ -93,7 +94,7 @@ class HomeViewModel @Inject constructor(
     private val episodeReleases: EpisodeReleaseRepository,
     private val tracking: EpisodeTrackingRepository,
     settings: SettingsRepository,
-    myList: MyListRepository,
+    private val myList: MyListRepository,
     profiles: ProfileRepository,
     private val trakt: TraktRepository,
     private val texts: Texts,
@@ -256,6 +257,8 @@ class HomeViewModel @Inject constructor(
                         profile.kids == query.kids
                     ) {
                         recommendationRows.value = result.rows
+                    } else {
+                        Log.d(TAG, "Ignoring stale recommendations for ${query.filter}")
                     }
                 }
         }
@@ -265,6 +268,8 @@ class HomeViewModel @Inject constructor(
         ContinueWatching.keysToRemove(watchProgress.progress.value, item.type, item.id)
             .forEach(watchProgress::clear)
     }
+
+    fun removeFromMyList(item: CatalogItem) = myList.remove(item.type, item.id)
 
     fun markUpNextWatched(item: CatalogItem, episode: Episode) {
         val key = com.shieldstream.tv.model.WatchProgress.episodeKey(item.id, episode.season, episode.number)
@@ -397,17 +402,46 @@ class HomeViewModel @Inject constructor(
             withTimeoutOrNull(5_000) { runCatching { catalogRepository.getItem(e.type, e.id) }.getOrNull() }
         }.filterNotNull()
         if (items.isEmpty()) return null
-        return CatalogRow(id = MY_LIST_ROW_ID, title = texts.get(StringsR.string.home_my_list_f0348a), items = items)
+        return CatalogRow(
+            id = MY_LIST_ROW_ID,
+            title = texts.get(StringsR.string.home_my_list_f0348a),
+            items = items,
+            style = RowStyle.MY_LIST,
+        )
     }
 
     private suspend fun buildRecommendationsRow(query: RecommendationQuery): CatalogRow? {
-        if (query.kids || query.traktUser == null) return null
+        Log.d(
+            TAG,
+            "Recommendations requested: filter=${query.filter}, connected=${query.traktUser != null}, kids=${query.kids}",
+        )
+        if (query.kids || query.traktUser == null) {
+            Log.d(TAG, "Recommendations hidden: profile is not eligible")
+            return null
+        }
+        val startedAt = System.currentTimeMillis()
         val entries = recommendationEntries(query).take(query.maxItems)
-        if (entries.isEmpty()) return null
+        if (entries.isEmpty()) {
+            Log.w(TAG, "Recommendations hidden: Trakt returned no usable ids for ${query.filter}")
+            return null
+        }
         val items = entries.mapConcurrent(concurrency = 4) { (type, id) ->
-            withTimeoutOrNull(5_000) { runCatching { catalogRepository.getItem(type, id) }.getOrNull() }
+            withTimeoutOrNull(5_000) {
+                runCatching { catalogRepository.getItem(type, id) }
+                    .onFailure { error ->
+                        Log.d(TAG, "Recommendation hydration failed for $type/$id: ${error.logSummary()}")
+                    }
+                    .getOrNull()
+            }
         }.filterNotNull()
-        if (items.isEmpty()) return null
+        if (items.isEmpty()) {
+            Log.w(TAG, "Recommendations hidden: none of ${entries.size} TMDB items hydrated")
+            return null
+        }
+        Log.d(
+            TAG,
+            "Recommendations ready: ${items.size}/${entries.size} items in ${System.currentTimeMillis() - startedAt} ms",
+        )
         return CatalogRow(
             id = RECOMMENDATIONS_ROW_ID,
             title = texts.get(StringsR.string.home_recommended_for_you),
@@ -416,9 +450,24 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recommendationEntries(query: RecommendationQuery): List<Pair<MediaType, String>> = coroutineScope {
-        suspend fun load(type: MediaType): List<String> = withTimeoutOrNull(5_000) {
-            runCatching { trakt.recommendations(query.profileId, type) }.getOrNull()
-        }.orEmpty()
+        suspend fun load(type: MediaType): List<String> {
+            val result = withTimeoutOrNull(5_000) {
+                runCatching { trakt.recommendations(query.profileId, type) }
+            }
+            return result?.fold(
+                onSuccess = { ids ->
+                    Log.d(TAG, "Trakt recommendations for $type: ${ids.size} ids")
+                    ids
+                },
+                onFailure = { error ->
+                    Log.w(TAG, "Trakt recommendations for $type failed: ${error.logSummary()}")
+                    emptyList()
+                },
+            ) ?: run {
+                Log.w(TAG, "Trakt recommendations for $type timed out")
+                emptyList()
+            }
+        }
 
         when (query.filter) {
             HomeFilter.MOVIES -> load(MediaType.MOVIE).map { MediaType.MOVIE to it }
@@ -458,7 +507,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun Throwable.logSummary() = "${javaClass.simpleName}: ${message ?: "no message"}"
+
     private companion object {
+        const val TAG = "HomeRows"
         const val CONTINUE_ROW_ID = "continue_watching"
         const val NEW_EPISODES_ROW_ID = "new_episodes"
         const val UP_NEXT_ROW_ID = "up_next"

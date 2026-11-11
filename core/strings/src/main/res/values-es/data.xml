@@ -9,10 +9,10 @@
     <string name="data_couldn_t_connect_check_your_connection">No se pudo conectar. Revisa la conexión.</string>
     <string name="data_couldn_t_verify">No se pudo comprobar</string>
     <string name="data_trending_today">Tendencias hoy</string>
-    <string name="data_top_10_movies_today">Top 10 películas hoy</string>
+    <string name="data_top_10_movies_week">Top 10 películas de la semana</string>
     <string name="data_popular_movies">Películas populares</string>
     <string name="data_popular_tv_shows">Series populares</string>
-    <string name="data_top_10_tv_shows_today">Top 10 series hoy</string>
+    <string name="data_top_10_tv_shows_week">Top 10 series de la semana</string>
     <string name="data_now_in_theaters">Estrenos en cines</string>
     <string name="data_action">Acción</string>
     <string name="data_sci_fi">Ciencia ficción</string>

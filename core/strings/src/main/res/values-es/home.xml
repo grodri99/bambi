@@ -8,7 +8,7 @@
     <string name="home_all">Todo</string>
     <string name="home_tv_shows">Series</string>
     <string name="home_movies">Películas</string>
-    <string name="home_hold_ok_to_remove">Mantén OK para quitar</string>
+    <string name="home_hold_ok_to_remove">Mantén OK para opciones</string>
     <string name="home_new_first">Nuevos primero</string>
     <string name="home_recent">Recientes</string>
     <string name="home_a_z">A–Z</string>
@@ -29,7 +29,7 @@
     <string name="home_hold_ok_to_dismiss">Mantén OK para descartar</string>
     <string name="home_next_30_days">Próximos 30 días</string>
     <string name="home_view_details">Ver detalles</string>
-    <string name="home_remove_from_continue_watching">Quitar de Seguir viendo</string>
+    <string name="home_remove">Quitar</string>
     <string name="home_cancel">Cancelar</string>
     <string name="home_exit_title">¿Salir de Franklix?</string>
     <string name="home_exit_confirm">Salir</string>
@@ -43,7 +43,6 @@
     <string name="home_new_episode">Nuevo episodio</string>
     <string name="home_new_season">Nueva temporada</string>
     <string name="home_mark_watched">Marcar como visto</string>
-    <string name="home_remove_from_up_next">Quitar de A continuación</string>
     <string name="home_couldn_t_load_the_catalog_check_your">No se pudo cargar el catálogo. Revisa la conexión.</string>
     <string name="home_error_loading_the_catalog">Error cargando el catálogo</string>
     <string name="home_search_error">Error en la búsqueda</string>

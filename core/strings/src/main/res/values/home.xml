@@ -8,7 +8,7 @@
     <string name="home_all">All</string>
     <string name="home_tv_shows">TV Shows</string>
     <string name="home_movies">Movies</string>
-    <string name="home_hold_ok_to_remove">Hold OK to remove</string>
+    <string name="home_hold_ok_to_remove">Hold OK for options</string>
     <string name="home_new_first">New first</string>
     <string name="home_recent">Recent</string>
     <string name="home_a_z">A–Z</string>
@@ -29,7 +29,7 @@
     <string name="home_hold_ok_to_dismiss">Hold OK to dismiss</string>
     <string name="home_next_30_days">Next 30 days</string>
     <string name="home_view_details">View details</string>
-    <string name="home_remove_from_continue_watching">Remove from Continue Watching</string>
+    <string name="home_remove">Remove</string>
     <string name="home_cancel">Cancel</string>
     <string name="home_exit_title">Exit Franklix?</string>
     <string name="home_exit_confirm">Exit</string>
@@ -43,7 +43,6 @@
     <string name="home_new_episode">New episode</string>
     <string name="home_new_season">New season</string>
     <string name="home_mark_watched">Mark watched</string>
-    <string name="home_remove_from_up_next">Remove from Up next</string>
     <string name="home_couldn_t_load_the_catalog_check_your">Couldn\'t load the catalog. Check your connection.</string>
     <string name="home_error_loading_the_catalog">Error loading the catalog</string>
     <string name="home_search_error">Search error</string>

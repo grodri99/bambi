@@ -9,10 +9,10 @@
     <string name="data_couldn_t_connect_check_your_connection">Couldn\'t connect. Check your connection.</string>
     <string name="data_couldn_t_verify">Couldn\'t verify</string>
     <string name="data_trending_today">Trending today</string>
-    <string name="data_top_10_movies_today">Top 10 movies today</string>
+    <string name="data_top_10_movies_week">Top 10 movies this week</string>
     <string name="data_popular_movies">Popular movies</string>
     <string name="data_popular_tv_shows">Popular TV shows</string>
-    <string name="data_top_10_tv_shows_today">Top 10 TV shows today</string>
+    <string name="data_top_10_tv_shows_week">Top 10 TV shows this week</string>
     <string name="data_now_in_theaters">Now in theaters</string>
     <string name="data_action">Action</string>
     <string name="data_sci_fi">Sci-fi</string>

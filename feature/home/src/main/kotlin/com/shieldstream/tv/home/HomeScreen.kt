@@ -74,7 +74,11 @@ import com.shieldstream.tv.strings.localizedCode
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.model.RowStyle
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import com.shieldstream.tv.ui.component.ActionMenuItem
+import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.ContinueCard
+import com.shieldstream.tv.ui.component.LineIcons
 import com.shieldstream.tv.ui.component.NewEpisodeCard
 import com.shieldstream.tv.ui.component.CatalogPosterCard
 import com.shieldstream.tv.ui.component.PosterWidth
@@ -90,6 +94,7 @@ import com.shieldstream.tv.ui.component.RailCollapsedWidth
 import com.shieldstream.tv.ui.component.RailContentStart
 import com.shieldstream.tv.ui.component.SoftBackdropImage
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
+import com.shieldstream.tv.ui.component.requestFocusWithRetry
 import com.shieldstream.tv.ui.component.shouldLoop
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
 import com.shieldstream.tv.ui.theme.LocalSoftBackdrops
@@ -188,6 +193,7 @@ fun HomeScreen(
             },
             onOpenCategory = onOpenCategory,
             onRemoveContinue = viewModel::removeFromContinue,
+            onRemoveMyList = viewModel::removeFromMyList,
             onMarkUpNextWatched = viewModel::markUpNextWatched,
             onRemoveUpNext = viewModel::removeUpNext,
             railRequester = railRequester,
@@ -201,7 +207,7 @@ fun HomeScreen(
 }
 
 private enum class TopFocus { HERO, CHIPS }
-private data class ContinueMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem)
+private data class ItemMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem)
 private data class UpNextMenu(val row: CatalogRow, val virtual: Int, val item: CatalogItem, val episode: Episode)
 private data class PendingFocus(val rowId: String, val itemKey: String?, val fallbackKey: String)
 
@@ -216,6 +222,7 @@ private fun HomeContent(
     onUpNextClick: (CatalogItem, Episode) -> Unit,
     onOpenCategory: (Category) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
+    onRemoveMyList: (CatalogItem) -> Unit,
     onMarkUpNextWatched: (CatalogItem, Episode) -> Unit,
     onRemoveUpNext: (CatalogItem, Episode) -> Unit,
     railRequester: FocusRequester,
@@ -233,8 +240,10 @@ private fun HomeContent(
     val parkingRequester = remember { FocusRequester() }
     fun switchView(change: () -> Unit) {
         parkingFocus = true
-        runCatching { parkingRequester.requestFocus() }
         change()
+    }
+    LaunchedEffect(parkingFocus) {
+        if (parkingFocus) runCatching { parkingRequester.requestFocus() }
     }
     Box(
         Modifier
@@ -252,6 +261,7 @@ private fun HomeContent(
                 onNewEpisodeClick = onNewEpisodeClick,
                 onUpNextClick = onUpNextClick,
                 onRemoveContinue = onRemoveContinue,
+                onRemoveMyList = onRemoveMyList,
                 onMarkUpNextWatched = onMarkUpNextWatched,
                 onRemoveUpNext = onRemoveUpNext,
                 onExitTop = {
@@ -304,8 +314,8 @@ private fun Billboard(
                 focusRail()
                 onRailFocusConsumed()
             }
-            initialFocus == TopFocus.HERO && featured.isNotEmpty() -> runCatching { heroRequester.requestFocus() }
-            else -> runCatching { chipsRequester.requestFocus() }
+            initialFocus == TopFocus.HERO && featured.isNotEmpty() -> heroRequester.requestFocusWithRetry()
+            else -> chipsRequester.requestFocusWithRetry()
         }
     }
     Box(
@@ -350,6 +360,7 @@ internal fun RowsBrowser(
     rows: List<CatalogRow>,
     onItemClick: (CatalogItem) -> Unit,
     onRemoveContinue: (CatalogItem) -> Unit,
+    onRemoveMyList: (CatalogItem) -> Unit,
     onExitTop: (() -> Unit)?,
     onNewEpisodeClick: ((CatalogItem, Episode) -> Unit)? = null,
     onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)? = null,
@@ -364,7 +375,8 @@ internal fun RowsBrowser(
     var restoreKey by remember { mutableStateOf(Snapshot.withoutReadObservation { validKey(savedFocus.value) }) }
     var lastVerticalRepeat by remember { mutableStateOf(0L) }
     var pendingFocus by remember { mutableStateOf<PendingFocus?>(null) }
-    var continueMenu by remember { mutableStateOf<ContinueMenu?>(null) }
+    var continueMenu by remember { mutableStateOf<ItemMenu?>(null) }
+    var myListMenu by remember { mutableStateOf<ItemMenu?>(null) }
     var upNextMenu by remember { mutableStateOf<UpNextMenu?>(null) }
 
     var hero by remember { mutableStateOf(Snapshot.withoutReadObservation { findByKey(rows, restoreKey) ?: rows.first().items.first() }) }
@@ -378,8 +390,7 @@ internal fun RowsBrowser(
     val contentStart = LocalContentStart.current
     val restoreRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { restoreRequester.requestFocus() }
+        restoreRequester.requestFocusWithRetry()
     }
     LaunchedEffect(rows) {
         val pending = pendingFocus ?: return@LaunchedEffect
@@ -387,8 +398,7 @@ internal fun RowsBrowser(
             ?.let { itemKey -> focusKeyForItem(rows, pending.rowId, itemKey) }
             ?: pending.fallbackKey
         savedFocus.value = restoreKey
-        withFrameNanos { }
-        runCatching { restoreRequester.requestFocus() }
+        restoreRequester.requestFocusWithRetry()
         pendingFocus = null
     }
 
@@ -441,7 +451,8 @@ internal fun RowsBrowser(
                             onNewEpisodeClick = onNewEpisodeClick,
                             onContinueClick = onContinueClick,
                             onUpNextClick = onUpNextClick,
-                            onContinueMenu = { virtual, item -> continueMenu = ContinueMenu(row, virtual, item) },
+                            onContinueMenu = { virtual, item -> continueMenu = ItemMenu(row, virtual, item) },
+                            onMyListMenu = { virtual, item -> myListMenu = ItemMenu(row, virtual, item) },
                             onUpNextMenu = { virtual, item, episode -> upNextMenu = UpNextMenu(row, virtual, item, episode) },
                             modifier = if (rowIndex == 0 && onExitTop != null) {
                                 Modifier.onPreviewKeyEvent { event ->
@@ -473,6 +484,21 @@ internal fun RowsBrowser(
                     continueMenu = null
                 },
                 onCancel = { continueMenu = null },
+            )
+        }
+        myListMenu?.let { menu ->
+            MyListActions(
+                item = menu.item,
+                onDetails = {
+                    myListMenu = null
+                    onItemClick(menu.item)
+                },
+                onRemove = {
+                    pendingFocus = PendingFocus(menu.row.id, itemKey = null, fallbackKey = neighbourKey(rows, menu.row, menu.virtual))
+                    onRemoveMyList(menu.item)
+                    myListMenu = null
+                },
+                onCancel = { myListMenu = null },
             )
         }
         upNextMenu?.let { menu ->
@@ -508,33 +534,16 @@ private fun ContinueActions(
     onDetails: () -> Unit,
     onRemove: () -> Unit,
     onCancel: () -> Unit,
-) {
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { requester.requestFocus() }
-    }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.82f))
-            .onBackKey(enabled = true, onBack = onCancel),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier
-                .width(360.dp)
-                .background(AppColors.Surface, AppShapes.Control)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.fillMaxWidth().focusRequester(requester))
-            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_continue_watching), onClick = onRemove, modifier = Modifier.fillMaxWidth())
-            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
+) = ActionMenuDialog(
+    title = item.title,
+    onDismiss = onCancel,
+    consumeOpeningKeyRelease = true,
+    actions = listOf(
+        ActionMenuItem(localizedStringResource(StringsR.string.home_cancel), LineIcons.Close, onCancel),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_view_details), AppIcons.List, onDetails),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_remove), LineIcons.Delete, onRemove),
+    ),
+)
 
 @Composable
 private fun UpNextActions(
@@ -543,34 +552,17 @@ private fun UpNextActions(
     onMarkWatched: () -> Unit,
     onRemove: () -> Unit,
     onCancel: () -> Unit,
-) {
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { requester.requestFocus() }
-    }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.82f))
-            .onBackKey(enabled = true, onBack = onCancel),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier
-                .width(360.dp)
-                .background(AppColors.Surface, AppShapes.Control)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(item.title, color = Color.White, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            TvButton(text = localizedStringResource(StringsR.string.home_view_details), onClick = onDetails, modifier = Modifier.focusRequester(requester))
-            TvButton(text = localizedStringResource(StringsR.string.home_mark_watched), onClick = onMarkWatched)
-            TvButton(text = localizedStringResource(StringsR.string.home_remove_from_up_next), onClick = onRemove)
-            TvButton(text = localizedStringResource(StringsR.string.home_cancel), onClick = onCancel)
-        }
-    }
-}
+) = ActionMenuDialog(
+    title = item.title,
+    onDismiss = onCancel,
+    consumeOpeningKeyRelease = true,
+    actions = listOf(
+        ActionMenuItem(localizedStringResource(StringsR.string.home_cancel), LineIcons.Close, onCancel),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_view_details), AppIcons.List, onDetails),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_mark_watched), LineIcons.Eye, onMarkWatched),
+        ActionMenuItem(localizedStringResource(StringsR.string.home_remove), LineIcons.Delete, onRemove),
+    ),
+)
 
 @Composable
 private fun CatalogRowView(
@@ -583,6 +575,7 @@ private fun CatalogRowView(
     onContinueClick: ((CatalogItem, ContinueInfo) -> Unit)?,
     onUpNextClick: ((CatalogItem, Episode) -> Unit)?,
     onContinueMenu: (Int, CatalogItem) -> Unit,
+    onMyListMenu: (Int, CatalogItem) -> Unit,
     onUpNextMenu: (Int, CatalogItem, Episode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -597,7 +590,7 @@ private fun CatalogRowView(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White.copy(alpha = 0.92f),
             )
-            if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT) {
+            if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT || row.style == RowStyle.MY_LIST) {
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
@@ -621,6 +614,14 @@ private fun CatalogRowView(
                                 item = item,
                                 onClick = { onItemClick(item) },
                                 onFocused = { onFocused(virtual) },
+                                newEpisodeCount = row.newEpisodeCounts[item.key] ?: 0,
+                                modifier = itemModifier,
+                            )
+                            RowStyle.MY_LIST -> CatalogPosterCard(
+                                item = item,
+                                onClick = { onItemClick(item) },
+                                onFocused = { onFocused(virtual) },
+                                onLongClick = { onMyListMenu(virtual, item) },
                                 newEpisodeCount = row.newEpisodeCounts[item.key] ?: 0,
                                 modifier = itemModifier,
                             )

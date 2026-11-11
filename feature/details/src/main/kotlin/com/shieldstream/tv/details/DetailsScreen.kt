@@ -89,6 +89,8 @@ import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
 import com.shieldstream.tv.ui.component.ActionDockCard
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import com.shieldstream.tv.ui.component.ActionMenuItem
 import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.BottomActionDialog
 import com.shieldstream.tv.ui.component.LineIcons
@@ -577,28 +579,16 @@ private fun EpisodeActions(
     onToggleWatched: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { requester.requestFocus() }
-    }
     val watched = state.progressOf(episode)?.isWatched == true
-    BottomActionDialog(
+    ActionMenuDialog(
         title = listOf(episode.localizedCode(), episode.title).filter { it.isNotBlank() }.joinToString(" · "),
         onDismiss = onDismiss,
         scrimAlpha = 0.88f,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TvButton(
-                text = localizedStringResource(StringsR.string.details_episode_play),
-                icon = AppIcons.Play,
-                onClick = onPlay,
-                modifier = Modifier.focusRequester(requester),
-            )
-            TvButton(
+        consumeOpeningKeyRelease = true,
+        actions = listOf(
+            ActionMenuItem(localizedStringResource(StringsR.string.details_cancel), LineIcons.Close, onDismiss),
+            ActionMenuItem(localizedStringResource(StringsR.string.details_episode_play), AppIcons.Play, onPlay),
+            ActionMenuItem(
                 text = localizedStringResource(
                     if (episodeMenuTogglesToWatched(state, episode)) {
                         StringsR.string.details_episode_mark_watched
@@ -608,13 +598,9 @@ private fun EpisodeActions(
                 ),
                 icon = if (watched) AppIcons.Check else LineIcons.Eye,
                 onClick = onToggleWatched,
-            )
-            TvButton(
-                text = localizedStringResource(StringsR.string.details_cancel),
-                onClick = onDismiss,
-            )
-        }
-    }
+            ),
+        ),
+    )
 }
 
 @Composable

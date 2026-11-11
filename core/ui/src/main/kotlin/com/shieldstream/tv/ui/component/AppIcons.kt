@@ -130,6 +130,7 @@ object LineIcons {
         "M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.46,13.97L5.82,21Z",
     )
     val Close = line("line_close", "M6,6L18,18M18,6L6,18")
+    val Delete = line("line_delete", "M4,7H20M9,7V4H15V7M6,7L7,21H17L18,7M10,11V17M14,11V17")
     val Exit = line("line_exit", "M10,5H5V19H10M14,8L18,12L14,16M18,12H9")
     val Bookmark = line("line_bookmark", "M7,4H17a1,1 0,0 1,1,1V20L12,16L6,20V5a1,1 0,0 1,1,-1Z")
     val Settings = line(

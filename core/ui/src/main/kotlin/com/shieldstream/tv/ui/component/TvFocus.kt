@@ -7,16 +7,23 @@ import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -61,6 +68,33 @@ fun ProvideMinimalScroll(margin: Dp = 0.dp, content: @Composable () -> Unit) {
     val px = with(LocalDensity.current) { margin.toPx() }
     val spec = remember(px) { MinimalBringIntoViewSpec(px) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
+}
+
+/** Requests focus after layout and tolerates a target that is still being attached during a view swap. */
+suspend fun FocusRequester.requestFocusWithRetry() {
+    withFrameNanos { }
+    repeat(4) { attempt ->
+        if (runCatching { requestFocus() }.getOrDefault(false)) return
+        if (attempt < 3) delay(60)
+    }
+}
+
+/**
+ * Consumes the OK release that opened a long-press overlay, before it can click its focused action.
+ * The next OK press is delivered normally.
+ */
+@Composable
+fun Modifier.consumeInitialConfirmationKeyUp(): Modifier {
+    var waitingForInitialKeyUp by remember { mutableStateOf(true) }
+    return onPreviewKeyEvent { event ->
+        val confirmationKey = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+        if (waitingForInitialKeyUp && confirmationKey && event.type == KeyEventType.KeyUp) {
+            waitingForInitialKeyUp = false
+            true
+        } else {
+            false
+        }
+    }
 }
 
 fun Modifier.onBackKey(enabled: Boolean, onBack: () -> Unit): Modifier = onKeyEvent { event ->

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -16,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -42,12 +46,14 @@ fun BottomActionDialog(
     modifier: Modifier = Modifier,
     scrimAlpha: Float = 0.82f,
     bottomPadding: Dp = 44.dp,
+    consumeOpeningKeyRelease: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
         modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = scrimAlpha))
+            .then(if (consumeOpeningKeyRelease) Modifier.consumeInitialConfirmationKeyUp() else Modifier)
             .onBackKey(enabled = true, onBack = onDismiss),
         contentAlignment = Alignment.BottomCenter,
     ) {
@@ -65,6 +71,47 @@ fun BottomActionDialog(
                 textAlign = TextAlign.Center,
             )
             content()
+        }
+    }
+}
+
+data class ActionMenuItem(
+    val text: String,
+    val icon: ImageVector?,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Standard bottom action menu. [consumeOpeningKeyRelease] is only for menus opened by long-press;
+ * normal-click menus must deliver their first intentional OK press.
+ */
+@Composable
+fun ActionMenuDialog(
+    title: String,
+    actions: List<ActionMenuItem>,
+    onDismiss: () -> Unit,
+    scrimAlpha: Float = 0.82f,
+    consumeOpeningKeyRelease: Boolean = false,
+) {
+    val firstActionRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        firstActionRequester.requestFocusWithRetry()
+    }
+    BottomActionDialog(
+        title = title,
+        onDismiss = onDismiss,
+        scrimAlpha = scrimAlpha,
+        consumeOpeningKeyRelease = consumeOpeningKeyRelease,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            actions.forEachIndexed { index, action ->
+                ActionDockCard(
+                    text = action.text,
+                    icon = action.icon,
+                    onClick = action.onClick,
+                    modifier = if (index == 0) Modifier.focusRequester(firstActionRequester) else Modifier,
+                )
+            }
         }
     }
 }

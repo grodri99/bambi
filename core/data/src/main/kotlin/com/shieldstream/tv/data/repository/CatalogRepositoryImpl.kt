@@ -123,11 +123,10 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private fun rowsFor(filter: HomeFilter): List<RowSpec> = when (filter) {
         HomeFilter.ALL -> listOf(
-            RowSpec("trending", texts.get(StringsR.string.data_trending_today)) { tmdb.trendingAll(key).results.mapNotNull { it.toCatalogItemOrNull() } },
-            RowSpec("top10_movies", texts.get(StringsR.string.data_top_10_movies_today), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("top10_movies", texts.get(StringsR.string.data_top_10_movies_week), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("popular_movies", texts.get(StringsR.string.data_popular_movies)) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("popular_tv", texts.get(StringsR.string.data_popular_tv_shows)) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
-            RowSpec("top10_tv", texts.get(StringsR.string.data_top_10_tv_shows_today), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("top10_tv", texts.get(StringsR.string.data_top_10_tv_shows_week), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
             RowSpec("now_playing", texts.get(StringsR.string.data_now_in_theaters)) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("action", texts.get(StringsR.string.data_action)) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
             RowSpec("scifi", texts.get(StringsR.string.data_sci_fi)) { tmdb.discoverMovies(key, "878").results.map { it.toCatalogItem() } },
@@ -136,7 +135,7 @@ class CatalogRepositoryImpl @Inject constructor(
             RowSpec("top_tv", texts.get(StringsR.string.data_acclaimed_tv_shows)) { tmdb.topRatedTv(key).results.map { it.toCatalogItem() } },
         )
         HomeFilter.MOVIES -> listOf(
-            RowSpec("m_top10", texts.get(StringsR.string.data_top_10_movies_today), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
+            RowSpec("m_top10", texts.get(StringsR.string.data_top_10_movies_week), RowStyle.TOP10) { tmdb.trendingMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("m_popular", texts.get(StringsR.string.data_popular)) { tmdb.popularMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("m_now", texts.get(StringsR.string.data_now_in_theaters)) { tmdb.nowPlayingMovies(key).results.map { it.toCatalogItem() } },
             RowSpec("m_action", texts.get(StringsR.string.data_action)) { tmdb.discoverMovies(key, "28").results.map { it.toCatalogItem() } },
@@ -148,7 +147,7 @@ class CatalogRepositoryImpl @Inject constructor(
             RowSpec("m_top", texts.get(StringsR.string.data_critically_acclaimed)) { tmdb.topRatedMovies(key).results.map { it.toCatalogItem() } },
         )
         HomeFilter.TV -> listOf(
-            RowSpec("t_top10", texts.get(StringsR.string.data_top_10_tv_shows_today), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
+            RowSpec("t_top10", texts.get(StringsR.string.data_top_10_tv_shows_week), RowStyle.TOP10) { tmdb.trendingTv(key).results.map { it.toCatalogItem() } },
             RowSpec("t_popular", texts.get(StringsR.string.data_popular)) { tmdb.popularTv(key).results.map { it.toCatalogItem() } },
             RowSpec("t_drama", "Dramas") { tmdb.discoverTv(key, "18").results.map { it.toCatalogItem() } },
             RowSpec("t_crime", texts.get(StringsR.string.data_crime)) { tmdb.discoverTv(key, "80").results.map { it.toCatalogItem() } },
