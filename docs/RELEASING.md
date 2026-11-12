@@ -1,5 +1,18 @@
 # Publicar una actualización
 
+## Cómo se publica Bambi ahora
+
+1. Sube `versionCode` y `versionName` en `app/build.gradle.kts` y haz push a `main` con el tag `vX.Y.Z`.
+2. Compila el APK público **sin claves**: crea en la raíz un archivo `.public_build` con el contenido `1` (está en
+   `.gitignore`) y compila la release. Así no lleva ni las claves iniciales, ni el secreto de Trakt, ni la configuración
+   de Ithil, aunque estén en `local.properties`. Después pon `0` en `.public_build` para volver a las compilaciones
+   de casa.
+3. Crea el Release `vX.Y.Z` en GitHub y adjunta ese APK. El actualizador de la app busca `Bambi.apk` y, si no lo
+   encuentra, cualquier `.apk` del Release.
+
+## Workflow automático (opcional, solo a mano)
+
+
 El workflow `.github/workflows/release.yml` publica un GitHub Release con el asset `Bambi.apk`, que es el nombre que busca el actualizador de la app.
 
 ## Requisitos
