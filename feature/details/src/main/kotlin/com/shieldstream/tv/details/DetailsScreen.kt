@@ -2,6 +2,7 @@ package com.shieldstream.tv.details
 
 import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.ui.theme.AppShapes
+
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.domain.SourceProvider
@@ -38,6 +39,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -103,7 +105,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import java.util.Locale
 
-private val Green = AppColors.Success
+private val Green = Color(0xFF46D369)
 private val Grey = Color(0xFFB3B3B3)
 private val WatchedCountColor = Color.White.copy(alpha = 0.75f)
 
@@ -152,7 +154,7 @@ fun DetailsScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenHidden() }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onScreenResumed() }
 
-    Box(Modifier.fillMaxSize().background(AppColors.Background)) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val s = state) {
             DetailsUiState.Loading -> CircularProgressIndicator(
                 color = Color.White,
@@ -231,7 +233,7 @@ private fun DetailsContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = if (state.isSeries) 24.dp else 44.dp, bottom = 72.dp),
+                .padding(top = 44.dp, bottom = 72.dp),
         ) {
             InfoBlock(
                 details = state.details,
@@ -249,7 +251,7 @@ private fun DetailsContent(
             )
 
             if (state.isSeries) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(28.dp))
                 SeasonsAndEpisodes(
                     state = state,
                     interactive = !panelOpen && !actionsOpen && episodeMenu == null,
@@ -364,12 +366,12 @@ private fun InfoBlock(
                 contentDescription = item.title,
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                modifier = Modifier.heightIn(max = if (state.isSeries) 80.dp else 110.dp).widthIn(max = 420.dp),
+                modifier = Modifier.heightIn(max = 110.dp).widthIn(max = 420.dp),
             )
         } else {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -380,7 +382,7 @@ private fun InfoBlock(
         MetaRow(details, state)
         if (details.genres.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
-            Text(details.genres.take(3).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
+            Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
         }
         details.nextEpisode?.let { next ->
             val nextCode = next.localizedCode()
@@ -393,7 +395,7 @@ private fun InfoBlock(
             Text(
                 text = localizedStringResource(StringsR.string.details_coming_soon, release),
                 color = Color.White,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -403,7 +405,7 @@ private fun InfoBlock(
             text = item.overview.ifBlank { details.tagline.orEmpty() },
             color = Color.White.copy(alpha = 0.9f),
             style = MaterialTheme.typography.bodyLarge,
-            maxLines = if (state.isSeries) 2 else 3,
+            maxLines = 4,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(20.dp))
@@ -757,7 +759,7 @@ private fun RatingStarsControl(
         Text(
             text = localizedStringResource(StringsR.string.details_rating_value, value),
             color = if (focused) Color.White else Grey,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         )
     }
 }
@@ -823,7 +825,7 @@ private fun MetaRow(details: CatalogDetails, state: DetailsUiState.Content) {
             Text(
                 text = localizedStringResource(StringsR.string.details_rating, (it * 10).toInt()),
                 color = Green,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             )
             Spacer(Modifier.width(14.dp))
         }
@@ -857,9 +859,9 @@ private fun Badge(text: String) {
     Text(
         text = text,
         color = Color.White,
-        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
         modifier = Modifier
-            .border(1.dp, Color.White.copy(alpha = 0.6f), AppShapes.Badge)
+            .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
             .padding(horizontal = 6.dp, vertical = 1.dp),
     )
 }
@@ -962,7 +964,7 @@ private fun SeasonsAndEpisodes(
                 Text(
                     text = localizedStringResource(StringsR.string.details_episodes),
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 )
                 if (loadedEpisodes.isNotEmpty()) {
                     Spacer(Modifier.width(12.dp))
@@ -1023,11 +1025,12 @@ private fun SeasonChip(label: String, selected: Boolean, enabled: Boolean, onCli
             selected -> Color.White
             else -> Color.White.copy(alpha = 0.75f)
         },
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
         modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
-            .clip(AppShapes.Pill)
+            .clip(RoundedCornerShape(20.dp))
             .background(bg)
+            .then(if (!focused && !selected) Modifier.border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(20.dp)) else Modifier)
             .tvClickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 7.dp),
     )
@@ -1045,7 +1048,7 @@ private fun EpisodeCard(
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "episodeScale")
-    val shape = AppShapes.Control
+    val shape = RoundedCornerShape(6.dp)
     Column(
         Modifier
             .width(200.dp)
@@ -1060,7 +1063,7 @@ private fun EpisodeCard(
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .clip(shape)
-                .background(AppColors.Placeholder)
+                .background(Color(0xFF232327))
                 .then(if (focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
                 .then(if (enabled) Modifier.tvClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.tvClickable(enabled = false) {}),
@@ -1079,11 +1082,11 @@ private fun EpisodeCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .size(26.dp)
-                        .clip(AppShapes.Pill)
+                        .clip(RoundedCornerShape(13.dp))
                         .background(Color.Black.copy(alpha = 0.75f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("✓", color = Green, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("✓", color = Green, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                 }
             } else if (progress != null && progress.fraction > 0.01f) {
                 WatchBar(
@@ -1096,7 +1099,7 @@ private fun EpisodeCard(
             }
             if (focused || loading) {
                 Box(
-                    Modifier.align(Alignment.Center).size(44.dp).clip(AppShapes.Pill)
+                    Modifier.align(Alignment.Center).size(44.dp).clip(RoundedCornerShape(22.dp))
                         .background(Color.Black.copy(alpha = 0.6f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1112,7 +1115,7 @@ private fun EpisodeCard(
         Text(
             text = "${episode.number}. ${episode.title}",
             color = if (selected || focused) Color.White else Color.White.copy(alpha = 0.8f),
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1190,7 +1193,7 @@ private fun SourcesPanel(
                 Text(
                     text = localizedStringResource(StringsR.string.details_choose_a_source),
                     color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.weight(1f),
                 )
                 SpanishOnlyChip(enabled = spanishOnly, onClick = onToggleSpanishOnly)
@@ -1286,7 +1289,7 @@ private fun SourcePanelChip(text: String, highlighted: Boolean, onClick: () -> U
     Text(
         text = text,
         color = if (focused) Color.Black else Color.White,
-        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
         modifier = Modifier
             .background(
                 when {
@@ -1294,7 +1297,7 @@ private fun SourcePanelChip(text: String, highlighted: Boolean, onClick: () -> U
                     highlighted -> Color.White.copy(alpha = 0.22f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
-                AppShapes.Pill,
+                RoundedCornerShape(50),
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
@@ -1310,12 +1313,12 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .background(if (focused) Color.White else Color.White.copy(alpha = 0.10f), AppShapes.Control)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+        Text(name, color = color, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
         val secondary = if (focused) Color.Black.copy(alpha = 0.7f) else Grey
         Text(
             note ?: localizedStringResource(StringsR.string.details_source_count, count),
@@ -1345,7 +1348,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
-            .clip(AppShapes.Control)
+            .clip(RoundedCornerShape(6.dp))
             .background(if (focused) Color.White else Color.White.copy(alpha = 0.06f))
             .tvClickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1379,7 +1382,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
                         }
                     },
                     color = fg,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -1402,14 +1405,14 @@ private fun WatchBar(fraction: Float, modifier: Modifier = Modifier) {
     Box(
         modifier
             .height(4.dp)
-            .clip(AppShapes.Pill)
+            .clip(RoundedCornerShape(2.dp))
             .background(Color.White.copy(alpha = 0.3f)),
     ) {
         Box(
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(AppColors.Accent),
+                .background(Color(0xFFE50914)),
         )
     }
 }

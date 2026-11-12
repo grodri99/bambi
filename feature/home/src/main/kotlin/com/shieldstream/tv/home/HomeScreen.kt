@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.Crossfade
+import com.shieldstream.tv.ui.theme.DisplayFont
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -61,7 +64,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.CatalogItem
@@ -85,7 +88,7 @@ import com.shieldstream.tv.ui.component.PosterWidth
 import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.Top10Card
 import com.shieldstream.tv.ui.component.TvButton
-import com.shieldstream.tv.ui.component.UpNextCard
+import com.shieldstream.tv.ui.component.LabeledPosterCard
 import com.shieldstream.tv.ui.component.firstVirtualIndex
 import com.shieldstream.tv.ui.component.formatEpisodeDate
 import com.shieldstream.tv.ui.component.loopingItems
@@ -107,7 +110,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import java.util.Locale
 
 private val ContentStart = AppSpacing.ScreenEdge
-private val RowBackground = AppColors.Background
+private val RowBackground = Color.Black
 
 internal enum class UpNextBadge { UP_NEXT, NEW_EPISODE, NEW_SEASON }
 
@@ -223,7 +226,8 @@ private fun HomeContent(
     preferTopBarFocus: Boolean,
     onTopBarFocusConsumed: () -> Unit,
 ) {
-    var inRows by rememberSaveable { mutableStateOf(rows.any { it.style == RowStyle.CONTINUE }) }
+    // Como en Bambi: el Inicio arranca en la portada (destacados + categorías); ▼ baja a las filas.
+    var inRows by rememberSaveable { mutableStateOf(false) }
     var topFocus by rememberSaveable { mutableStateOf(TopFocus.HERO) }
     val saveable = rememberSaveableStateHolder()
     // Swapping the rows view and the billboard disposes the focused item, and the new view only
@@ -314,38 +318,31 @@ private fun Billboard(
             else -> chipsRequester.requestFocusWithRetry()
         }
     }
-    Box(
+    Column(
         Modifier
             .fillMaxSize()
-            .background(AppColors.Background)
+            .background(BillboardBackground)
             .onBackKey(enabled = !topBarFocused) { focusTopBar() },
     ) {
+        topBar(Modifier.onFocusChanged { topBarFocused = it.hasFocus })
         if (featured.isNotEmpty()) {
             FeaturedCarousel(
                 items = featured,
                 onOpen = onItemClick,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
                     .focusRequester(heroRequester)
+                    // ▲ desde la portada → la pestaña activa del menú (no la más cercana).
+                    // ▼ → el botón de categoría recordado, no el "más cercano" geométricamente.
                     .focusProperties {
                         up = topBarRequester
                         down = chipsRequester
                     }
                     .onFocusChanged { if (it.isFocused) onFocusChange(TopFocus.HERO) },
             )
+        } else {
+            Spacer(Modifier.weight(1f))
         }
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(112.dp)
-                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.75f), 1f to Color.Transparent)),
-        )
-        topBar(
-            Modifier
-                .align(Alignment.TopCenter)
-                .onFocusChanged { topBarFocused = it.hasFocus },
-        )
         CategoryChips(
             categories = categories,
             onOpen = onOpenCategory,
@@ -353,10 +350,7 @@ private fun Billboard(
             upRequester = if (featured.isNotEmpty()) heroRequester else topBarRequester,
             onFocused = { onFocusChange(TopFocus.CHIPS) },
             onDown = onEnterRows,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f)))
-                .padding(bottom = 6.dp),
+            modifier = Modifier.padding(bottom = 6.dp),
         )
     }
 }
@@ -424,24 +418,21 @@ internal fun RowsBrowser(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
+                    .height(236.dp)
                     .padding(start = ContentStart, top = 24.dp, end = 320.dp),
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 header?.let {
                     Text(
                         text = it.uppercase(Lang.locale),
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.12.em,
-                        ),
-                        color = AppColors.Highlight,
-                        modifier = Modifier.padding(bottom = 6.dp),
+                        fontFamily = DisplayFont,
+                        fontSize = 30.sp,
+                        color = AppColors.Accent,
                     )
                 }
                 HeroInfo(item = hero)
             }
-            ProvidePivotScroll(leading = 46.dp) {
+            ProvidePivotScroll(leading = 51.dp) {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(bottom = 260.dp),
@@ -587,28 +578,28 @@ private fun CatalogRowView(
     Column(modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.padding(start = ContentStart, top = 22.dp),
+            modifier = Modifier.padding(start = ContentStart, top = 4.dp),
         ) {
             Text(
                 text = row.title,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White.copy(alpha = 0.92f),
+                color = Color.White,
             )
             if (row.style == RowStyle.CONTINUE || row.style == RowStyle.UP_NEXT || row.style == RowStyle.MY_LIST) {
-                Spacer(Modifier.width(12.dp))
                 Text(
-                    text = localizedStringResource(StringsR.string.home_hold_ok_for_options),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.38f),
+                    text = "   " + localizedStringResource(StringsR.string.home_hold_ok_for_options),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.45f),
                 )
             }
         }
         key(shouldLoop(row.items.size)) {
-            ProvidePivotScroll(leading = ContentStart + 3.dp) {
+            // + 6 dp: lo que crece por cada lado el póster enfocado; así su borde sigue alineado con el título.
+            ProvidePivotScroll(leading = ContentStart + 6.dp) {
                 LazyRow(
                     state = rememberLoopingRowState(row.items.size),
-                    contentPadding = PaddingValues(horizontal = ContentStart, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 16.dp),
+                    contentPadding = PaddingValues(horizontal = ContentStart, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (row.style == RowStyle.TOP10) 6.dp else 12.dp),
                 ) {
                     loopingItems(row.items) { virtual, index, item ->
                         val itemModifier = if (keyOf(row, virtual) == focusKey) Modifier.focusRequester(restoreRequester) else Modifier
@@ -689,19 +680,18 @@ private fun CatalogRowView(
                                         modifier = itemModifier,
                                     )
                                 } else {
-                                    UpNextCard(
+                                    // Bambi: póster con la etiqueta (A continuación / Nuevo episodio) y el capítulo abajo.
+                                    LabeledPosterCard(
                                         item = item,
-                                        episode = episode,
-                                        label = episodeLabel,
-                                        releaseLabel = releaseLabel,
-                                        badgeText = badgeText,
+                                        badge = badgeText,
+                                        badgeDot = upNextBadge(info) != UpNextBadge.UP_NEXT,
+                                        label = listOf(episodeLabel, releaseLabel).filter { it.isNotEmpty() }.joinToString("\n"),
                                         onClick = {
                                             if (onUpNextClick == null) onItemClick(item)
                                             else onUpNextClick(item, episode)
                                         },
                                         onLongClick = { onUpNextMenu(virtual, item, episode) },
                                         onFocused = { onFocused(virtual) },
-                                        highlightBadge = upNextBadge(info) != UpNextBadge.UP_NEXT,
                                         modifier = itemModifier,
                                     )
                                 }
@@ -722,40 +712,40 @@ private fun CatalogRowView(
     }
 }
 
+/** Backdrop del título enfocado, arriba a la derecha, fundido a negro por la izquierda y por abajo. */
 @Composable
 private fun HeroBackdrop(item: CatalogItem) {
     Box(Modifier.fillMaxSize()) {
-        // Softened by default so the rows, not the artwork, carry the screen. The featured carousel
-        // stays sharp either way.
-        item.backdropUrl?.let { url ->
-            if (LocalSoftBackdrops.current) {
-                SoftBackdropImage(url = url, modifier = Modifier.fillMaxSize())
-            } else {
-                AsyncImage(
-                    // The soft path decodes at 320 px, so resolution only matters for sharp backdrops.
-                    model = BackdropUrls.fullScreen(url, lightweight = false, highRes = LocalHighResBackdrops.current),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        val area = Modifier.align(Alignment.TopEnd).fillMaxWidth(0.74f).fillMaxHeight(0.70f)
+        val url = BackdropUrls.fullScreen(item.backdropUrl, lightweight = false, highRes = LocalHighResBackdrops.current)
+        Crossfade(targetState = url, animationSpec = tween(450), label = "heroBackdrop", modifier = area) { u ->
+            if (u != null) {
+                if (LocalSoftBackdrops.current) {
+                    SoftBackdropImage(url = u, modifier = Modifier.fillMaxSize())
+                } else {
+                    AsyncImage(
+                        model = u,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
         Box(
-            Modifier.fillMaxSize().background(
+            area.background(
                 Brush.horizontalGradient(
-                    0f to AppColors.Background,
-                    0.28f to AppColors.Background,
-                    0.52f to AppColors.Background.copy(alpha = 0.72f),
-                    0.72f to Color.Transparent,
+                    0f to Color.Black,
+                    0.30f to Color.Black.copy(alpha = 0.55f),
+                    0.65f to Color.Transparent,
                 ),
             ),
         )
         Box(
-            Modifier.fillMaxSize().background(
+            area.background(
                 Brush.verticalGradient(
-                    0.40f to Color.Transparent,
-                    0.72f to AppColors.Background.copy(alpha = 0.25f),
-                    1f to AppColors.Background,
+                    0.45f to Color.Transparent,
+                    1f to Color.Black,
                 ),
             ),
         )
@@ -767,16 +757,25 @@ private fun HeroInfo(item: CatalogItem) {
     Column {
         Text(
             text = item.title,
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = metaLine(item),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = Color(0xFF46D369),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = item.overview,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.62f),
+            color = Color.White.copy(alpha = 0.85f),
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 520.dp),
         )
     }
 }
@@ -788,8 +787,8 @@ private fun metaLine(item: CatalogItem): String = buildList {
     item.rating?.takeIf { it > 0f }?.let { add("★ " + String.format(Lang.locale, "%.1f", it)) }
 }.joinToString("  ·  ")
 
-private val BillboardBackground = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
-private val SkeletonColor = AppColors.Placeholder
+private val BillboardBackground = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
+private val SkeletonColor = Color(0xFF1C1E2A)
 
 @Composable
 private fun delayedSkeletonAlpha(): Float {

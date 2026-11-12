@@ -1,7 +1,5 @@
 package com.shieldstream.tv.ui.component
 
-import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -59,8 +58,8 @@ private fun MediaBadge(text: String, icon: ImageVector, accent: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .background(accent.copy(alpha = 0.20f), AppShapes.Badge)
-            .border(1.dp, accent.copy(alpha = 0.58f), AppShapes.Badge)
+            .background(accent.copy(alpha = 0.20f), RoundedCornerShape(5.dp))
+            .border(1.dp, accent.copy(alpha = 0.58f), RoundedCornerShape(5.dp))
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
         Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(12.dp))
@@ -79,12 +78,11 @@ private fun hdrIcon(type: HdrType): ImageVector = if (type == HdrType.DOLBY_VISI
 
 private fun hdrColor(type: HdrType): Color = if (type == HdrType.DOLBY_VISION) BadgeColors.DolbyVision else BadgeColors.Hdr
 
-// Monochrome: every badge shares one neutral treatment; only software decoding keeps a warning hue.
 private object BadgeColors {
-    val Neutral = Color(0xFFC8C8CC)
-    val Hdr = Neutral
-    val DolbyVision = Neutral
-    val Codec = Neutral
-    val Hardware = Neutral
-    val Software = AppColors.Warning
+    val Neutral = Color(0xFFB8BBC8)
+    val Hdr = Color(0xFF66B5FF)
+    val DolbyVision = Color(0xFFC49AFF)
+    val Codec = Color(0xFF65D8D0)
+    val Hardware = Color(0xFF65D98A)
+    val Software = Color(0xFFF5B83D)
 }

@@ -1,7 +1,5 @@
 package com.shieldstream.tv.settings
 
-import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.ui.platform.LocalContext
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
@@ -31,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -86,12 +85,12 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import com.shieldstream.tv.ui.theme.DisplayFont
 
-private val Background = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
-private val Panel = AppColors.Surface
+private val Background = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
+private val Panel = Color(0xFF1A1C27)
 private val Muted = Color.White.copy(alpha = 0.62f)
-private val Green = AppColors.Success
-private val Red = AppColors.Error
-private val Accent = AppColors.Accent
+private val Green = Color(0xFF46D369)
+private val Red = Color(0xFFFF5A5F)
+private val Accent = Color(0xFFE50914)
 
 @Composable
 fun SetupScreen(
@@ -234,7 +233,7 @@ private fun SetupHeader(step: SetupStep) {
                         Modifier
                             .width(36.dp)
                             .height(5.dp)
-                            .background(if (i <= n) Accent else Color.White.copy(alpha = 0.18f), AppShapes.Pill),
+                            .background(if (i <= n) Accent else Color.White.copy(alpha = 0.18f), RoundedCornerShape(3.dp)),
                     )
                 }
             }
@@ -295,28 +294,23 @@ private fun RowScope.WelcomeTile(number: String, title: String, subtitle: String
         modifier = Modifier
             .weight(1f)
             .height(84.dp)
-            .background(Panel, AppShapes.Control)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Control)
+            .background(Panel, RoundedCornerShape(14.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         StepNumber(number)
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = Color.White)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Muted)
         }
     }
 }
 
 @Composable
-private fun StepNumber(
-    text: String,
-    color: Color = Accent,
-    size: Dp = 30.dp,
-    contentColor: Color = AppColors.OnAccent,
-) {
+private fun StepNumber(text: String, color: Color = Accent, size: Dp = 30.dp) {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(size).background(color, CircleShape)) {
-        Text(text, fontFamily = DisplayFont, fontSize = (size.value * 0.6f).sp, color = contentColor)
+        Text(text, fontFamily = DisplayFont, fontSize = (size.value * 0.6f).sp, color = Color.White)
     }
 }
 
@@ -457,11 +451,11 @@ private fun SetupChoice(
     Column(
         modifier = modifier
             .height(76.dp)
-            .background(if (selected) Color.White.copy(alpha = 0.14f) else Panel, AppShapes.Control)
+            .background(if (selected) Color.White.copy(alpha = 0.14f) else Panel, RoundedCornerShape(12.dp))
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) Color.White else if (selected) Green else Color.White.copy(alpha = 0.1f),
-                shape = AppShapes.Control,
+                shape = RoundedCornerShape(12.dp),
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
@@ -470,7 +464,7 @@ private fun SetupChoice(
     ) {
         Text(
             text = (if (selected) "✓ " else "") + title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
         )
         Text(description, style = MaterialTheme.typography.bodySmall, color = Muted)
@@ -531,7 +525,7 @@ private fun ColumnScope.KeyStep(
             Spacer(Modifier.height(10.dp))
             steps.forEachIndexed { i, text ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                    StepNumber("${i + 1}", color = Color.White.copy(alpha = 0.14f), size = 24.dp, contentColor = Color.White)
+                    StepNumber("${i + 1}", color = Color.White.copy(alpha = 0.14f), size = 24.dp)
                     Spacer(Modifier.width(12.dp))
                     Text(text, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
@@ -622,18 +616,18 @@ private fun ConfiguredRow(service: ApiService, maskedKey: String?, detail: Strin
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(Green.copy(alpha = 0.10f), AppShapes.Control)
-            .border(1.dp, Green.copy(alpha = 0.35f), AppShapes.Control)
+            .background(Green.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
+            .border(1.dp, Green.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
             .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(28.dp).background(Green, CircleShape)) {
-            Text("✓", color = Color.Black, fontWeight = FontWeight.SemiBold)
+            Text("✓", color = Color.Black, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(14.dp))
         Column {
             Text(
                 localizedStringResource(SR.setup_service_configured, localizedStringResource(service.titleResource)),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
             )
             Text(
@@ -705,11 +699,11 @@ private fun KeyField(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Field, AppShapes.Control)
+                    .background(Color(0xFF101119), RoundedCornerShape(10.dp))
                     .border(
                         width = if (focused) 2.dp else 1.dp,
                         color = if (focused) Color.White else Color.White.copy(alpha = 0.2f),
-                        shape = AppShapes.Control,
+                        shape = RoundedCornerShape(10.dp),
                     )
                     .padding(horizontal = 18.dp, vertical = 15.dp),
             ) {
@@ -732,20 +726,20 @@ private fun QrPanel(url: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(250.dp)
-            .background(Panel, AppShapes.Panel)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
+            .background(Panel, RoundedCornerShape(18.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
             .padding(20.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(190.dp).background(Color.White, AppShapes.Control).padding(12.dp),
+            modifier = Modifier.size(190.dp).background(Color.White, RoundedCornerShape(12.dp)).padding(12.dp),
         ) {
             QrCode(url, Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(12.dp))
         Text(
             localizedStringResource(SR.setup_scan_qr),
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
             color = Color.White,
             textAlign = TextAlign.Center,
         )
@@ -797,7 +791,7 @@ private fun ColumnScope.DoneStep(state: SetupUiState.Ready, onFinish: () -> Unit
         modifier = Modifier.fillMaxWidth().weight(1f),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp).background(Green, CircleShape)) {
-            Text("✓", color = Color.Black, fontSize = 44.sp, fontWeight = FontWeight.SemiBold)
+            Text("✓", color = Color.Black, fontSize = 44.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(16.dp))
         Text(localizedStringResource(SR.setup_all_set), fontFamily = DisplayFont, fontSize = 48.sp, color = Color.White)
@@ -843,7 +837,7 @@ private fun PreferenceSummaryRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(Panel, AppShapes.Control)
+            .background(Panel, RoundedCornerShape(12.dp))
             .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
         Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
@@ -862,10 +856,10 @@ private fun SummaryRow(label: String, ok: Boolean, required: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(Panel, AppShapes.Control)
+            .background(Panel, RoundedCornerShape(12.dp))
             .padding(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        Text(mark, color = color, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, modifier = Modifier.width(24.dp))
+        Text(mark, color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.width(24.dp))
         Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
         Text(note, style = MaterialTheme.typography.bodyMedium, color = color)
     }

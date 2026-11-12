@@ -1,7 +1,5 @@
 package com.shieldstream.tv.settings.profiles
 
-import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -18,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -102,7 +101,7 @@ fun ProfileEditScreen(
                 if (editing.isNew) localizedStringResource(StringsR.string.settings_add_profile) else localizedStringResource(StringsR.string.settings_edit_profile),
                 color = Color.White,
                 fontSize = 34.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(18.dp))
             Row {
@@ -329,11 +328,11 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(AppColors.Field, AppShapes.Control)
+                    .background(Color(0xFF101119), RoundedCornerShape(10.dp))
                     .border(
                         width = if (focused) 2.dp else 1.dp,
                         color = if (focused) Color.White else Color.White.copy(alpha = 0.2f),
-                        shape = AppShapes.Control,
+                        shape = RoundedCornerShape(10.dp),
                     )
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             ) {
@@ -362,7 +361,7 @@ private fun ColorChoice(initial: String, avatar: Int, selected: Boolean, onClick
                     selected -> Color.White.copy(alpha = 0.55f)
                     else -> Color.Transparent
                 },
-                shape = AppShapes.Control,
+                shape = RoundedCornerShape(10.dp),
             )
             .padding(4.dp)
             .onFocusChanged { focused = it.isFocused }
@@ -395,11 +394,11 @@ private fun TraktCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (focused) AppColors.SurfaceFocused else AppColors.Surface, AppShapes.Control)
+            .background(if (focused) Color(0xFF2A2D3D) else Color(0xFF1A1C27), RoundedCornerShape(14.dp))
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) Color.White else Color.White.copy(alpha = 0.08f),
-                shape = AppShapes.Control,
+                shape = RoundedCornerShape(14.dp),
             )
             .onFocusChanged {
                 focused = it.isFocused
@@ -411,15 +410,15 @@ private fun TraktCard(
             .padding(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Box(
-            Modifier.size(44.dp).background(TraktRed, AppShapes.Pill),
+            Modifier.size(44.dp).background(TraktRed, RoundedCornerShape(50)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("t", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+            Text("t", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(18.dp))
         Column {
-            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = if (state.confirmDisconnect) AppColors.Warning else ProfileMuted, fontSize = 15.sp)
+            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = if (state.confirmDisconnect) Color(0xFFF5B83D) else ProfileMuted, fontSize = 15.sp)
         }
     }
 }
@@ -437,7 +436,7 @@ private fun OptionChip(
         text,
         color = if (focused) Color.Black else Color.White,
         fontSize = 16.sp,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         modifier = modifier
             .background(
                 when {
@@ -445,7 +444,7 @@ private fun OptionChip(
                     highlighted -> Color.White.copy(alpha = 0.2f)
                     else -> Color.White.copy(alpha = 0.08f)
                 },
-                AppShapes.Pill,
+                RoundedCornerShape(50),
             )
             .onFocusChanged {
                 focused = it.isFocused

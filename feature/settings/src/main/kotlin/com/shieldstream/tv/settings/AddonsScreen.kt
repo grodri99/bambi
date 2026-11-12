@@ -101,7 +101,7 @@ fun AddonsScreen(
                 item {
                     Text(
                         localizedStringResource(StringsR.string.settings_addons_title),
-                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
                     )
                     Text(
@@ -221,7 +221,7 @@ private fun AddonCard(
         Column(Modifier.weight(1f)) {
             Text(
                 text = metadata?.name?.takeUnless { it.isBlank() } ?: addon?.host ?: localizedStringResource(StringsR.string.settings_add_addon),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
             )
             Text(
@@ -298,7 +298,7 @@ private fun AddonEditorDialog(
                     if (editor.id == null) StringsR.string.settings_add_manifest_title
                     else StringsR.string.settings_replace_manifest_title,
                 ),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
             )
             Text(

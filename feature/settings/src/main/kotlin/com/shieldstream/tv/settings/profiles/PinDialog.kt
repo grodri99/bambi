@@ -1,7 +1,5 @@
 package com.shieldstream.tv.settings.profiles
 
-import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,8 +73,8 @@ fun PinDialog(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .background(AppColors.Surface, AppShapes.Panel)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
+                .background(Color(0xFF15161E), RoundedCornerShape(20.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
                 .padding(horizontal = 40.dp, vertical = 28.dp)
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -98,7 +97,7 @@ fun PinDialog(
         ) {
             Icon(AppIcons.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(10.dp))
-            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(subtitle, color = ProfileMuted, fontSize = 15.sp)
             Spacer(Modifier.height(18.dp))
@@ -113,7 +112,7 @@ fun PinDialog(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text(error ?: " ", color = AppColors.Error, fontSize = 15.sp)
+            Text(error ?: " ", color = Color(0xFFFF6B6B), fontSize = 15.sp)
             Spacer(Modifier.height(10.dp))
             val rows = listOf("123", "456", "789")
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,10 +140,10 @@ private fun PinKey(label: String, modifier: Modifier = Modifier, onClick: () -> 
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(width = 64.dp, height = 46.dp)
-            .background(if (focused) Color.White else Color.White.copy(alpha = 0.08f), AppShapes.Control)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick),
     ) {
-        Text(label, color = if (focused) Color.Black else Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = if (focused) Color.Black else Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
     }
 }

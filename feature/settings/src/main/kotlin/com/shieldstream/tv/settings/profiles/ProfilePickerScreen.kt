@@ -1,6 +1,7 @@
 package com.shieldstream.tv.settings.profiles
 
 import com.shieldstream.tv.ui.theme.AppColors
+
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.animation.core.animateFloatAsState
@@ -52,7 +53,7 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
-internal val ProfileBackground = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
+internal val ProfileBackground = Brush.verticalGradient(listOf(Color(0xFF14151F), Color.Black))
 internal val ProfileMuted = Color.White.copy(alpha = 0.55f)
 
 @Composable
@@ -64,7 +65,7 @@ fun ProfilePickerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val ready = state as? ProfilesUiState.Ready ?: run {
-        Box(Modifier.fillMaxSize().background(AppColors.Background))
+        Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
     var manage by remember { mutableStateOf(false) }
@@ -118,7 +119,7 @@ fun ProfilePickerScreen(
                 if (manage) localizedStringResource(StringsR.string.settings_manage_profiles) else localizedStringResource(StringsR.string.settings_who_s_watching),
                 color = Color.White,
                 fontSize = 40.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(44.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(26.dp), verticalAlignment = Alignment.Top) {
@@ -250,7 +251,7 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
             profile.name,
             color = if (focused) Color.White else ProfileMuted,
             fontSize = 20.sp,
-            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium,
+            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -259,10 +260,10 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (profile.traktUser != null) {
                     // Green reads as "linked/OK" here; Trakt's brand red looked like a warning.
-                    Text("Trakt ✓", color = AppColors.Success.copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Trakt ✓", color = AppColors.Success.copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
                 if (profile.kids) {
-                    Text(localizedStringResource(StringsR.string.settings_kids), color = Color(0xFF56CCF2).copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(localizedStringResource(StringsR.string.settings_kids), color = Color(0xFF56CCF2).copy(alpha = if (focused) 1f else 0.75f), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
                 if (profile.locked) {
                     Icon(AppIcons.Lock, contentDescription = localizedStringResource(StringsR.string.settings_pin_protected), tint = ProfileMuted, modifier = Modifier.size(14.dp))
@@ -306,7 +307,7 @@ private fun AddTile(onClick: () -> Unit) {
             localizedStringResource(StringsR.string.settings_add_profile),
             color = if (focused) Color.White else ProfileMuted,
             fontSize = 20.sp,
-            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Medium,
+            fontWeight = if (focused) FontWeight.Bold else FontWeight.Medium,
         )
     }
 }

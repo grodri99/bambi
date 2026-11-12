@@ -1,7 +1,7 @@
 package com.shieldstream.tv.settings.update
 
-import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.ui.theme.AppShapes
+
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,9 +45,9 @@ import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
-private val Panel = AppColors.Surface
+private val Panel = Color(0xFF1A1C27)
 private val Muted = Color.White.copy(alpha = 0.6f)
-private val Progress = AppColors.Accent
+private val Red = Color(0xFFE50914)
 
 @Composable
 fun UpdatePrompt(
@@ -71,8 +72,8 @@ fun UpdatePrompt(
         Column(
             Modifier
                 .width(620.dp)
-                .background(Panel, AppShapes.Panel)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
+                .background(Panel, RoundedCornerShape(18.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
                 .padding(32.dp),
         ) {
             when (val s = visible.state) {
@@ -157,13 +158,13 @@ fun IthilUpdatePrompt(viewModel: IthilUpdateViewModel = hiltViewModel()) {
 
 @Composable
 private fun UpdateBody(title: String, subtitle: String, update: AppUpdate?, actions: @Composable () -> Unit) {
-    Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+    Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(8.dp))
     Text(subtitle, color = Muted, fontSize = 17.sp)
     val notes = update?.notes?.let(::cleanNotes).orEmpty()
     if (notes.isNotBlank()) {
         Spacer(Modifier.height(18.dp))
-        Text(localizedStringResource(StringsR.string.settings_what_s_new), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text(localizedStringResource(StringsR.string.settings_what_s_new), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         Text(notes, color = Muted, fontSize = 16.sp, maxLines = 9, overflow = TextOverflow.Ellipsis)
     }
@@ -199,13 +200,13 @@ private fun ProgressBar(progress: Float) {
         Modifier
             .fillMaxWidth()
             .height(8.dp)
-            .background(Color.White.copy(alpha = 0.12f), AppShapes.Pill),
+            .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(4.dp)),
     ) {
         Box(
             Modifier
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .height(8.dp)
-                .background(Progress, AppShapes.Pill),
+                .background(Red, RoundedCornerShape(4.dp)),
         )
     }
 }
@@ -236,11 +237,11 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (focused) AppColors.SurfaceFocused else Panel, AppShapes.Control)
+            .background(if (focused) Color(0xFF2A2D3D) else Panel, RoundedCornerShape(14.dp))
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) Color.White else Color.White.copy(alpha = 0.08f),
-                shape = AppShapes.Control,
+                shape = RoundedCornerShape(14.dp),
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable {
@@ -255,7 +256,7 @@ fun UpdateCard(viewModel: UpdateViewModel = hiltViewModel()) {
             .padding(horizontal = 24.dp, vertical = 18.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             if (subtitle.isNotEmpty()) Text(subtitle, color = Muted, fontSize = 15.sp)
         }
         if (state !is UpdateState.Unsupported) {

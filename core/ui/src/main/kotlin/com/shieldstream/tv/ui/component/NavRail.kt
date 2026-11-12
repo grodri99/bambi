@@ -1,6 +1,5 @@
 package com.shieldstream.tv.ui.component
 
-import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.annotation.StringRes
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.R as StringsR
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -130,7 +130,7 @@ private fun RailItem(
             .fillMaxWidth()
             .height(46.dp)
             .onFocusChanged { focused = it.isFocused }
-            .clip(AppShapes.Control)
+            .clip(RoundedCornerShape(6.dp))
             .background(if (focused) Color.White else Color.Transparent)
             .tvClickable(onClick = onClick)
             .padding(horizontal = 12.dp),

@@ -41,7 +41,7 @@ fun EpisodeCenterScreen(
         Text(
             text = localizedStringResource(StringsR.string.home_episodes),
             color = Color.White,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
         )
         Spacer(Modifier.height(16.dp))
         when (val s = state) {
@@ -119,7 +119,7 @@ fun EpisodeCenterScreen(
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
+    Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
 }
 
 private fun episodeLabel(episode: Episode, episodeCode: String): String =

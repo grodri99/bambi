@@ -260,6 +260,38 @@ fun NewEpisodeCard(
     }
 }
 
+/** Póster con una etiqueta arriba (p. ej. "A continuación") y un texto abajo (capítulo / fecha). */
+@Composable
+fun LabeledPosterCard(
+    item: CatalogItem,
+    badge: String,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocused: () -> Unit = {},
+    badgeDot: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+) {
+    PosterCard(
+        item = item,
+        onClick = onClick,
+        modifier = modifier,
+        onFocused = onFocused,
+        onLongClick = onLongClick,
+    ) {
+        if (badge.isNotEmpty()) {
+            StatusPill(
+                text = badge,
+                dot = badgeDot,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp),
+            )
+        }
+        if (label.isNotEmpty()) BottomLabel(label, fraction = null)
+    }
+}
+
 /**
  * Tarjeta "Top 10": número gigante con contorno gris + póster, como en Netflix.
  */

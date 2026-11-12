@@ -1,7 +1,5 @@
 package com.shieldstream.tv.settings
 
-import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -20,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,10 +43,10 @@ import com.shieldstream.tv.strings.localizedTitle
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
 
-private val Panel = AppColors.Surface
-private val PanelFocused = AppColors.SurfaceFocused
+private val Panel = Color(0xFF1A1C27)
+private val PanelFocused = Color(0xFF2A2D3D)
 private val Dim = Color.White.copy(alpha = 0.6f)
-private val Selected = AppColors.Accent
+private val Red = Color(0xFFE50914)
 
 @Composable
 internal fun HomeCategoriesDialog(
@@ -67,11 +66,11 @@ internal fun HomeCategoriesDialog(
         Column(
             Modifier
                 .width(900.dp)
-                .background(Panel, AppShapes.Panel)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
+                .background(Panel, RoundedCornerShape(18.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
                 .padding(28.dp),
         ) {
-            Text(localizedStringResource(StringsR.string.settings_home_categories), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text(localizedStringResource(StringsR.string.settings_home_categories), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 localizedStringResource(StringsR.string.settings_ok_shows_or_hides_each_one_back),
@@ -111,11 +110,11 @@ private fun CategoryToggle(category: Category, shown: Boolean, onClick: () -> Un
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .background(if (focused) PanelFocused else Color.White.copy(alpha = 0.04f), AppShapes.Control)
+            .background(if (focused) PanelFocused else Color.White.copy(alpha = 0.04f), RoundedCornerShape(10.dp))
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) Color.White else Color.White.copy(alpha = 0.06f),
-                shape = AppShapes.Control,
+                shape = RoundedCornerShape(10.dp),
             )
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
@@ -125,10 +124,10 @@ private fun CategoryToggle(category: Category, shown: Boolean, onClick: () -> Un
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(22.dp)
-                .background(if (shown) Selected else Color.Transparent, AppShapes.Badge)
-                .border(2.dp, if (shown) Selected else Color.White.copy(alpha = 0.4f), AppShapes.Badge),
+                .background(if (shown) Red else Color.Transparent, RoundedCornerShape(5.dp))
+                .border(2.dp, if (shown) Red else Color.White.copy(alpha = 0.4f), RoundedCornerShape(5.dp)),
         ) {
-            if (shown) Text("✓", color = AppColors.OnAccent, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            if (shown) Text("✓", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(12.dp))
         Text(
@@ -148,9 +147,9 @@ private fun DialogButton(text: String, onClick: () -> Unit) {
         text,
         color = if (focused) Color.Black else Color.White,
         fontSize = 17.sp,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         modifier = Modifier
-            .background(if (focused) Color.White else Color.White.copy(alpha = 0.12f), AppShapes.Control)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 12.dp),

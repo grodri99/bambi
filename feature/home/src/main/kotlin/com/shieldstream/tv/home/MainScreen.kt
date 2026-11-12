@@ -1,6 +1,5 @@
 package com.shieldstream.tv.home
 
-import com.shieldstream.tv.ui.theme.AppColors
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -81,7 +80,7 @@ fun MainScreen(
     }
 
     val saveable = rememberSaveableStateHolder()
-    Box(Modifier.fillMaxSize().background(AppColors.Background)) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         val openCategory = category
         when {
             openCategory != null -> CategoryScreen(

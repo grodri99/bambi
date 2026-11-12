@@ -1,6 +1,5 @@
 package com.shieldstream.tv.home
 
-import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.strings.R as StringsR
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,7 +41,7 @@ fun CategoryScreen(
 ) {
     LaunchedEffect(category, filter) { viewModel.load(category, filter) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize().background(AppColors.Background).onBackKey(enabled = true) { onBack() }) {
+    Box(Modifier.fillMaxSize().background(Color.Black).onBackKey(enabled = true) { onBack() }) {
         when (val s = state) {
             HomeUiState.Loading -> HomeSkeleton()
             is HomeUiState.Error -> HomeError(s.message, onRetry = { viewModel.load(category, filter, force = true) })

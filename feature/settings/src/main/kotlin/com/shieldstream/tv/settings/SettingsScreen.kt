@@ -1,7 +1,7 @@
 package com.shieldstream.tv.settings
 
-import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.ui.theme.AppShapes
+
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.keyNameResource
@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -95,14 +96,14 @@ import com.shieldstream.tv.ui.component.onBackKey
 import com.shieldstream.tv.ui.component.tvClickable
 import com.shieldstream.tv.ui.theme.DisplayFont
 
-private val Background = Brush.verticalGradient(listOf(AppColors.BackgroundRaised, Color.Black))
-private val CardColor = AppColors.Surface
-private val CardFocused = AppColors.SurfaceFocused
-private val CardShape = AppShapes.Control
+private val Background = Brush.verticalGradient(listOf(Color(0xFF151622), Color.Black))
+private val CardColor = Color(0xFF1A1C27)
+private val CardFocused = Color(0xFF2A2D3D)
+private val CardShape = RoundedCornerShape(14.dp)
 private val Muted = Color.White.copy(alpha = 0.6f)
-private val Green = AppColors.Success
-private val Amber = AppColors.Warning
-private val Red = AppColors.Error
+private val Green = Color(0xFF46D369)
+private val Amber = Color(0xFFF5B83D)
+private val Red = Color(0xFFFF5A5F)
 
 @Composable
 fun SettingsScreen(
@@ -573,7 +574,7 @@ private fun SubtitleAppearanceHeaderCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = localizedStringResource(StringsR.string.subtitle_appearance),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -613,7 +614,7 @@ private fun SubtitleAppearanceCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 modifier = Modifier.weight(1f),
             )
@@ -649,7 +650,7 @@ internal fun ServiceCard(ui: ServiceUi, onClick: () -> Unit, modifier: Modifier 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             localizedStringResource(ui.service.titleResource),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = Color.White,
                         )
                         Spacer(Modifier.width(10.dp))
@@ -718,7 +719,7 @@ private fun StatusPill(status: ServiceStatus) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .background(color.copy(alpha = 0.14f), AppShapes.Pill)
+            .background(color.copy(alpha = 0.14f), RoundedCornerShape(50))
             .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Box(Modifier.size(8.dp).background(color, CircleShape))
@@ -739,7 +740,7 @@ private fun PhoneConfigCard(onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_configure_from_phone),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -764,7 +765,7 @@ private fun SetupGuideCard(onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_setup_guide),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -802,7 +803,7 @@ internal fun DebridSelectorCard(active: DebridService, onChange: (DebridService)
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_service_in_use),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -870,7 +871,7 @@ private fun HomeRowLimitCard(viewModel: SettingsViewModel = hiltViewModel()) {
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_items_per_home_row),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -914,7 +915,7 @@ private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) 
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_lightweight_ui),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -926,7 +927,7 @@ private fun LightweightModeCard(viewModel: SettingsViewModel = hiltViewModel()) 
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
@@ -978,7 +979,7 @@ private fun OnOffCard(title: String, summary: String, enabled: Boolean, onChange
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1018,7 +1019,7 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_autoplay_next_episode),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1030,7 +1031,7 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
@@ -1069,7 +1070,7 @@ private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewMode
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_new_episode_notifications),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1079,7 +1080,7 @@ private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewMode
                 )
             }
             Spacer(Modifier.width(24.dp))
-            Row(Modifier.background(Color.White.copy(alpha = 0.08f), AppShapes.Pill).padding(4.dp)) {
+            Row(Modifier.background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50)).padding(4.dp)) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
                 SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
             }
@@ -1104,7 +1105,7 @@ private fun MatchContentFrameRateCard(enabled: Boolean, onChange: (Boolean) -> U
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_match_content_frame_rate),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1116,7 +1117,7 @@ private fun MatchContentFrameRateCard(enabled: Boolean, onChange: (Boolean) -> U
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
@@ -1143,7 +1144,7 @@ private fun ExperimentalSyncCard(enabled: Boolean, onChange: (Boolean) -> Unit) 
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_experimental_subtitle_sync),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1155,7 +1156,7 @@ private fun ExperimentalSyncCard(enabled: Boolean, onChange: (Boolean) -> Unit) 
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
@@ -1189,7 +1190,7 @@ private fun DeviceOptimizationCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_device_optimization),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1224,7 +1225,7 @@ private fun DeviceOptimizationCard(
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_automatic), selected = optimization == DeviceOptimization.AUTOMATIC)
@@ -1251,7 +1252,7 @@ private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boole
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_seeking_in_the_player),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1269,7 +1270,7 @@ private fun SeekModeCard(thumbnails: Boolean, enabled: Boolean, onChange: (Boole
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 SegmentOption(localizedStringResource(StringsR.string.settings_thumbnails), selected = thumbnails)
@@ -1299,7 +1300,7 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_app_language),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1315,7 +1316,7 @@ private fun LanguageCard(current: AppLanguage, onApply: (AppLanguage) -> Unit) {
             Spacer(Modifier.width(24.dp))
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.08f), AppShapes.Pill)
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .padding(4.dp),
             ) {
                 AppLanguage.entries.forEach { SegmentOption(it.label, selected = it == pending) }
@@ -1345,7 +1346,7 @@ private fun SourceExclusionGroupCard(title: String, summary: String, expanded: B
             Column(Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1372,7 +1373,7 @@ private fun SourceExclusionCard(label: String, excluded: Boolean, onClick: () ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 modifier = Modifier.weight(1f),
             )
@@ -1392,7 +1393,7 @@ private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: ()
     FocusCard(onClick = onClick) { _ ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(localizedStringResource(provider.sectionResource), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                Text(localizedStringResource(provider.sectionResource), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
                 Text(providerNote(provider), style = MaterialTheme.typography.bodyMedium, color = Muted)
             }
             Spacer(Modifier.width(24.dp))
@@ -1417,10 +1418,10 @@ private fun providerNote(p: SourceProvider): String = when (p) {
 private fun SegmentOption(text: String, selected: Boolean) {
     Text(
         text,
-        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
         color = if (selected) Color.Black else Color.White.copy(alpha = 0.7f),
         modifier = Modifier
-            .background(if (selected) Color.White else Color.Transparent, AppShapes.Pill)
+            .background(if (selected) Color.White else Color.Transparent, RoundedCornerShape(50))
             .padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
@@ -1447,7 +1448,7 @@ private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) 
             Column(Modifier.weight(1f)) {
                 Text(
                     localizedStringResource(StringsR.string.settings_player_buffer),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1483,7 +1484,7 @@ private fun BufferCard(seconds: Int, enabled: Boolean, onChange: (Int) -> Unit) 
                                     .height(4.dp)
                                     .background(
                                         if (step <= seconds) Color.White else Color.White.copy(alpha = 0.18f),
-                                        AppShapes.Pill,
+                                        RoundedCornerShape(2.dp),
                                     ),
                             )
                         }
@@ -1516,7 +1517,7 @@ private fun AboutCard(onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     if (testing) localizedStringResource(StringsR.string.settings_bambi_testing) else "Bambi",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 Text(
@@ -1563,8 +1564,8 @@ private fun KeyEditorDialog(
         Column(
             Modifier
                 .width(if (editor.service == ApiService.ALLDEBRID) 1040.dp else 720.dp)
-                .background(AppColors.Surface, AppShapes.Panel)
-                .border(1.dp, Color.White.copy(alpha = 0.1f), AppShapes.Panel)
+                .background(Color(0xFF1B1D29), RoundedCornerShape(20.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
                 .padding(36.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1573,7 +1574,7 @@ private fun KeyEditorDialog(
                 Column {
                     Text(
                         localizedStringResource(editor.service.titleResource),
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
                     )
                     Text(
@@ -1631,11 +1632,11 @@ private fun KeyEditorDialog(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .background(AppColors.Field, AppShapes.Control)
+                            .background(Color(0xFF101119), RoundedCornerShape(10.dp))
                             .border(
                                 width = if (fieldFocused) 2.dp else 1.dp,
                                 color = if (fieldFocused) Color.White else Color.White.copy(alpha = 0.2f),
-                                shape = AppShapes.Control,
+                                shape = RoundedCornerShape(10.dp),
                             )
                             .padding(horizontal = 18.dp, vertical = 16.dp),
                     ) {

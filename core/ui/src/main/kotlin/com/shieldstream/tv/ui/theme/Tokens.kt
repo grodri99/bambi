@@ -13,13 +13,13 @@ object AppColors {
     val Background = Color(0xFF0E0E10)
 
     /** Top stop of subtle full-screen gradients and image placeholders behind backdrops. */
-    val BackgroundRaised = Color(0xFF141416)
+    val BackgroundRaised = Color(0xFF151622)
 
     /** Panels, cards, dialogs, and unfocused controls. */
-    val Surface = Color(0xFF1A1A1D)
+    val Surface = Color(0xFF1A1C27)
 
     /** Focused panel rows when the control does not invert to white. */
-    val SurfaceFocused = Color(0xFF2A2A2E)
+    val SurfaceFocused = Color(0xFF2A2D3D)
 
     /** Text fields and inset areas inside a [Surface]. */
     val Field = Color(0xFF101012)
@@ -56,10 +56,10 @@ object AppShapes {
     val Badge = RoundedCornerShape(4.dp)
 
     /** Buttons, cards, posters, list rows, keys, and text fields. */
-    val Control = RoundedCornerShape(12.dp)
+    val Control = RoundedCornerShape(14.dp)
 
     /** Panels, sheets, and dialogs. */
-    val Panel = RoundedCornerShape(20.dp)
+    val Panel = RoundedCornerShape(16.dp)
 
     /** Chips, pills, and progress bars. */
     val Pill = RoundedCornerShape(50)
