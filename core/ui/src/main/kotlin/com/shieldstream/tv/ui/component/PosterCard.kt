@@ -75,8 +75,8 @@ fun PosterCard(
     width: Dp = PosterWidth,
     onLongClick: (() -> Unit)? = null,
     newEpisodeCount: Int = 0,
-    overlay: @Composable BoxScope.() -> Unit = {},
     @Suppress("UNUSED_PARAMETER") caption: (@Composable ColumnScope.() -> Unit)? = null,
+    overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale = focusScale(focused, 1.1f)
