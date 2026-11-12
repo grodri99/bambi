@@ -35,3 +35,6 @@ pi-session-*.html
 *.iml
 .DS_Store
 Thumbs.db
+
+# Marca de compilación pública (APK sin claves para GitHub)
+.public_build

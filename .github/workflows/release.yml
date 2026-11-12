@@ -1,8 +1,7 @@
 name: Publish release
 
+# Solo a mano (pestaña Actions): necesita los secretos de firma y de Ithil del repositorio (ver RELEASING.md).
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:

@@ -12,17 +12,21 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-val seedKeys: Boolean = localProps.getProperty("seedKeys")?.trim()?.lowercase() == "true"
+// APK para publicar en GitHub: si existe .public_build con "1", se compila SIN ninguna clave ni dato privado
+// (ni las claves iniciales, ni el secreto de Trakt, ni la configuración de Ithil), pase lo que pase en local.properties.
+val publicBuild: Boolean = rootProject.file(".public_build").let { it.exists() && it.readText().trim() == "1" }
+val seedKeys: Boolean = !publicBuild && localProps.getProperty("seedKeys")?.trim()?.lowercase() == "true"
 fun seed(name: String): String = if (seedKeys) localProps.getProperty(name) ?: "" else ""
+fun privateProp(name: String): String = if (publicBuild) "" else localProps.getProperty(name)?.trim() ?: ""
 val rdToken: String = seed("rdToken")
 val subdlApiKey: String = seed("subdlApiKey")
 val tmdbApiKey: String = seed("tmdbApiKey")
 val traktClientId: String = localProps.getProperty("traktClientId")?.trim() ?: ""
-val traktClientSecret: String = localProps.getProperty("traktClientSecret")?.trim() ?: ""
+val traktClientSecret: String = privateProp("traktClientSecret")
 val traktRedirectUri: String = localProps.getProperty("traktRedirectUri")?.trim() ?: "urn:ietf:wg:oauth:2.0:oob"
-val ithilMetadataUrl: String = localProps.getProperty("ithilMetadataUrl")?.trim() ?: ""
-val ithilIndexKey: String = localProps.getProperty("ithilIndexKey")?.trim() ?: ""
-val ithilArchivePrefix: String = localProps.getProperty("ithilArchivePrefix")?.trim() ?: ""
+val ithilMetadataUrl: String = privateProp("ithilMetadataUrl")
+val ithilIndexKey: String = privateProp("ithilIndexKey")
+val ithilArchivePrefix: String = privateProp("ithilArchivePrefix")
 
 android {
     namespace = "com.shieldstream.tv"

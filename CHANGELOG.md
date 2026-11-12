@@ -7,6 +7,22 @@ de Javier Molina, versiones 1.0.7 a 1.0.21 de su historial, abajo) con el aspect
 del menú lateral, rojo de Bambi en vez del estilo monocromo, logo, iconos y nombre de Bambi, letra del sistema y
 colores de perfil de siempre. Real-Debrid sigue siendo el debrid por defecto e Ithil viene activado de serie.
 
+### Novedades propias de esta versión
+
+- **Interfaz de Bambi 1.0.6** con todas las funciones nuevas: portada con destacados y categorías al abrir el Inicio,
+  pósteres estrechos con borde blanco, títulos de bloque en rojo, paleta azulada en Ajustes y perfiles, negritas y
+  barra de progreso roja del reproductor de siempre. "A continuación" vuelve a mostrarse como póster.
+- **Intro de Bambi al abrir:** animación de entrada mientras se preparan por detrás las filas, los destacados y las
+  carátulas del Inicio, que aparece ya pintado. Se salta con OK o Atrás. Ajuste *Intro de Bambi siempre*: activado,
+  sale cada vez que se vuelve a la app; desactivado (por defecto), solo al arrancar o al volver tras más de 30 minutos,
+  cuando hay que recargar el Inicio.
+- **Inicio guardado en la Shield:** el último Inicio se enseña al instante y se actualiza en segundo plano.
+- **Pantalla de carga del perfil:** si al elegir perfil el Inicio aún no está listo, avatar con anillo rojo.
+- **Elementos por fila de Inicio** ahora sí amplía las filas: se piden a TMDB las páginas necesarias (hasta 100
+  títulos) y "Recomendado para ti" pide a Trakt hasta ese número (antes 20 y 40 fijos). Al cambiarlo, el Inicio se recarga.
+- **Elegir fuente:** el nombre completo de la fuente enfocada se desplaza en vez de cortarse con "…".
+- **Episodios:** el póster enfocado ya no se corta por la izquierda.
+
 ---
 
 # Historial de Franklix (javiermolinar/franklix)
