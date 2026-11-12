@@ -37,21 +37,25 @@ fun EpisodeCenterScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.activate() }
-    Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 36.dp, top = 24.dp)) {
+    // Sin margen lateral en la columna: lo lleva cada texto y las filas como contentPadding, para que el
+    // póster enfocado (crece al enfocarse) no quede cortado por el borde izquierdo de la fila.
+    Column(Modifier.fillMaxSize().padding(top = 24.dp)) {
         Text(
             text = localizedStringResource(StringsR.string.home_episodes),
             color = Color.White,
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(start = EdgeStart),
         )
         Spacer(Modifier.height(16.dp))
         when (val s = state) {
-            EpisodeCenterUiState.Loading -> Text(localizedStringResource(StringsR.string.home_finding_episodes), color = Color.White.copy(alpha = 0.6f))
+            EpisodeCenterUiState.Loading -> Text(localizedStringResource(StringsR.string.home_finding_episodes), color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(start = EdgeStart))
             is EpisodeCenterUiState.Content -> {
                 if (s.available.isEmpty() && s.upcoming.isEmpty()) {
                     Text(
                         text = localizedStringResource(StringsR.string.home_no_recent_or_upcoming_episodes_in_your),
                         color = Color.White.copy(alpha = 0.65f),
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(start = EdgeStart, end = EdgeEnd),
                     )
                 } else {
                     LazyColumn(contentPadding = PaddingValues(bottom = 48.dp)) {
@@ -61,7 +65,7 @@ fun EpisodeCenterScreen(
                             }
                             item(key = "available_row") {
                                 LazyRow(
-                                    contentPadding = PaddingValues(vertical = 12.dp),
+                                    contentPadding = PaddingValues(start = EdgeStart, end = EdgeEnd, top = 14.dp, bottom = 14.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     items(s.available, key = { it.item.key }) { status ->
@@ -83,6 +87,7 @@ fun EpisodeCenterScreen(
                                     text = localizedStringResource(StringsR.string.home_hold_ok_to_dismiss),
                                     color = Color.White.copy(alpha = 0.45f),
                                     style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = EdgeStart),
                                 )
                             }
                         }
@@ -93,7 +98,7 @@ fun EpisodeCenterScreen(
                             }
                             item(key = "upcoming_row") {
                                 LazyRow(
-                                    contentPadding = PaddingValues(vertical = 12.dp),
+                                    contentPadding = PaddingValues(start = EdgeStart, end = EdgeEnd, top = 14.dp, bottom = 14.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     items(s.upcoming, key = { it.item.key }) { status ->
@@ -119,8 +124,16 @@ fun EpisodeCenterScreen(
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+    Text(
+        text,
+        color = Color.White,
+        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+        modifier = Modifier.padding(start = EdgeStart),
+    )
 }
+
+private val EdgeStart = 48.dp
+private val EdgeEnd = 36.dp
 
 private fun episodeLabel(episode: Episode, episodeCode: String): String =
     listOf(episodeCode, formatEpisodeDate(episode.airDate)).filter { it.isNotBlank() }.joinToString(" · ")

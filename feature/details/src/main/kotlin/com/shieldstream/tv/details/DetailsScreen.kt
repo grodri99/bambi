@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1389,12 +1390,18 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
                 )
             }
             Spacer(Modifier.height(2.dp))
+            // Enfocada, el nombre completo de la fuente se desplaza (marquesina) en vez de cortarse con "…".
             Text(
                 text = source.seeders?.let { "$it seeds · ${source.title}" } ?: source.title,
                 color = sub,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
+                modifier = if (focused) {
+                    Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 700, repeatDelayMillis = 1500)
+                } else {
+                    Modifier
+                },
             )
         }
     }
