@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.7] - Bambi
+
+Bambi 1.0.7 incorpora todas las funciones de [Franklix](https://github.com/javiermolinar/franklix) (fork de Bambi
+de Javier Molina, versiones 1.0.7 a 1.0.21 de su historial, abajo) con el aspecto de Bambi: barra superior en vez
+del menú lateral, rojo de Bambi en vez del estilo monocromo, logo, iconos y nombre de Bambi, letra del sistema y
+colores de perfil de siempre. Real-Debrid sigue siendo el debrid por defecto e Ithil viene activado de serie.
+
+---
+
+# Historial de Franklix (javiermolinar/franklix)
+
 ## [1.0.21] - 2026-11-11
 
 ### Added
@@ -120,7 +131,7 @@
 
 ### Added
 
-- **Franklix rebrand:** new name and artwork throughout the app, Android TV launcher, setup, README, and release packages. Existing installations keep their application ID, profiles, preferences, and stored keys.
+- **Cambio de nombre a Franklix (no aplica en Bambi):** new name and artwork throughout the app, Android TV launcher, setup, README, and release packages. Existing installations keep their application ID, profiles, preferences, and stored keys.
 - **AllDebrid QR sign-in:** authorize AllDebrid from setup or Settings and save the returned API key automatically. Manual API-key entry remains available.
 - **Guided phone setup:** complete first-run configuration in four steps—TMDB, debrid, optional SubDL, and language/audio/subtitles—with required-key validation and a final confirmation.
 - **Phone configuration editor:** later, use Settings to edit service keys, source finders, and playback preferences from a phone or computer on the same local network. Sessions expire after 10 minutes and existing secrets stay hidden.
