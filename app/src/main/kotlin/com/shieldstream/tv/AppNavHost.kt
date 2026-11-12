@@ -16,6 +16,9 @@ import com.shieldstream.tv.details.DetailsScreen
 import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.home.MainScreen
+import com.shieldstream.tv.intro.IntroScreen
+import com.shieldstream.tv.intro.IntroViewModel
+import com.shieldstream.tv.intro.ProfileLoadingScreen
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.player.PlayerScreen
 import com.shieldstream.tv.settings.AddonsScreen
@@ -45,8 +48,12 @@ fun AppNavHost(
     val navController = rememberNavController()
     val gate: SetupGateViewModel = hiltViewModel()
     val watchNextNavigation: WatchNextNavigationViewModel = hiltViewModel()
-    val start = remember { if (gate.needsSetup) "setup" else "profiles" }
+    // Al abrir en frío, la intro de Bambi (mientras se precarga el Inicio) y después "¿Quién está viendo?".
+    val start = remember { if (gate.needsSetup) "setup" else "intro" }
+    val intro: IntroViewModel = hiltViewModel()
     val request by watchNextRequest.collectAsState()
+    // Si se abre desde "Seguir viendo" de Android TV, la intro es más corta.
+    val quickIntro = remember { watchNextRequest.value != null }
     val currentEntry by navController.currentBackStackEntryFlow.collectAsState(initial = null)
 
     LaunchedEffect(request?.requestedAtNs) {
@@ -83,9 +90,32 @@ fun AppNavHost(
                 onOpenPhone = { navController.navigate("phone_setup") },
             )
         }
+        composable("intro") {
+            IntroScreen(
+                onStartPreload = intro::start,
+                awaitReady = intro::awaitReady,
+                onFinished = { navController.navigate("profiles") { popUpTo("intro") { inclusive = true } } },
+                quick = quickIntro,
+            )
+        }
+        composable("profile_loading") {
+            val profiles: ProfilesViewModel = hiltViewModel()
+            val active by profiles.active.collectAsState()
+            ProfileLoadingScreen(
+                initial = active.initial,
+                avatar = active.avatar,
+                awaitReady = intro::awaitReady,
+                onReady = toMainFresh,
+            )
+        }
         composable("profiles") { entry ->
             ProfilePickerScreen(
-                onSelected = { if (entry.isVisible()) toMainFresh() },
+                onSelected = {
+                    if (entry.isVisible()) {
+                        // Si el Inicio de este perfil ya está preparado se entra directo; si no, avatar + anillo.
+                        if (intro.isReady()) toMainFresh() else navController.navigate("profile_loading")
+                    }
+                },
                 onEdit = { id -> if (entry.isVisible()) navController.navigate("profile_edit/$id") },
                 onAdd = { if (entry.isVisible()) navController.navigate("profile_edit/${ProfileEditViewModel.NEW}") },
             )

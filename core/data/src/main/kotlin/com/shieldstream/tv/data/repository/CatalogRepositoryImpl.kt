@@ -49,6 +49,10 @@ import com.shieldstream.tv.network.dto.TmdbImagesDto
 import com.shieldstream.tv.network.dto.TmdbTranslationsDto
 import com.shieldstream.tv.network.dto.TorrentioStreamDto
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
@@ -68,6 +72,8 @@ class CatalogRepositoryImpl @Inject constructor(
     private val texts: Texts,
     private val ithil: IthilLibraryRepository,
     private val ithilAccess: IthilAccessRepository,
+    /** Copia en disco del último Inicio (null en tests). */
+    private val diskCache: HomeDiskCache? = null,
 ) : CatalogRepository {
 
     private val kids: Boolean get() = profiles.active.value.kids
@@ -76,17 +82,88 @@ class CatalogRepositoryImpl @Inject constructor(
     private val homeCache = ConcurrentHashMap<String, Cached>()
     private val homeLocks = ConcurrentHashMap<String, Mutex>()
 
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val refreshing = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Memoria → disco → red.
+     * - Menos de [HOME_CACHE_MS]: se usa tal cual.
+     * - Hasta [HOME_STALE_MS]: se enseña al instante lo guardado y se actualiza por detrás (para la próxima vez).
+     * - Más antiguo, o nada guardado: se espera a la red; si falla, se tira de lo guardado aunque sea viejo.
+     */
     @Suppress("UNCHECKED_CAST")
-    private suspend fun <T : List<*>> cachedHome(cacheKey: String, load: suspend () -> T): T =
-        homeLocks.getOrPut(cacheKey) { Mutex() }.withLock {
+    private suspend fun <T : List<*>> cachedHome(
+        baseKey: String,
+        readDisk: (HomeDiskCache, String) -> HomeDiskCache.Entry<T>?,
+        writeDisk: (HomeDiskCache, String, T) -> Unit,
+        load: suspend () -> T,
+    ): T {
+        // Los títulos y sinopsis dependen del idioma de la app.
+        val cacheKey = "${baseKey}_${Lang.current.name}"
+        return homeLocks.getOrPut(cacheKey) { Mutex() }.withLock {
+            val now = System.currentTimeMillis()
             val hit = homeCache[cacheKey]
-            if (hit != null && System.currentTimeMillis() - hit.at < HOME_CACHE_MS) return@withLock hit.value as T
-            load().also { if (it.isNotEmpty()) homeCache[cacheKey] = Cached(System.currentTimeMillis(), it) }
+            if (hit != null && now - hit.at < HOME_CACHE_MS) return@withLock hit.value as T
+            if (hit != null && now - hit.at < HOME_STALE_MS) {
+                refreshInBackground(cacheKey, writeDisk, load)
+                return@withLock hit.value as T
+            }
+            val disk = diskCache?.takeIf { hit == null }?.let { cache -> withContext(Dispatchers.IO) { readDisk(cache, cacheKey) } }
+                ?.takeIf { it.value.isNotEmpty() }
+            if (disk != null && now - disk.savedAt < HOME_STALE_MS) {
+                homeCache[cacheKey] = Cached(disk.savedAt, disk.value)
+                if (now - disk.savedAt >= HOME_CACHE_MS) refreshInBackground(cacheKey, writeDisk, load)
+                return@withLock disk.value
+            }
+            val fresh = try {
+                load()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val fallback = (hit?.value as T?) ?: disk?.value
+                if (fallback != null && fallback.isNotEmpty()) return@withLock fallback
+                throw e
+            }
+            if (fresh.isNotEmpty()) {
+                homeCache[cacheKey] = Cached(System.currentTimeMillis(), fresh)
+                diskCache?.let { cache -> withContext(Dispatchers.IO) { writeDisk(cache, cacheKey, fresh) } }
+            }
+            fresh
         }
+    }
+
+    private fun <T : List<*>> refreshInBackground(
+        cacheKey: String,
+        writeDisk: (HomeDiskCache, String, T) -> Unit,
+        load: suspend () -> T,
+    ) {
+        if (!refreshing.add(cacheKey)) return
+        refreshScope.launch {
+            try {
+                val fresh = load()
+                if (fresh.isNotEmpty()) {
+                    homeCache[cacheKey] = Cached(System.currentTimeMillis(), fresh)
+                    diskCache?.let { writeDisk(it, cacheKey, fresh) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.d("CatalogRepository", "Actualización en segundo plano de $cacheKey fallida: ${e.message}")
+            } finally {
+                refreshing.remove(cacheKey)
+            }
+        }
+    }
+
+    private suspend fun cachedRows(baseKey: String, load: suspend () -> List<CatalogRow>): List<CatalogRow> =
+        cachedHome(baseKey, { c, k -> c.readRows(k) }, { c, k, v -> c.writeRows(k, v) }, load)
+
+    private suspend fun cachedFeatured(baseKey: String, load: suspend () -> List<FeaturedItem>): List<FeaturedItem> =
+        cachedHome(baseKey, { c, k -> c.readFeatured(k) }, { c, k, v -> c.writeFeatured(k, v) }, load)
 
     override suspend fun getFeatured(filter: HomeFilter): List<FeaturedItem> =
-        if (kids) cachedHome("featured_kids_${filter.name}") { extras.kidsFeatured(filter) }
-        else cachedHome("featured_${filter.name}") { extras.featured(filter) }
+        if (kids) cachedFeatured("featured_kids_${filter.name}") { extras.kidsFeatured(filter) }
+        else cachedFeatured("featured_${filter.name}") { extras.featured(filter) }
 
     override suspend fun getCategoryRows(category: Category, filter: HomeFilter): List<CatalogRow> =
         if (kids && category !in Category.KIDS_SAFE) emptyList() else extras.categoryRows(category, filter)
@@ -104,8 +181,8 @@ class CatalogRepositoryImpl @Inject constructor(
     override suspend fun getHome(filter: HomeFilter, maxItems: Int): List<CatalogRow> {
         // Las páginas que hacen falta para llenar cada fila con el máximo elegido en Ajustes (20 por página).
         val pages = ((maxItems + TMDB_PAGE_SIZE - 1) / TMDB_PAGE_SIZE).coerceIn(1, MAX_HOME_PAGES)
-        return if (kids) cachedHome("home_kids_${filter.name}_p$pages") { loadHome(kidsRowsFor(filter, pages), pages) }
-        else cachedHome("home_${filter.name}_p$pages") { loadHome(rowsFor(filter), pages) }
+        return if (kids) cachedRows("home_kids_${filter.name}_p$pages") { loadHome(kidsRowsFor(filter, pages), pages) }
+        else cachedRows("home_${filter.name}_p$pages") { loadHome(rowsFor(filter), pages) }
     }
 
     private suspend fun loadHome(specs: List<RowSpec>, pages: Int): List<CatalogRow> = coroutineScope {
@@ -770,6 +847,8 @@ class CatalogRepositoryImpl @Inject constructor(
 }
 
 private const val HOME_CACHE_MS = 30 * 60 * 1000L
+/** Hasta cuándo lo guardado en disco se enseña al abrir mientras se actualiza por detrás. */
+private const val HOME_STALE_MS = 24 * 60 * 60 * 1000L
 private const val TMDB_PAGE_SIZE = 20
 /** 5 páginas = 100 títulos, el máximo de "Elementos por fila de Inicio". */
 private const val MAX_HOME_PAGES = 5
