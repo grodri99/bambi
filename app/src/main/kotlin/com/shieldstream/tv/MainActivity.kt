@@ -2,6 +2,8 @@ package com.shieldstream.tv
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
@@ -9,6 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.shieldstream.tv.domain.IthilUpdateRepository
+import com.shieldstream.tv.intro.IntroKeyGate
+import com.shieldstream.tv.intro.ResumeIntro
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.TraktRepository
@@ -29,6 +33,10 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     private val watchNextRequest = MutableStateFlow<WatchNextRequest?>(null)
+
+    /** Intro al volver a la app desde segundo plano (no en el arranque, que ya empieza con ella). */
+    private val resumeIntro = MutableStateFlow<ResumeIntro?>(null)
+    private var stoppedAt = 0L
 
     @Inject
     lateinit var holder: SelectedContentHolder
@@ -67,6 +75,8 @@ class MainActivity : ComponentActivity() {
                         holder = holder,
                         onExit = { finish() },
                         watchNextRequest = watchNextRequest,
+                        resumeIntro = resumeIntro,
+                        onResumeIntroDone = { done -> if (resumeIntro.value == done) resumeIntro.value = null },
                         onWatchNextHandled = { handled ->
                             if (watchNextRequest.value?.requestedAtNs == handled.requestedAtNs) {
                                 watchNextRequest.value = null
@@ -78,6 +88,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Durante la intro las teclas del mando son para ella (OK/Atrás la saltan) y no para la pantalla de debajo.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val gate = IntroKeyGate.onKey ?: return super.dispatchKeyEvent(event)
+        if (event.action == KeyEvent.ACTION_UP) gate()
+        return true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stoppedAt = SystemClock.elapsedRealtime()
+    }
+
+    private companion object {
+        /** Lo que dura fresco el Inicio guardado: pasado esto, al volver se recarga. */
+        const val RELOAD_AFTER_MS = 30 * 60_000L
+        const val ALWAYS_MIN_AWAY_MS = 3_000L
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -86,6 +114,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (stoppedAt > 0L) {
+            val away = SystemClock.elapsedRealtime() - stoppedAt
+            // Tras mucho rato fuera el Inicio está caducado: la intro sale siempre y lo recarga con sus carátulas.
+            // Con "Intro siempre" sale además cada vez que se vuelve (salvo vueltas de un instante).
+            val reload = away >= RELOAD_AFTER_MS
+            if (reload || (settings.introAlwaysEnabled && away >= ALWAYS_MIN_AWAY_MS)) {
+                resumeIntro.value = ResumeIntro(reload = reload, at = SystemClock.elapsedRealtime())
+            }
+        }
         watchNext.onForeground()
         trakt.syncActive()
         updates.check(manual = false)

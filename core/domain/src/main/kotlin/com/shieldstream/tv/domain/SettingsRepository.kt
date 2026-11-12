@@ -25,6 +25,11 @@ interface SettingsRepository {
     suspend fun setLightweightUi(enabled: Boolean)
 
     /** Blur the backdrop behind Home rows. App-wide; on by default. */
+    /** Intro de Bambi cada vez que se abre la app (si no, solo al arrancar o cuando hay que recargar el Inicio). */
+    val introAlways: Flow<Boolean>
+    val introAlwaysEnabled: Boolean
+    suspend fun setIntroAlways(enabled: Boolean)
+
     val softBackdrops: Flow<Boolean>
     val softBackdropsEnabled: Boolean
     suspend fun setSoftBackdrops(enabled: Boolean)

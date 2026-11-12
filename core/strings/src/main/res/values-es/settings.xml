@@ -136,6 +136,8 @@
     <string name="settings_sources_and_links_through_torrentio">Fuentes y enlaces a través de Torrentio.</string>
     <string name="settings_direct_connection_to_real_debrid">Conexión directa con Real-Debrid.</string>
     <string name="settings_lightweight_ui">Interfaz ligera</string>
+    <string name="settings_intro_always">Intro de Bambi siempre</string>
+    <string name="settings_intro_always_summary">Activado: sale cada vez que abres Bambi. Desactivado: solo al arrancar la app o cuando hay que volver a cargar el Inicio y las carátulas (tras más de 30 minutos fuera).</string>
     <string name="settings_soft_backdrops">Fondos suaves</string>
     <string name="settings_soft_backdrops_summary">Difumina la imagen de fondo detrás de las filas de Inicio para que destaquen los títulos.</string>
     <string name="settings_high_res_backdrops">Fondos en alta resolución</string>

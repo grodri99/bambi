@@ -83,6 +83,14 @@ class CatalogRepositoryImpl @Inject constructor(
     private val homeLocks = ConcurrentHashMap<String, Mutex>()
 
     private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var invalidatedAt = 0L
+
+    override fun invalidateHome() {
+        invalidatedAt = System.currentTimeMillis()
+    }
+
+    /** Guardado antes de [invalidateHome] y ya caducado: hay que esperar a la red. */
+    private fun mustReload(savedAt: Long, now: Long) = savedAt < invalidatedAt && now - savedAt >= HOME_CACHE_MS
     private val refreshing = ConcurrentHashMap.newKeySet<String>()
 
     /**
@@ -104,13 +112,13 @@ class CatalogRepositoryImpl @Inject constructor(
             val now = System.currentTimeMillis()
             val hit = homeCache[cacheKey]
             if (hit != null && now - hit.at < HOME_CACHE_MS) return@withLock hit.value as T
-            if (hit != null && now - hit.at < HOME_STALE_MS) {
+            if (hit != null && now - hit.at < HOME_STALE_MS && !mustReload(hit.at, now)) {
                 refreshInBackground(cacheKey, writeDisk, load)
                 return@withLock hit.value as T
             }
             val disk = diskCache?.takeIf { hit == null }?.let { cache -> withContext(Dispatchers.IO) { readDisk(cache, cacheKey) } }
                 ?.takeIf { it.value.isNotEmpty() }
-            if (disk != null && now - disk.savedAt < HOME_STALE_MS) {
+            if (disk != null && now - disk.savedAt < HOME_STALE_MS && !mustReload(disk.savedAt, now)) {
                 homeCache[cacheKey] = Cached(disk.savedAt, disk.value)
                 if (now - disk.savedAt >= HOME_CACHE_MS) refreshInBackground(cacheKey, writeDisk, load)
                 return@withLock disk.value

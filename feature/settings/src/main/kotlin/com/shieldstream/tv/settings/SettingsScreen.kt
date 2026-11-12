@@ -388,6 +388,7 @@ private fun SettingsList(
             item { SectionTitle(localizedStringResource(StringsR.string.settings_home)) }
             item { HomeRowLimitCard() }
             item { LightweightModeCard() }
+            item { IntroAlwaysCard() }
             item { SoftBackdropsCard() }
             item { HighResBackdropsCard() }
             item { SectionTitle("Idioma · Language") }
@@ -946,6 +947,18 @@ private fun SoftBackdropsCard(viewModel: SettingsViewModel = hiltViewModel()) {
         summary = localizedStringResource(StringsR.string.settings_soft_backdrops_summary),
         enabled = enabled,
         onChange = viewModel::setSoftBackdrops,
+    )
+}
+
+/** Intro de Bambi: siempre al abrir, o solo cuando hace falta (arranque o Inicio por recargar). */
+@Composable
+private fun IntroAlwaysCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.introAlways.collectAsStateWithLifecycle()
+    OnOffCard(
+        title = localizedStringResource(StringsR.string.settings_intro_always),
+        summary = localizedStringResource(StringsR.string.settings_intro_always_summary),
+        enabled = enabled,
+        onChange = viewModel::setIntroAlways,
     )
 }
 

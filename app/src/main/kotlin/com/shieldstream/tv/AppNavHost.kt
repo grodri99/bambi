@@ -1,6 +1,11 @@
 package com.shieldstream.tv
 
 import androidx.compose.runtime.Composable
+import com.shieldstream.tv.intro.ResumeIntro
+import androidx.compose.runtime.key
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +49,8 @@ fun AppNavHost(
     onExit: () -> Unit,
     watchNextRequest: StateFlow<WatchNextRequest?>,
     onWatchNextHandled: (WatchNextRequest) -> Unit,
+    resumeIntro: StateFlow<ResumeIntro?>,
+    onResumeIntroDone: (ResumeIntro) -> Unit,
 ) {
     val navController = rememberNavController()
     val gate: SetupGateViewModel = hiltViewModel()
@@ -79,6 +86,7 @@ fun AppNavHost(
         navController.navigate("main") { popUpTo(navController.graph.id) { inclusive = true } }
     }
 
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = navController, startDestination = start) {
         composable("setup") {
             val toProfiles = {
@@ -231,7 +239,34 @@ fun AppNavHost(
             )
         }
     }
+    ResumeIntroOverlay(resumeIntro, currentEntry?.destination?.route, intro, onResumeIntroDone)
+    }
 }
+
+@Composable
+private fun ResumeIntroOverlay(
+    resumeIntro: StateFlow<ResumeIntro?>,
+    route: String?,
+    intro: IntroViewModel,
+    onDone: (ResumeIntro) -> Unit,
+) {
+    val pending by resumeIntro.collectAsState()
+    val request = pending ?: return
+    // No tapa el reproductor ni la configuración inicial, ni repite la intro del arranque.
+    if (route == null || route in NO_RESUME_INTRO_ROUTES) {
+        LaunchedEffect(request) { onDone(request) }
+        return
+    }
+    key(request.at) {
+        IntroScreen(
+            onStartPreload = { if (request.reload) intro.refresh() else intro.start() },
+            awaitReady = intro::awaitReady,
+            onFinished = { onDone(request) },
+        )
+    }
+}
+
+private val NO_RESUME_INTRO_ROUTES = setOf("intro", "player", "setup", "phone_setup", "profile_loading")
 
 private val WATCH_NEXT_INTERRUPT_ROUTES = setOf("details", "player", "settings")
 

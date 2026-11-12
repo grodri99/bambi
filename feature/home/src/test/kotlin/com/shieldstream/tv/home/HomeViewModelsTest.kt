@@ -81,6 +81,7 @@ class HomeViewModelsTest {
             profiles = mockk { every { active } returns MutableStateFlow(Profile("main", "Main", 0)) },
             trakt = mockk(),
             texts = mockk(relaxed = true),
+            preloader = mockk { every { refreshed } returns MutableStateFlow(0) },
         )
 
         viewModel.load(HomeFilter.ALL)
@@ -151,6 +152,7 @@ class HomeViewModelsTest {
             },
             trakt = trakt,
             texts = mockk(relaxed = true),
+            preloader = mockk { every { refreshed } returns MutableStateFlow(0) },
         )
 
         viewModel.load(HomeFilter.ALL)
@@ -669,6 +671,7 @@ class HomeViewModelsTest {
         profiles = mockk { every { this@mockk.active } returns active },
         trakt = trakt,
         texts = mockk(relaxed = true),
+        preloader = mockk { every { refreshed } returns MutableStateFlow(0) },
     )
 
     private fun homeSettings(

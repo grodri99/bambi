@@ -9,6 +9,7 @@ import javax.inject.Inject
 @HiltViewModel
 class IntroViewModel @Inject constructor(private val preloader: HomePreloader) : ViewModel() {
     fun start() = preloader.start()
+    fun refresh() = preloader.refresh()
     fun isReady(): Boolean = preloader.isReady()
     suspend fun awaitReady(timeoutMs: Long): Boolean = preloader.awaitReady(timeoutMs)
 }

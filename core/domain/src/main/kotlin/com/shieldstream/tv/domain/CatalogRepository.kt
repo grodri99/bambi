@@ -17,6 +17,9 @@ interface CatalogRepository {
 
     suspend fun getFeatured(filter: HomeFilter): List<FeaturedItem>
 
+    /** A partir de ahora, lo guardado con más de 30 minutos se vuelve a pedir a la red en vez de enseñarse. */
+    fun invalidateHome()
+
     suspend fun getCategoryRows(category: Category, filter: HomeFilter): List<CatalogRow>
 
     suspend fun trending(): List<CatalogItem>

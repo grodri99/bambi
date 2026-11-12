@@ -171,6 +171,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setLightweightUi(enabled) }
     }
 
+    val introAlways: StateFlow<Boolean> =
+        settings.introAlways.stateIn(viewModelScope, SharingStarted.Eagerly, settings.introAlwaysEnabled)
+
+    fun setIntroAlways(enabled: Boolean) {
+        viewModelScope.launch { settings.setIntroAlways(enabled) }
+    }
+
     val softBackdrops: StateFlow<Boolean> =
         settings.softBackdrops.stateIn(viewModelScope, SharingStarted.Eagerly, settings.softBackdropsEnabled)
 

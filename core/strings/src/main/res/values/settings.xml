@@ -136,6 +136,8 @@
     <string name="settings_sources_and_links_through_torrentio">Sources and links through Torrentio.</string>
     <string name="settings_direct_connection_to_real_debrid">Direct connection to Real-Debrid.</string>
     <string name="settings_lightweight_ui">Lightweight UI</string>
+    <string name="settings_intro_always">Bambi intro every time</string>
+    <string name="settings_intro_always_summary">On: plays every time you open Bambi. Off: only when the app starts or when Home and its artwork need reloading (after more than 30 minutes away).</string>
     <string name="settings_soft_backdrops">Soft backgrounds</string>
     <string name="settings_soft_backdrops_summary">Blurs the artwork behind the Home rows so titles stand out.</string>
     <string name="settings_high_res_backdrops">High-resolution backgrounds</string>

@@ -60,6 +60,15 @@ class SettingsRepositoryImpl @Inject constructor(
         lightweightUiFlow.value = enabled
     }
 
+    private val introAlwaysFlow = MutableStateFlow(prefs.getBoolean(KEY_INTRO_ALWAYS, false))
+    override val introAlways: Flow<Boolean> = introAlwaysFlow
+    override val introAlwaysEnabled: Boolean get() = introAlwaysFlow.value
+
+    override suspend fun setIntroAlways(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_INTRO_ALWAYS, enabled).apply()
+        introAlwaysFlow.value = enabled
+    }
+
     private val softBackdropsFlow = MutableStateFlow(prefs.getBoolean(KEY_SOFT_BACKDROPS, false))
     override val softBackdrops: Flow<Boolean> = softBackdropsFlow
     override val softBackdropsEnabled: Boolean get() = softBackdropsFlow.value
@@ -248,6 +257,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_SEEK_THUMBNAILS = "seek_thumbnails"
         const val KEY_LIGHTWEIGHT_UI = "lightweight_ui"
         const val KEY_SOFT_BACKDROPS = "soft_backdrops"
+        const val KEY_INTRO_ALWAYS = "intro_always"
         const val KEY_HIGH_RES_BACKDROPS = "high_res_backdrops"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
         const val KEY_AUTO_NEXT = "auto_next_episode"

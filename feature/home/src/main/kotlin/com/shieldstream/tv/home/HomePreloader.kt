@@ -24,6 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -53,6 +54,11 @@ class HomePreloader @Inject constructor(
     private val readyFor = MutableStateFlow<String?>(null)
     private var job: Job? = null
     private var jobKey: String? = null
+    @Volatile private var pendingRefresh = false
+    private val _refreshed = MutableStateFlow(0)
+
+    /** Sube cada vez que una recarga ([refresh]) deja el Inicio renovado: el Inicio abierto se actualiza. */
+    val refreshed: StateFlow<Int> = _refreshed
 
     /** Empieza (o sigue) la precarga para el perfil activo. Se puede llamar las veces que haga falta. */
     fun start() {
@@ -64,6 +70,22 @@ class HomePreloader @Inject constructor(
             jobKey = key
             job = scope.launch { preload(key) }
         }
+    }
+
+    /**
+     * Vuelve a pedir filas, destacados y carátulas aunque ya estuvieran (tras mucho rato fuera de la app):
+     * lo guardado con más de 30 minutos ya no se enseña, se espera a lo nuevo.
+     */
+    fun refresh() {
+        catalog.invalidateHome()
+        synchronized(this) {
+            job?.cancel()
+            job = null
+            jobKey = null
+            readyFor.value = null
+            pendingRefresh = true
+        }
+        start()
     }
 
     /** El Inicio del perfil activo ya está preparado. */
@@ -89,6 +111,10 @@ class HomePreloader @Inject constructor(
             val essential = firstScreen(featured, rows, sizes)
             withTimeoutOrNull(ESSENTIAL_TIMEOUT_MS) { fetchAll(essential, memory = true) }
             readyFor.value = key
+            if (pendingRefresh) {
+                pendingRefresh = false
+                _refreshed.value += 1
+            }
             Log.d(TAG, "Inicio listo en ${System.currentTimeMillis() - startedAt} ms (${essential.size} imágenes)")
 
             // Resto, sin prisa y solo a disco (para no echar de la memoria lo que se va a ver primero).

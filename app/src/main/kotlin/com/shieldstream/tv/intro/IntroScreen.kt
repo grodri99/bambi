@@ -13,7 +13,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -44,9 +42,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -94,18 +89,19 @@ fun IntroScreen(
     val proceed = remember { CompletableDeferred<Unit>() }
     var exiting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val focus = remember { FocusRequester() }
     val startedAt = remember { System.currentTimeMillis() }
 
     fun skip() {
         // Un margen para que la pulsación que abrió la app no la salte de golpe.
         if (System.currentTimeMillis() - startedAt > 350) proceed.complete(Unit)
     }
-    BackHandler { skip() }
+    DisposableEffect(Unit) {
+        IntroKeyGate.onKey = { skip() }
+        onDispose { IntroKeyGate.onKey = null }
+    }
 
     LaunchedEffect(Unit) {
         onStartPreload()
-        runCatching { focus.requestFocus() }
         // Entrada
         launch { delay(120); logoIn.animateTo(1f, tween(900, easing = Emphasized)) }
         launch { delay(480); shine.animateTo(1f, tween(1_050, easing = FastOutSlowInEasing)) }
@@ -151,13 +147,7 @@ fun IntroScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .focusRequester(focus)
-            .focusable()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp) skip()
-                true
-            },
+            .background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         val e = exit.value

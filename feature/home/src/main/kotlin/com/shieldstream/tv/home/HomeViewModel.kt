@@ -98,6 +98,7 @@ class HomeViewModel @Inject constructor(
     profiles: ProfileRepository,
     private val trakt: TraktRepository,
     private val texts: Texts,
+    private val preloader: HomePreloader,
 ) : ViewModel() {
 
     val kidsProfile: Boolean = profiles.active.value.kids
@@ -171,6 +172,13 @@ class HomeViewModel @Inject constructor(
     private var prefetchJob: Job? = null
 
     init {
+        // Tras mucho rato fuera, la intro recarga el Inicio: se cambia sin pasar por la pantalla de carga.
+        viewModelScope.launch {
+            preloader.refreshed.collect { version ->
+                val filter = loadedFilter
+                if (version > 0 && filter != null) load(filter, force = true, silent = true)
+            }
+        }
         // Al cambiar "Elementos por fila de Inicio" se vuelven a pedir las filas con el nuevo tamaño.
         viewModelScope.launch {
             rowItemLimit.collect { limit ->
@@ -547,7 +555,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun load(filter: HomeFilter, force: Boolean = false) {
+    fun load(filter: HomeFilter, force: Boolean = false, silent: Boolean = false) {
         filterFlow.value = filter
         val limit = rowItemLimit.value
         if (!force && loadedFilter == filter && loadedLimit == limit && _uiState.value is HomeUiState.Content) return
@@ -555,7 +563,8 @@ class HomeViewModel @Inject constructor(
         loadedFilter = filter
         loadedLimit = limit
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
+            // En silencio se mantiene lo que hay en pantalla hasta que llega lo nuevo.
+            if (!(silent && _uiState.value is HomeUiState.Content)) _uiState.value = HomeUiState.Loading
             val featured = async { runCatching { catalogRepository.getFeatured(filter) }.getOrDefault(emptyList()) }
             runCatching { catalogRepository.getHome(filter, limit) }
                 .onSuccess { rows ->
@@ -567,7 +576,10 @@ class HomeViewModel @Inject constructor(
                     if (filter == HomeFilter.ALL) prefetchOtherTabs()
                 }
                 .onFailure { e ->
-                    _uiState.value = HomeUiState.Error(e.message ?: texts.get(StringsR.string.home_error_loading_the_catalog))
+                    // Una recarga en silencio que falla deja lo que ya se veía.
+                    if (!(silent && _uiState.value is HomeUiState.Content)) {
+                        _uiState.value = HomeUiState.Error(e.message ?: texts.get(StringsR.string.home_error_loading_the_catalog))
+                    }
                 }
         }
     }
