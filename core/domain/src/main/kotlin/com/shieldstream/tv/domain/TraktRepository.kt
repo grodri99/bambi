@@ -45,7 +45,8 @@ interface TraktRepository {
 
     suspend fun disconnect(profileId: String)
 
-    suspend fun recommendations(profileId: String, type: MediaType): List<String>
+    /** Hasta [limit] recomendaciones (Trakt admite como máximo 100 por petición). */
+    suspend fun recommendations(profileId: String, type: MediaType, limit: Int = 40): List<String>
 
     suspend fun getRating(target: TraktRatingTarget): Int?
 

@@ -164,9 +164,20 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState.Loading)
 
     private var loadedFilter: HomeFilter? = null
+    /** Máximo de títulos por fila (Ajustes): decide cuántas páginas se piden a TMDB. */
+    private val rowItemLimit = settings.homeRowItemLimit
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT)
+    private var loadedLimit: Int? = null
     private var prefetchJob: Job? = null
 
     init {
+        // Al cambiar "Elementos por fila de Inicio" se vuelven a pedir las filas con el nuevo tamaño.
+        viewModelScope.launch {
+            rowItemLimit.collect { limit ->
+                val filter = loadedFilter
+                if (filter != null && loadedLimit != null && limit != loadedLimit) load(filter, force = true)
+            }
+        }
         viewModelScope.launch {
             combine(filterFlow.filterNotNull(), watchProgress.progress) { filter, all ->
                 ContinueWatching.entries(all, filter)
@@ -452,7 +463,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun recommendationEntries(query: RecommendationQuery): List<Pair<MediaType, String>> = coroutineScope {
         suspend fun load(type: MediaType): List<String> {
             val result = withTimeoutOrNull(5_000) {
-                runCatching { trakt.recommendations(query.profileId, type) }
+                runCatching { trakt.recommendations(query.profileId, type, query.maxItems) }
             }
             return result?.fold(
                 onSuccess = { ids ->
@@ -530,7 +541,7 @@ class HomeViewModel @Inject constructor(
             for (other in listOf(HomeFilter.TV, HomeFilter.MOVIES)) {
                 coroutineScope {
                     launch { runCatching { catalogRepository.getFeatured(other) } }
-                    runCatching { catalogRepository.getHome(other) }
+                    runCatching { catalogRepository.getHome(other, rowItemLimit.value) }
                 }
             }
         }
@@ -538,13 +549,15 @@ class HomeViewModel @Inject constructor(
 
     fun load(filter: HomeFilter, force: Boolean = false) {
         filterFlow.value = filter
-        if (!force && loadedFilter == filter && _uiState.value is HomeUiState.Content) return
+        val limit = rowItemLimit.value
+        if (!force && loadedFilter == filter && loadedLimit == limit && _uiState.value is HomeUiState.Content) return
         prefetchJob?.cancel()
         loadedFilter = filter
+        loadedLimit = limit
         viewModelScope.launch {
             _uiState.value = HomeUiState.Loading
             val featured = async { runCatching { catalogRepository.getFeatured(filter) }.getOrDefault(emptyList()) }
-            runCatching { catalogRepository.getHome(filter) }
+            runCatching { catalogRepository.getHome(filter, limit) }
                 .onSuccess { rows ->
                     _uiState.value = if (rows.isEmpty()) {
                         HomeUiState.Error(texts.get(StringsR.string.home_couldn_t_load_the_catalog_check_your))

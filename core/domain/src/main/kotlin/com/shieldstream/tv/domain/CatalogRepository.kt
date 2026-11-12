@@ -12,7 +12,8 @@ import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.ShowAiring
 
 interface CatalogRepository {
-    suspend fun getHome(filter: HomeFilter): List<CatalogRow>
+    /** Filas del Inicio con hasta [maxItems] títulos cada una (se piden las páginas de TMDB necesarias). */
+    suspend fun getHome(filter: HomeFilter, maxItems: Int = SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT): List<CatalogRow>
 
     suspend fun getFeatured(filter: HomeFilter): List<FeaturedItem>
 
