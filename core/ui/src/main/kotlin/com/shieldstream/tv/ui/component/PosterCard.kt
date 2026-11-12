@@ -1,7 +1,8 @@
 package com.shieldstream.tv.ui.component
 
 import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,9 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
@@ -47,12 +49,23 @@ import com.shieldstream.tv.strings.R
 import com.shieldstream.tv.strings.localizedPluralResource
 import com.shieldstream.tv.strings.localizedStringResource
 
-val PosterWidth: Dp = 136.dp
-private val CardShape = AppShapes.Control
-private val FocusBorderColor = Color.White.copy(alpha = 0.88f)
-private val PosterCaptionHeight = 48.dp
-private val ContinueCardWidth = 240.dp
+val PosterWidth: Dp = 124.dp
+private val CardShape = RoundedCornerShape(6.dp)
 
+/** Escala al enfocar como en Bambi (animada, salvo con la interfaz ligera). */
+@Composable
+private fun focusScale(focused: Boolean, target: Float): Float =
+    if (LocalLightweightUi.current) {
+        if (focused) target else 1f
+    } else {
+        animateFloatAsState(if (focused) target else 1f, label = "posterScale").value
+    }
+
+/**
+ * Póster 2:3 con foco estilo Netflix TV: escala + borde blanco. Sin ripple.
+ * [onFocused] se usa para actualizar el fondo/hero de la pantalla. [newEpisodeCount] > 0 pinta la etiqueta de
+ * capítulos nuevos. [caption] se mantiene por compatibilidad (Bambi no pone texto bajo los pósteres).
+ */
 @Composable
 fun PosterCard(
     item: CatalogItem,
@@ -63,70 +76,59 @@ fun PosterCard(
     onLongClick: (() -> Unit)? = null,
     newEpisodeCount: Int = 0,
     overlay: @Composable BoxScope.() -> Unit = {},
-    caption: (@Composable ColumnScope.() -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") caption: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale = if (focused) 1.04f else 1f
+    val scale = focusScale(focused, 1.1f)
 
-    Column(
+    Box(
         modifier = modifier
             .zIndex(if (focused) 1f else 0f)
             .width(width)
+            .aspectRatio(2f / 3f)
+            // Bambi 1.0.6: el foco (clickable) va ANTES que la escala. Si la escala va delante, el rectángulo que
+            // la tarjeta pide "traer a la vista" crece con la animación y la lista de filas da un "saltito".
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .tvClickable(onLongClick = onLongClick, onClick = onClick),
+            .tvClickable(onLongClick = onLongClick, onClick = onClick)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CardShape)
+            .background(Color(0xFF232327))
+            .then(if (focused) Modifier.border(2.dp, Color.White, CardShape) else Modifier),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .clip(CardShape)
-                .background(AppColors.Placeholder)
-                .then(if (focused) Modifier.border(2.dp, FocusBorderColor, CardShape) else Modifier),
-        ) {
-            if (item.posterUrl != null) {
-                AsyncImage(
-                    model = item.posterUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Text(
-                    text = item.title,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center).padding(8.dp),
-                )
-            }
-            overlay()
-            if (newEpisodeCount > 0) {
-                StatusPill(
-                    text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                )
-            }
+        if (item.posterUrl != null) {
+            AsyncImage(
+                model = item.posterUrl,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Text(
+                text = item.title,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center).padding(8.dp),
+            )
         }
-        if (caption != null) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(PosterCaptionHeight),
-            ) {
-                caption.invoke(this)
-            }
+        overlay()
+        if (newEpisodeCount > 0) {
+            StatusPill(
+                text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp),
+            )
         }
     }
 }
 
+/** Póster de catálogo (filas de Inicio, Mi lista…): en Bambi es el mismo póster sin texto debajo. */
 @Composable
 fun CatalogPosterCard(
     item: CatalogItem,
@@ -145,26 +147,63 @@ fun CatalogPosterCard(
         width = width,
         onLongClick = onLongClick,
         newEpisodeCount = newEpisodeCount,
-        caption = {
-            Spacer(Modifier.height(7.dp))
-            Text(
-                text = item.title,
-                color = Color.White.copy(alpha = 0.94f),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = item.year?.toString().orEmpty(),
-                color = Color.White.copy(alpha = 0.55f),
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-            )
-        },
     )
 }
 
+/** Degradado inferior con una o dos líneas de texto (y barra de progreso opcional), como "Seguir viendo". */
+@Composable
+private fun BoxScope.BottomLabel(label: String, fraction: Float?) {
+    Box(
+        Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .height(84.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.45f to Color.Black.copy(alpha = 0.75f),
+                    1f to Color.Black.copy(alpha = 0.95f),
+                ),
+            ),
+    )
+    Column(
+        Modifier
+            .align(Alignment.BottomStart)
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (fraction != null) {
+            Spacer(Modifier.height(5.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.3f)),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .background(AppColors.Accent),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tarjeta de "Seguir viendo": póster con la etiqueta (T1:E6 · 14 min) y la barra roja de progreso.
+ * Mantener OK → [onLongClick] (opciones). [newEpisodeCount]: capítulos nuevos de la serie.
+ */
 @Composable
 fun ContinueCard(
     item: CatalogItem,
@@ -176,93 +215,19 @@ fun ContinueCard(
     onFocused: () -> Unit = {},
     newEpisodeCount: Int = 0,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val scale = if (focused) 1.04f else 1f
-
-    Box(
-        modifier = modifier
-            .zIndex(if (focused) 1f else 0f)
-            .width(ContinueCardWidth)
-            .aspectRatio(16f / 9f)
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocused()
-            }
-            .tvClickable(onLongClick = onLongClick, onClick = onClick)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(CardShape)
-            .background(AppColors.Placeholder)
-            .then(if (focused) Modifier.border(2.dp, FocusBorderColor, CardShape) else Modifier),
+    PosterCard(
+        item = item,
+        onClick = onClick,
+        modifier = modifier,
+        onFocused = onFocused,
+        onLongClick = onLongClick,
+        newEpisodeCount = newEpisodeCount,
     ) {
-        val imageUrl = item.backdropUrl ?: item.posterUrl
-        if (imageUrl != null) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = "${item.title}, $label",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(64.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        1f to Color.Black.copy(alpha = 0.88f),
-                    ),
-                ),
-        )
-        if (label.isNotEmpty()) {
-            StatusPill(
-                text = label,
-                dot = false,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-            )
-        }
-        if (newEpisodeCount > 0) {
-            StatusPill(
-                text = localizedPluralResource(R.plurals.poster_new_episodes, newEpisodeCount, newEpisodeCount),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp),
-            )
-        }
-        Text(
-            text = item.title,
-            color = Color.White,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-        )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(Color.White.copy(alpha = 0.24f)),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                    .background(AppColors.Highlight),
-            )
-        }
+        BottomLabel(label, fraction)
     }
 }
 
+/** Episodio recién emitido o por llegar: póster con la etiqueta roja arriba y el capítulo abajo. */
 @Composable
 fun NewEpisodeCard(
     item: CatalogItem,
@@ -279,40 +244,25 @@ fun NewEpisodeCard(
         modifier = modifier,
         onFocused = onFocused,
         onLongClick = onLongClick,
-        overlay = {
-            StatusPill(
-                text = if (count == 0) {
-                    localizedStringResource(R.string.coming_soon)
-                } else {
-                    localizedPluralResource(R.plurals.new_episode_count, count, count)
-                },
-                dot = count > 0,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp),
-            )
-        },
-        caption = {
-            Spacer(Modifier.height(7.dp))
-            Text(
-                text = item.title,
-                color = Color.White.copy(alpha = 0.94f),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = label,
-                color = Color.White.copy(alpha = 0.60f),
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-    )
+    ) {
+        StatusPill(
+            text = if (count == 0) {
+                localizedStringResource(R.string.coming_soon)
+            } else {
+                localizedPluralResource(R.plurals.new_episode_count, count, count)
+            },
+            dot = count > 0,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(6.dp),
+        )
+        if (label.isNotEmpty()) BottomLabel(label, fraction = null)
+    }
 }
 
+/**
+ * Tarjeta "Top 10": número gigante con contorno gris + póster, como en Netflix.
+ */
 @Composable
 fun Top10Card(
     rank: Int,
@@ -322,29 +272,31 @@ fun Top10Card(
     onFocused: () -> Unit = {},
     newEpisodeCount: Int = 0,
 ) {
-    PosterCard(
-        item = item,
-        onClick = onClick,
-        onFocused = onFocused,
-        newEpisodeCount = newEpisodeCount,
-        modifier = modifier,
-        overlay = {
-            Text(
-                text = rank.toString(),
-                color = Color.White,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Black,
-                style = TextStyle(
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.75f),
-                        offset = Offset(2f, 2f),
-                        blurRadius = 6f,
-                    ),
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 8.dp, bottom = 4.dp),
-            )
-        },
-    )
+    val numberWidth = if (rank >= 10) 104.dp else 70.dp
+    val posterHeight = PosterWidth * 1.5f
+    Box(modifier = Modifier.width(numberWidth + PosterWidth).height(posterHeight)) {
+        val numberStyle = TextStyle(
+            fontSize = 150.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = (-12).sp,
+        )
+        // Relleno oscuro + contorno gris superpuestos.
+        Text(
+            text = rank.toString(),
+            style = numberStyle.copy(color = Color(0xFF0E0E10)),
+            modifier = Modifier.align(Alignment.BottomStart).offset(x = (-4).dp, y = 36.dp),
+        )
+        Text(
+            text = rank.toString(),
+            style = numberStyle.copy(color = Color(0xFF8C8C90), drawStyle = Stroke(width = 5f)),
+            modifier = Modifier.align(Alignment.BottomStart).offset(x = (-4).dp, y = 36.dp),
+        )
+        PosterCard(
+            item = item,
+            onClick = onClick,
+            onFocused = onFocused,
+            newEpisodeCount = newEpisodeCount,
+            modifier = modifier.align(Alignment.BottomEnd),
+        )
+    }
 }

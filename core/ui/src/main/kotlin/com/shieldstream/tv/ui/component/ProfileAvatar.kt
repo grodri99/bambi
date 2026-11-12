@@ -1,7 +1,6 @@
 package com.shieldstream.tv.ui.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shieldstream.tv.model.ProfileAvatars
 
@@ -34,14 +32,13 @@ fun ProfileAvatar(
     Box(
         modifier
             .size(size)
-            .background(gradient, shape)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape),
+            .background(gradient, shape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = initial,
             color = Color.White,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Black,
             fontSize = (size.value * 0.48f).sp,
         )
     }

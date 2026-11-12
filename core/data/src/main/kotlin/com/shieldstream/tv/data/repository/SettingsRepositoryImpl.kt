@@ -60,7 +60,7 @@ class SettingsRepositoryImpl @Inject constructor(
         lightweightUiFlow.value = enabled
     }
 
-    private val softBackdropsFlow = MutableStateFlow(prefs.getBoolean(KEY_SOFT_BACKDROPS, true))
+    private val softBackdropsFlow = MutableStateFlow(prefs.getBoolean(KEY_SOFT_BACKDROPS, false))
     override val softBackdrops: Flow<Boolean> = softBackdropsFlow
     override val softBackdropsEnabled: Boolean get() = softBackdropsFlow.value
 

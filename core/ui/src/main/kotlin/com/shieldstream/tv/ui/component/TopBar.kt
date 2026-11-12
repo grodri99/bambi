@@ -12,11 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.res.painterResource
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -151,13 +147,13 @@ private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
             .border(
                 width = 2.dp,
                 color = if (focused) Color.White else Color.Transparent,
-                shape = CircleShape,
+                shape = RoundedCornerShape(8.dp),
             )
             .padding(3.dp)
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick),
     ) {
-        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp, shape = CircleShape)
+        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp, shape = RoundedCornerShape(6.dp))
     }
 }
 
@@ -172,33 +168,29 @@ private fun TopBarItem(
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale = if (LocalLightweightUi.current) {
-        if (focused) 1.03f else 1f
+        if (focused) 1.06f else 1f
     } else {
-        animateFloatAsState(if (focused) 1.03f else 1f, label = "topBarScale").value
+        animateFloatAsState(if (focused) 1.06f else 1f, label = "topBarScale").value
     }
-    // Focus is a faint pill; the selected tab carries a small accent underline.
-    val background = if (focused) Color.White.copy(alpha = 0.18f) else Color.Transparent
-    val foreground = if (focused || selected) Color.White else Color.White.copy(alpha = 0.6f)
-    val showIndicator = selected
+    // Como en Bambi: pastilla blanca al enfocar y gris translúcida en la pestaña activa.
+    val background = when {
+        focused -> Color.White
+        selected -> Color.White.copy(alpha = 0.18f)
+        else -> Color.Transparent
+    }
+    val foreground = when {
+        focused -> Color.Black
+        selected -> Color.White
+        else -> Color.White.copy(alpha = 0.75f)
+    }
     Box(
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .background(background, AppShapes.Pill)
-            .drawBehind {
-                if (showIndicator) {
-                    val width = 18.dp.toPx()
-                    val height = 3.dp.toPx()
-                    drawRoundRect(
-                        color = AppColors.Accent,
-                        topLeft = Offset((size.width - width) / 2f, size.height - height - 1.dp.toPx()),
-                        size = Size(width, height),
-                        cornerRadius = CornerRadius(height / 2f),
-                    )
-                }
-            }
+            // Fondo dibujado ya redondeado (sin clip): en la Shield el clip de una capa escalada se perdía.
+            .background(background, RoundedCornerShape(50))
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick)
             .padding(horizontal = if (label != null) 18.dp else 10.dp, vertical = 7.dp),
@@ -212,7 +204,7 @@ private fun TopBarItem(
                     text = label,
                     color = foreground,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Medium,
+                        fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Medium,
                     ),
                 )
                 if (badgeCount > 0) {

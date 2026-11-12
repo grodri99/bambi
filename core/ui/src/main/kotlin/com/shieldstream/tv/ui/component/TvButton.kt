@@ -38,7 +38,7 @@ fun TvButton(
     var focused by remember { mutableStateOf(false) }
     val duration = if (LocalLightweightUi.current) 0 else 150
     val background by animateColorAsState(
-        if (focused) Color.White else Color.White.copy(alpha = 0.12f),
+        if (focused) Color.White else Color.White.copy(alpha = 0.16f),
         tween(duration),
         label = "buttonBackground",
     )
@@ -47,21 +47,20 @@ fun TvButton(
     Row(
         modifier = modifier
             .onFocusChanged { focused = it.isFocused }
-            .clip(AppShapes.Control)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
             .background(background)
             .tvClickable(enabled = enabled, onClick = onClick)
-            .height(44.dp)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 22.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(10.dp))
         }
         Text(
             text = text,
             color = content,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
         )
     }
 }

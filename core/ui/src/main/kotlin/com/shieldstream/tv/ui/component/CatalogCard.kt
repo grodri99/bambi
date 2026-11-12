@@ -34,7 +34,7 @@ fun CatalogCard(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = AppShapes.Control
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
 
     Box(
         modifier = modifier
@@ -59,7 +59,7 @@ fun CatalogCard(
             )
         } else {
             Box(
-                modifier = Modifier.fillMaxSize().background(AppColors.SurfaceFocused),
+                modifier = Modifier.fillMaxSize().background(Color(0xFF2A2A2E)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(item.title, color = Color.White, style = MaterialTheme.typography.bodySmall)

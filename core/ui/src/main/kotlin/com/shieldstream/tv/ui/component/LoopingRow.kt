@@ -24,7 +24,7 @@ fun firstVirtualIndex(size: Int): Int = if (shouldLoop(size)) loopStartIndex(siz
 fun rememberLoopingRowState(size: Int): LazyListState =
     rememberLazyListState(
         initialFirstVisibleItemIndex = firstVirtualIndex(size),
-        prefetchStrategy = androidx.compose.foundation.lazy.LazyListPrefetchStrategy(nestedPrefetchItemCount = 2),
+        prefetchStrategy = androidx.compose.foundation.lazy.LazyListPrefetchStrategy(nestedPrefetchItemCount = 7),
     )
 
 fun <T> LazyListScope.loopingItems(
