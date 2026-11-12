@@ -1,7 +1,8 @@
 package com.shieldstream.tv.home
 
 import com.shieldstream.tv.model.Lang
-import com.shieldstream.tv.model.tr
+import com.shieldstream.tv.strings.R as StringsR
+import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.model.BackdropUrls
 import com.shieldstream.tv.strings.localizedLabel
 import com.shieldstream.tv.strings.localizedTitle
@@ -214,7 +215,7 @@ private fun FeaturedSlide(featured: FeaturedItem) {
 private fun MetaLine(featured: FeaturedItem) {
     val item = featured.item
     val text = listOfNotNull(
-        if (item.type == MediaType.TV) tr("Serie", "Series") else tr("Película", "Movie"),
+        if (item.type == MediaType.TV) localizedStringResource(StringsR.string.home_series) else localizedStringResource(StringsR.string.home_movie),
         featured.genre,
         item.year?.toString(),
         featured.durationText,
