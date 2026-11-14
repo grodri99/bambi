@@ -57,6 +57,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -91,7 +92,8 @@ class CatalogRepositoryImpl @Inject constructor(
 
     /** Guardado antes de [invalidateHome] y ya caducado: hay que esperar a la red. */
     private fun mustReload(savedAt: Long, now: Long) = savedAt < invalidatedAt && now - savedAt >= HOME_CACHE_MS
-    private val refreshing = ConcurrentHashMap.newKeySet<String>()
+    // newKeySet() es de API 24 y la app admite desde la 21.
+    private val refreshing: MutableSet<String> = Collections.synchronizedSet(HashSet())
 
     /**
      * Memoria → disco → red.

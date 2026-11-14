@@ -1,5 +1,6 @@
 package com.shieldstream.tv
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
@@ -89,6 +90,8 @@ class MainActivity : ComponentActivity() {
     }
 
     // Durante la intro las teclas del mando son para ella (OK/Atrás la saltan) y no para la pantalla de debajo.
+    // Falso positivo conocido de lint: ComponentActivity marca dispatchKeyEvent como restringido, pero sobrescribirlo es legítimo.
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val gate = IntroKeyGate.onKey ?: return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_UP) gate()
