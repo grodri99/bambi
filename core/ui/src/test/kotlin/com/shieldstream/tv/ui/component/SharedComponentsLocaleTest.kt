@@ -170,7 +170,8 @@ class SharedComponentsLocaleTest {
     }
 
     @Test
-    fun `catalog captions stay visible during focus changes`() {
+    fun `catalog poster keeps its title for accessibility through focus changes`() {
+        // Estilo Bambi: el póster va sin texto debajo; el título queda como descripción de la imagen.
         val requester = FocusRequester()
         val item = testItem.copy(posterUrl = "https://invalid.local/poster.jpg", year = 2026)
         composeRule.setContent {
@@ -181,12 +182,9 @@ class SharedComponentsLocaleTest {
             )
         }
 
-        composeRule.onNodeWithText(item.title).assertIsDisplayed()
-        composeRule.onNodeWithText("2026").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(item.title, useUnmergedTree = true).assertExists()
         composeRule.runOnIdle { requester.requestFocus() }
-
-        composeRule.onNodeWithText(item.title).assertIsDisplayed()
-        composeRule.onNodeWithText("2026").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(item.title, useUnmergedTree = true).assertExists()
     }
 
     private fun renderBadges() {

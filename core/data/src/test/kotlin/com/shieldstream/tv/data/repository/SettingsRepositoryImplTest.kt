@@ -77,13 +77,23 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
-    fun `soft backdrops default on and persist across reloads`() = runTest {
-        assertEquals(true, repository().softBackdrops.first())
-
-        repository().setSoftBackdrops(false)
-
+    fun `soft backdrops default off and persist across reloads`() = runTest {
         assertEquals(false, repository().softBackdrops.first())
-        assertEquals(false, repository().softBackdropsEnabled)
+
+        repository().setSoftBackdrops(true)
+
+        assertEquals(true, repository().softBackdrops.first())
+        assertEquals(true, repository().softBackdropsEnabled)
+    }
+
+    @Test
+    fun `intro always defaults off and persists across reloads`() = runTest {
+        assertEquals(false, repository().introAlways.first())
+
+        repository().setIntroAlways(true)
+
+        assertEquals(true, repository().introAlways.first())
+        assertEquals(true, repository().introAlwaysEnabled)
     }
 
     @Test

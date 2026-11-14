@@ -28,9 +28,10 @@ class IthilAccessRepositoryImplTest {
     }
 
     @Test
-    fun unlockPersistsAcrossRepositoryRecreation() {
+    fun unlockedByDefaultAndPersistsAcrossRepositoryRecreation() {
+        // En Bambi, Ithil viene activado de serie.
         val access = IthilAccessRepositoryImpl(context, library)
-        assertFalse(access.isUnlocked)
+        assertTrue(access.isUnlocked)
 
         access.unlock()
 
