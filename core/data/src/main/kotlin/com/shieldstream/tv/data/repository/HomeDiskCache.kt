@@ -37,19 +37,23 @@ class HomeDiskCache @Inject constructor(@ApplicationContext context: Context) {
     }
 
     fun readFeatured(key: String): Entry<List<FeaturedItem>>? = read(key) { json ->
+        // Copias anteriores a los tráileres: se vuelven a pedir una vez, sin tirar la caché de filas.
+        if (!json.optBoolean(FEATURED_TRAILERS, false)) return@read null
         json.getJSONArray("featured").objects().map { it.toFeatured() }
     }
 
     fun writeFeatured(key: String, items: List<FeaturedItem>) = write(key) {
+        put(FEATURED_TRAILERS, true)
         put("featured", JSONArray().apply { items.forEach { put(it.toJson()) } })
     }
 
-    private fun <T> read(key: String, parse: (JSONObject) -> T): Entry<T>? = runCatching {
+    private fun <T : Any> read(key: String, parse: (JSONObject) -> T?): Entry<T>? = runCatching {
         val file = file(key)
         if (!file.isFile) return null
         val json = JSONObject(file.readText())
         if (json.optInt("v") != VERSION) return null
-        Entry(json.getLong("savedAt"), parse(json))
+        val value = parse(json) ?: return null
+        Entry(json.getLong("savedAt"), value)
     }.onFailure { Log.w(TAG, "No se pudo leer la caché $key: ${it.message}") }.getOrNull()
 
     private fun write(key: String, fill: JSONObject.() -> Unit) {
@@ -97,6 +101,7 @@ class HomeDiskCache @Inject constructor(@ApplicationContext context: Context) {
         putOpt("genre", genre)
         putOpt("durationText", durationText)
         putOpt("certification", certification)
+        putOpt("trailerKey", trailerKey)
     }
 
     private fun JSONObject.toFeatured() = FeaturedItem(
@@ -106,6 +111,7 @@ class HomeDiskCache @Inject constructor(@ApplicationContext context: Context) {
         genre = str("genre"),
         durationText = str("durationText"),
         certification = str("certification"),
+        trailerKey = str("trailerKey"),
     )
 
     private fun CatalogItem.toJson() = JSONObject().apply {
@@ -140,5 +146,8 @@ class HomeDiskCache @Inject constructor(@ApplicationContext context: Context) {
     private companion object {
         const val TAG = "HomeDiskCache"
         const val VERSION = 1
+
+        /** Marca de las portadas que ya guardan `trailerKey`. */
+        const val FEATURED_TRAILERS = "featuredTrailers"
     }
 }

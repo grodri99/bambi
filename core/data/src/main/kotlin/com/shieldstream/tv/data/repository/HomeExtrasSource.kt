@@ -17,6 +17,10 @@ import com.shieldstream.tv.network.dto.TmdbContentRatingsDto
 import com.shieldstream.tv.network.dto.TmdbImagesDto
 import com.shieldstream.tv.network.dto.TmdbReleaseDatesDto
 import com.shieldstream.tv.network.dto.TmdbSearchResultDto
+import com.shieldstream.tv.network.dto.TmdbVideoDto
+import com.shieldstream.tv.network.dto.TmdbVideosDto
+import com.shieldstream.tv.model.TrailerVideo
+import com.shieldstream.tv.model.pickTrailer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -151,7 +155,7 @@ class HomeExtrasSource @Inject constructor(
     }
 
     private suspend fun loadFeaturedMovie(pick: Pick): FeaturedItem? {
-        val d = tmdb.movieDetails(pick.id, key, append = "images,release_dates")
+        val d = tmdb.movieDetails(pick.id, key, append = "images,release_dates,videos")
         return FeaturedItem(
             item = CatalogItem(
                 id = pick.id.toString(),
@@ -170,11 +174,12 @@ class HomeExtrasSource @Inject constructor(
             genre = d.genres.firstOrNull()?.name,
             durationText = d.runtime?.takeIf { it > 0 }?.let { formatRuntime(it) },
             certification = movieCertification(d.release_dates),
+            trailerKey = trailerKey(d.videos),
         )
     }
 
     private suspend fun loadFeaturedSeries(pick: Pick): FeaturedItem? {
-        val d = tmdb.tvDetails(pick.id, key, append = "images,content_ratings,external_ids")
+        val d = tmdb.tvDetails(pick.id, key, append = "images,content_ratings,external_ids,videos")
         val seasons = d.seasons.count { it.season_number > 0 }.takeIf { it > 0 } ?: d.number_of_seasons
         return FeaturedItem(
             item = CatalogItem(
@@ -194,8 +199,20 @@ class HomeExtrasSource @Inject constructor(
             genre = d.genres.firstOrNull()?.name,
             durationText = seasons.takeIf { it > 0 }?.let { if (it == 1) texts.get(StringsR.string.data_1_season) else texts.get(StringsR.string.data_season_count, it) },
             certification = tvCertification(d.content_ratings),
+            trailerKey = trailerKey(d.videos),
         )
     }
+
+    private fun trailerKey(videos: TmdbVideosDto?): String? =
+        pickTrailer(videos?.results?.map { it.toTrailerVideo() }.orEmpty(), Lang.current.code)
+
+    private fun TmdbVideoDto.toTrailerVideo() = TrailerVideo(
+        key = key,
+        site = site,
+        type = type,
+        official = official,
+        language = iso_639_1,
+    )
 
     private fun readPicks(raw: String?, week: String): List<Pick>? {
         if (raw == null) return null

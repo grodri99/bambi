@@ -6,8 +6,13 @@ import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.network.api.TmdbApi
+import com.shieldstream.tv.network.dto.TmdbMovieDetailDto
 import com.shieldstream.tv.network.dto.TmdbMovieDto
 import com.shieldstream.tv.network.dto.TmdbPaginated
+import com.shieldstream.tv.network.dto.TmdbSearchResultDto
+import com.shieldstream.tv.network.dto.TmdbTvDetailDto
+import com.shieldstream.tv.network.dto.TmdbVideoDto
+import com.shieldstream.tv.network.dto.TmdbVideosDto
 import com.shieldstream.tv.strings.Texts
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -48,5 +53,48 @@ class HomeExtrasSourceTest {
             assertEquals("500", query["vote_count.gte"])
         }
         coVerify(exactly = 0) { tmdb.discoverTvQuery(any(), any()) }
+    }
+
+    @Test
+    fun `featured billboard carries the best trailer key from TMDB videos`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        // Las elecciones de la semana se guardan en disco: sin limpiar, otro test decidiría por este.
+        context.getSharedPreferences("featured", Context.MODE_PRIVATE).edit().clear().commit()
+
+        val tmdb = mockk<TmdbApi>()
+        val store = mockk<TokenStore> { every { tmdbKey } returns "tmdb-key" }
+        coEvery { tmdb.trendingAllWeek("tmdb-key", 1) } returns TmdbPaginated(
+            results = listOf(
+                TmdbSearchResultDto(id = 1, media_type = "movie", backdrop_path = "/b1.jpg", poster_path = "/p1.jpg"),
+                TmdbSearchResultDto(id = 2, media_type = "tv", backdrop_path = "/b2.jpg", poster_path = "/p2.jpg"),
+            ),
+        )
+        coEvery { tmdb.trendingAllWeek("tmdb-key", 2) } returns TmdbPaginated()
+        coEvery {
+            tmdb.movieDetails(1, "tmdb-key", append = "images,release_dates,videos")
+        } returns TmdbMovieDetailDto(
+            id = 1,
+            title = "Movie",
+            backdrop_path = "/b1.jpg",
+            videos = TmdbVideosDto(listOf(TmdbVideoDto(key = "movie-trailer", site = "YouTube", type = "Trailer"))),
+        )
+        coEvery {
+            tmdb.tvDetails(2, "tmdb-key", append = "images,content_ratings,external_ids,videos")
+        } returns TmdbTvDetailDto(
+            id = 2,
+            name = "Show",
+            backdrop_path = "/b2.jpg",
+            videos = TmdbVideosDto(
+                listOf(
+                    TmdbVideoDto(key = "show-teaser", site = "YouTube", type = "Teaser"),
+                    TmdbVideoDto(key = "show-trailer", site = "YouTube", type = "Trailer"),
+                ),
+            ),
+        )
+        val source = HomeExtrasSource(tmdb, context, store, mockk<Texts>(relaxed = true))
+
+        val featured = source.featured(HomeFilter.ALL)
+
+        assertEquals(listOf("movie-trailer", "show-trailer"), featured.map { it.trailerKey })
     }
 }

@@ -139,6 +139,7 @@ fun HomeScreen(
     LaunchedEffect(filter) { viewModel.load(filter) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val hidden by viewModel.hiddenCategories.collectAsStateWithLifecycle()
+    val trailersEnabled by viewModel.billboardTrailers.collectAsStateWithLifecycle()
 
     when (val s = state) {
         HomeUiState.Loading -> Column(Modifier.fillMaxSize().background(BillboardBackground)) {
@@ -170,6 +171,7 @@ fun HomeScreen(
                     else -> Category.forFilter(filter).filter { it.name !in hidden }.ifEmpty { Category.forFilter(filter) }
                 }
             },
+            trailersEnabled = trailersEnabled,
             onItemClick = { item ->
                 viewModel.cancelBackgroundPrefetch()
                 onItemClick(item)
@@ -211,6 +213,7 @@ private fun HomeContent(
     rows: List<CatalogRow>,
     featured: List<FeaturedItem>,
     categories: List<Category>,
+    trailersEnabled: Boolean,
     onItemClick: (CatalogItem) -> Unit,
     onContinueClick: (CatalogItem, ContinueInfo) -> Unit,
     onNewEpisodeClick: (CatalogItem, Episode) -> Unit,
@@ -274,6 +277,7 @@ private fun HomeContent(
             Billboard(
                 featured = featured,
                 categories = categories,
+                trailersEnabled = trailersEnabled,
                 initialFocus = topFocus,
                 onFocusChange = { topFocus = it },
                 onItemClick = onItemClick,
@@ -293,6 +297,7 @@ private fun HomeContent(
 private fun Billboard(
     featured: List<FeaturedItem>,
     categories: List<Category>,
+    trailersEnabled: Boolean,
     initialFocus: TopFocus,
     onFocusChange: (TopFocus) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
@@ -329,6 +334,7 @@ private fun Billboard(
             FeaturedCarousel(
                 items = featured,
                 onOpen = onItemClick,
+                trailersEnabled = trailersEnabled,
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(heroRequester)

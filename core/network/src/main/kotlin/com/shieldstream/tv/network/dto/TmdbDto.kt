@@ -105,6 +105,22 @@ data class TmdbImagesDto(
 )
 
 @Serializable
+data class TmdbVideoDto(
+    val id: String = "",
+    val key: String = "",
+    val name: String = "",
+    val site: String = "",
+    val type: String = "",
+    val official: Boolean = false,
+    val iso_639_1: String? = null,
+)
+
+@Serializable
+data class TmdbVideosDto(
+    val results: List<TmdbVideoDto> = emptyList(),
+)
+
+@Serializable
 data class TmdbMovieDetailDto(
     val id: Int = 0,
     val original_title: String? = null,
@@ -121,6 +137,7 @@ data class TmdbMovieDetailDto(
     val images: TmdbImagesDto? = null,
     val translations: TmdbTranslationsDto? = null,
     val release_dates: TmdbReleaseDatesDto? = null,
+    val videos: TmdbVideosDto? = null,
 )
 
 @Serializable
@@ -152,6 +169,7 @@ data class TmdbTvDetailDto(
     val original_language: String? = null,
     val last_episode_to_air: TmdbEpisodeDto? = null,
     val next_episode_to_air: TmdbEpisodeDto? = null,
+    val videos: TmdbVideosDto? = null,
 )
 
 @Serializable

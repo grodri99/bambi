@@ -121,6 +121,7 @@ interface TmdbApi {
         @Query("api_key") key: String,
         @Query("append_to_response") append: String = "images,translations",
         @Query("include_image_language") imageLanguages: String = if (Lang.isEnglish) "en,null" else "es,en,null",
+        @Query("include_video_language") videoLanguages: String = if (Lang.isEnglish) "en,null" else "es,en,null",
     ): TmdbMovieDetailDto
 
     @GET("3/tv/{id}")
@@ -129,6 +130,7 @@ interface TmdbApi {
         @Query("api_key") key: String,
         @Query("append_to_response") append: String = "images,external_ids,translations",
         @Query("include_image_language") imageLanguages: String = if (Lang.isEnglish) "en,null" else "es,en,null",
+        @Query("include_video_language") videoLanguages: String = if (Lang.isEnglish) "en,null" else "es,en,null",
     ): TmdbTvDetailDto
 
     @GET("3/tv/{id}/season/{season}")
