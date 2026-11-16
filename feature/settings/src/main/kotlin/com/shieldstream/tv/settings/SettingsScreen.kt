@@ -391,6 +391,7 @@ private fun SettingsList(
             item { IntroAlwaysCard() }
             item { SoftBackdropsCard() }
             item { HighResBackdropsCard() }
+            item { BillboardTrailersCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
@@ -971,6 +972,18 @@ private fun HighResBackdropsCard(viewModel: SettingsViewModel = hiltViewModel())
         summary = localizedStringResource(StringsR.string.settings_high_res_backdrops_summary),
         enabled = enabled,
         onChange = viewModel::setHighResBackdrops,
+    )
+}
+
+/** Muted trailer over the featured billboard (Netflix-style). */
+@Composable
+private fun BillboardTrailersCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.billboardTrailers.collectAsStateWithLifecycle()
+    OnOffCard(
+        title = localizedStringResource(StringsR.string.settings_billboard_trailers),
+        summary = localizedStringResource(StringsR.string.settings_billboard_trailers_summary),
+        enabled = enabled,
+        onChange = viewModel::setBillboardTrailers,
     )
 }
 

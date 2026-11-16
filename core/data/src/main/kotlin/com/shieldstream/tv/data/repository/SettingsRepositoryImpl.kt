@@ -88,6 +88,15 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_HIGH_RES_BACKDROPS, enabled).apply()
         highResBackdropsFlow.value = enabled
     }
+
+    private val billboardTrailersFlow = MutableStateFlow(prefs.getBoolean(KEY_BILLBOARD_TRAILERS, true))
+    override val billboardTrailers: Flow<Boolean> = billboardTrailersFlow
+    override val billboardTrailersEnabled: Boolean get() = billboardTrailersFlow.value
+
+    override suspend fun setBillboardTrailers(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BILLBOARD_TRAILERS, enabled).apply()
+        billboardTrailersFlow.value = enabled
+    }
     override val spanishFirst: Flow<Boolean> = profiles.active
         .map { it.spanishFirst || it.spanishOnlySources }.distinctUntilChanged()
 
@@ -259,6 +268,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_SOFT_BACKDROPS = "soft_backdrops"
         const val KEY_INTRO_ALWAYS = "intro_always"
         const val KEY_HIGH_RES_BACKDROPS = "high_res_backdrops"
+        const val KEY_BILLBOARD_TRAILERS = "billboard_trailers"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
         const val KEY_AUTO_NEXT = "auto_next_episode"
         const val KEY_HOME_ROW_ITEM_LIMIT = "home_row_item_limit"
