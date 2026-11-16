@@ -192,6 +192,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setHighResBackdrops(enabled) }
     }
 
+    val billboardTrailers: StateFlow<Boolean> =
+        settings.billboardTrailers.stateIn(viewModelScope, SharingStarted.Eagerly, settings.billboardTrailersEnabled)
+
+    fun setBillboardTrailers(enabled: Boolean) {
+        viewModelScope.launch { settings.setBillboardTrailers(enabled) }
+    }
+
     val homeRowItemLimit: StateFlow<Int> = settings.homeRowItemLimit
         .stateIn(
             viewModelScope,

@@ -16,6 +16,8 @@ data class FeaturedItem(
     val genre: String?,
     val durationText: String?,
     val certification: String?,
+    /** Clave de YouTube del tráiler que se reproduce en la portada. `null` = solo arte estático. */
+    val trailerKey: String? = null,
 )
 
 enum class Category(val forMovies: Boolean = true, val forTv: Boolean = true) {

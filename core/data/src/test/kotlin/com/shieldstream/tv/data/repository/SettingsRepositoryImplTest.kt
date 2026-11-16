@@ -106,6 +106,16 @@ class SettingsRepositoryImplTest {
         assertEquals(true, repository().highResBackdropsEnabled)
     }
 
+    @Test
+    fun `billboard trailers default on and persist across reloads`() = runTest {
+        assertEquals(true, repository().billboardTrailers.first())
+
+        repository().setBillboardTrailers(false)
+
+        assertEquals(false, repository().billboardTrailers.first())
+        assertEquals(false, repository().billboardTrailersEnabled)
+    }
+
     private fun repository(): SettingsRepositoryImpl {
         val tokenStore = mockk<TokenStore> { every { token } returns null }
         val profiles = mockk<ProfileRepository> {
