@@ -374,67 +374,22 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private val _sleepTimer = MutableStateFlow<SleepTimer>(SleepTimer.Off)
-    val sleepTimer: StateFlow<SleepTimer> = _sleepTimer.asStateFlow()
-    /** Minutos que quedan, redondeados hacia arriba (null si no hay cuenta atrás). */
-    private val _sleepTimerRemainingMinutes = MutableStateFlow<Int?>(null)
-    val sleepTimerRemainingMinutes: StateFlow<Int?> = _sleepTimerRemainingMinutes.asStateFlow()
-    private var sleepTimerJob: Job? = null
     private val _sleepTimerFinished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val sleepTimerFinished: SharedFlow<Unit> = _sleepTimerFinished.asSharedFlow()
 
-    /** Pasa a la siguiente opción (desactivado → 15 → 30 → 45 → 60 → 90 → fin del episodio → desactivado). */
-    fun cycleSleepTimer() {
-        val next = when (val current = _sleepTimer.value) {
-            SleepTimer.Off -> SleepTimer.Minutes(15)
-            is SleepTimer.Minutes -> when (current.minutes) {
-                15 -> SleepTimer.Minutes(30)
-                30 -> SleepTimer.Minutes(45)
-                45 -> SleepTimer.Minutes(60)
-                60 -> SleepTimer.Minutes(90)
-                else -> SleepTimer.EndOfEpisode
-            }
-            SleepTimer.EndOfEpisode -> SleepTimer.Off
-        }
-        setSleepTimer(next)
-    }
-
-    private fun setSleepTimer(timer: SleepTimer) {
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
-        _sleepTimer.value = timer
-        when (timer) {
-            SleepTimer.Off, SleepTimer.EndOfEpisode -> _sleepTimerRemainingMinutes.value = null
-            is SleepTimer.Minutes -> {
-                _sleepTimerRemainingMinutes.value = timer.minutes
-                sleepTimerJob = viewModelScope.launch {
-                    var remaining = timer.minutes * 60_000L
-                    while (isActive && remaining > 0) {
-                        val step = minOf(remaining, 5_000L)
-                        delay(step)
-                        remaining -= step
-                        val minutesLeft = ((remaining + 59_999L) / 60_000L).toInt()
-                        if (minutesLeft != _sleepTimerRemainingMinutes.value) {
-                            _sleepTimerRemainingMinutes.value = minutesLeft
-                        }
-                    }
-                    if (isActive) finishSleepTimer()
-                }
-            }
-        }
-    }
-
-    /** Para la reproducción y avisa a la pantalla para volver a Inicio. */
-    private fun finishSleepTimer() {
-        if (_sleepTimer.value == SleepTimer.Off) return
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
-        _sleepTimer.value = SleepTimer.Off
-        _sleepTimerRemainingMinutes.value = null
+    /** Temporizador de apagado: al vencer pausa y avisa a la pantalla para volver a Inicio. */
+    private val sleepTimerControl = SleepTimerController(viewModelScope) {
         _player.value?.pause()
         _notice.value = texts.get(StringsR.string.player_sleep_timer_paused)
         _sleepTimerFinished.tryEmit(Unit)
     }
+    val sleepTimer: StateFlow<SleepTimer> = sleepTimerControl.timer
+
+    /** Minutos que quedan, redondeados hacia arriba (null si no hay cuenta atrás). */
+    val sleepTimerRemainingMinutes: StateFlow<Int?> = sleepTimerControl.remainingMinutes
+
+    /** Pasa a la siguiente opción (desactivado → 15 → 30 → 45 → 60 → 90 → fin del episodio → desactivado). */
+    fun cycleSleepTimer() = sleepTimerControl.cycle()
 
     // -----------------------------------------------------------------------
     // -----------------------------------------------------------------------
@@ -599,8 +554,8 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun playNextNow() {
-        if (_sleepTimer.value == SleepTimer.EndOfEpisode) {
-            finishSleepTimer()
+        if (sleepTimerControl.endsWithEpisode) {
+            sleepTimerControl.finish()
             return
         }
         val next = nextSnapshot ?: return
@@ -664,10 +619,7 @@ class PlayerViewModel @Inject constructor(
     fun onStop() {
         playbackVisible = false
         subtitleCoordinator.onPlaybackStopped()
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
-        _sleepTimer.value = SleepTimer.Off
-        _sleepTimerRemainingMinutes.value = null
+        sleepTimerControl.reset()
         playerGeneration++
         playerCreationJob?.cancel()
         playerCreationJob = null
@@ -794,8 +746,8 @@ class PlayerViewModel @Inject constructor(
                     if (playbackState == Player.STATE_ENDED) {
                         markCurrentFinished()
                         scrobble(ScrobbleAction.STOP, fraction = 1f)
-                        if (_sleepTimer.value == SleepTimer.EndOfEpisode) {
-                            finishSleepTimer()
+                        if (sleepTimerControl.endsWithEpisode) {
+                            sleepTimerControl.finish()
                         } else if (!nextUpDismissed && autoNext.value) {
                             playNextNow()
                         }
@@ -894,8 +846,7 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         playbackVisible = false
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
+        sleepTimerControl.cancel()
         playerGeneration++
         playerCreationJob?.cancel()
         earlyPreparationPending = null

@@ -2,28 +2,14 @@ package com.shieldstream.tv.data.repository
 
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.Texts
-import com.shieldstream.tv.strings.sectionResource
-import com.shieldstream.tv.strings.titleResource
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
-import com.shieldstream.tv.domain.SourceProvider
 import com.shieldstream.tv.model.Lang
-import android.net.Uri
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.Flow
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.MediaType.Companion.toMediaType
 import com.shieldstream.tv.domain.StreamResults
-import com.shieldstream.tv.domain.ApiService
 import android.util.Log
 import com.shieldstream.tv.domain.CatalogRepository
-import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.SettingsRepository
-import kotlinx.coroutines.flow.first
-import com.shieldstream.tv.model.AudioCodec
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.CollectionDetails
 import com.shieldstream.tv.model.CollectionRef
@@ -36,26 +22,20 @@ import com.shieldstream.tv.model.CatalogRow
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.FeaturedItem
 import com.shieldstream.tv.model.Episode
-import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.HomeFilter
 import com.shieldstream.tv.model.MediaType
-import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.RowStyle
 import com.shieldstream.tv.model.Season
 import com.shieldstream.tv.model.ShowAiring
-import com.shieldstream.tv.model.SpanishAudio
-import com.shieldstream.tv.model.StreamSource
-import com.shieldstream.tv.model.VideoCodec
 import com.shieldstream.tv.network.api.TmdbApi
 import com.shieldstream.tv.network.api.TorrentioApi
 import com.shieldstream.tv.data.security.TokenStore
-import com.shieldstream.tv.network.di.ApiConfig
+import com.shieldstream.tv.data.repository.streams.StreamSearch
+import com.shieldstream.tv.data.repository.streams.englishTitle
 import com.shieldstream.tv.network.dto.TmdbCastDto
 import com.shieldstream.tv.network.dto.TmdbImagesDto
 import com.shieldstream.tv.network.dto.TmdbSearchResultDto
 import com.shieldstream.tv.network.dto.TmdbVideosDto
-import com.shieldstream.tv.network.dto.TmdbTranslationsDto
-import com.shieldstream.tv.network.dto.TorrentioStreamDto
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -185,6 +165,8 @@ class CatalogRepositoryImpl @Inject constructor(
         if (kids && category !in Category.KIDS_SAFE) emptyList() else extras.categoryRows(category, filter)
 
     private val key: String get() = store.tmdbKey.orEmpty()
+
+    private val streamSearch = StreamSearch(tmdb, torrentio, store, settings, texts) { key }
 
     private class RowSpec(
         val id: String,
@@ -535,573 +517,19 @@ class CatalogRepositoryImpl @Inject constructor(
         )
     }
 
-    override fun getStreams(item: CatalogItem, episode: Episode?): Flow<StreamResults> = channelFlow {
-        val aioConfigured = !store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).isNullOrBlank()
-        val enabled = settings.sourceProviders.first()
-        // Los buscadores propios (castellano, The Pirate Bay, Knaben, Nyaa) dan torrents sueltos: se resuelven con el
-        // servicio activo, sea cual sea (por su API o, si la app no la tiene, a través de Torrentio).
-        val providers = SourceProvider.entries.filter {
-            it in enabled && (it != SourceProvider.AIOSTREAMS || aioConfigured)
-        }
-        val imdbId = item.imdbId ?: resolveImdb(item) ?: error(texts.get(StringsR.string.data_imdb_id_missing, item.title))
-        val (type, streamId) = if (item.type == MediaType.TV) {
-            val ep = episode ?: error(texts.get(StringsR.string.data_pick_an_episode))
-            "series" to "$imdbId:${ep.season}:${ep.number}"
-        } else {
-            "movie" to imdbId.orEmpty()
-        }
-        val done = LinkedHashMap<SourceProvider, Result<List<StreamSource>>>()
-        val lock = Mutex()
-        fun snapshot(): StreamResults {
-            val sources = providers.flatMap { p ->
-                done[p]?.getOrNull().orEmpty().map {
-                    val section = if (p == SourceProvider.CASTELLANO && it.provider.isNotBlank()) it.provider else texts.get(p.sectionResource)
-                    it.copy(id = "${p.name}:${it.id}", provider = section)
-                }
-            }.distinctBy { it.provider + ":" + if (it.resolveUrl == null) it.infoHash.lowercase() else it.id }
-            val sections = providers.groupBy { texts.get(it.sectionResource) }
-            val withSources = sources.map { it.provider }.toSet()
-            val pending = sections.filter { (_, ps) -> ps.any { it !in done } }.keys
-            val unavailable = sections.mapNotNull { (section, ps) ->
-                when {
-                    section in pending || section in withSources -> null
-                    ps.all { done[it]?.isFailure == true } -> section to texts.get(StringsR.string.data_not_responding_right_now)
-                    else -> section to texts.get(StringsR.string.data_no_sources_for_this)
-                }
-            }.toMap()
-            return StreamResults(sources, unavailable, pending)
-        }
-        send(snapshot())
-        coroutineScope {
-            providers.map { p ->
-                launch {
-                    val r = try {
-                        Result.success(withTimeout(PROVIDER_TIMEOUT_MS) { providerStreams(p, item, type, streamId, episode) })
-                    } catch (e: TimeoutCancellationException) {
-                        Result.failure(e)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Result.failure(e)
-                    }
-                    r.exceptionOrNull()?.let { Log.w("Catalog", "${texts.get(p.titleResource)} falló: ${it.message}") }
-                    r.getOrNull()?.let { list ->
-                        Log.i("Catalog", "${p.name}: ${list.size} fuentes (${list.count { it.isCached }} ⚡) con ${settings.debridService.first().title}")
-                    }
-                    lock.withLock {
-                        done[p] = r
-                        send(snapshot())
-                    }
-                }
-            }.joinAll()
-        }
-        if (snapshot().sources.isEmpty()) {
-            val failed = done.filter { it.value.isFailure }
-            failed.values.firstNotNullOfOrNull { r -> r.exceptionOrNull()?.takeIf { it is IllegalStateException && it !is kotlinx.coroutines.CancellationException } }?.let { throw it }
-            if (failed.isNotEmpty()) {
-                val names = failed.keys.joinToString { texts.get(it.titleResource) }
-                error(texts.get(StringsR.string.data_provider_unavailable, names))
-            }
-        }
-    }
-
-    private suspend fun providerStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String, episode: Episode?): List<StreamSource> =
-        when (p) {
-            SourceProvider.CASTELLANO -> castellanoStreams(item, type, streamId)
-            SourceProvider.AIOSTREAMS -> coroutineScope {
-                val bases = aioStreamBases(store.getSecret(TokenStore.keyNameFor(ApiService.AIOSTREAMS)).orEmpty())
-                bases.map { base ->
-                    val label = addonLabel(base, bases.size)
-                    async {
-                        runCatching { aioStreams(base, item, type, streamId, label = label) }
-                            .onFailure { Log.w("Catalog", "Addon $label falló (${it.javaClass.simpleName})") }
-                            .getOrDefault(emptyList())
-                    }
-                }.awaitAll().flatten()
-            }
-            SourceProvider.THEPIRATEBAY, SourceProvider.KNABEN,
-            SourceProvider.NYAA,
-            -> scraperStreams(p, item, streamId)
-            SourceProvider.COMET -> cometStreams(item, type, streamId)
-            // Peerflix busca por título en webs españolas y mezcla series parecidas: fuera las de otra serie.
-            SourceProvider.PEERFLIX -> {
-                val sources = torrentioStreams(p, item, type, streamId)
-                val titles = showTitlesFor(item)
-                sources.filter { ShowNameFilter.matches(it.title, titles, movie = item.type != MediaType.TV) }
-            }
-            else -> torrentioStreams(p, item, type, streamId)
-        }
-
-    /** Nombres del título en TMDB (español, inglés, original), para [ShowNameFilter] y [CastellanoMatcher]. */
-    private suspend fun showTitlesFor(item: CatalogItem): List<String> {
-        releaseTitle(item) // rellena showTitles (una petición por título, en caché)
-        return showTitles[item.key].orEmpty().ifEmpty { listOf(item.title) }
-    }
-
-    /**
-     * Buscador propio de castellano (ver [SourceProvider.CASTELLANO]): a la vez, las webs españolas de Torrentio y
-     * búsquedas con el título en español en Knaben y The Pirate Bay. Se queda con lo que es de este título y dice
-     * traer castellano, sin repetidos, y ordena por lo claro que lo dice el nombre, calidad y seeds.
-     */
-    private suspend fun castellanoStreams(item: CatalogItem, type: String, streamId: String): List<StreamSource> = coroutineScope {
-        val parts = streamId.split(':')
-        val season = parts.getOrNull(1)?.toIntOrNull()
-        val episode = parts.getOrNull(2)?.toIntOrNull()
-        val titles = showTitlesFor(item)
-        val matcher = CastellanoMatcher(listOf(item.title) + titles, season, episode, item.year)
-
-        val sites = async {
-            runCatching {
-                torrentio.streamsAt("${SourceProvider.TORRENTIO.baseUrl}/$SPANISH_SITES_CONFIG/stream/$type/$streamId.json")
-                    .streams.withoutOtherShows(item)
-            }.onFailure { Log.w("Catalog", "Castellano (webs españolas) falló: ${it.message}") }.getOrDefault(emptyList())
-        }
-        val searches = listOf(SourceProvider.KNABEN, SourceProvider.THEPIRATEBAY).map { p ->
-            async {
-                runCatching { castellanoSearch(p, matcher) }
-                    .onFailure { Log.w("Catalog", "Castellano (${p.name}) falló: ${it.message}") }.getOrDefault(emptyList())
-            }
-        }
-        // Cada resultado va a la sección del sitio del que sale (Torrentio, Knaben, The Pirate Bay): ya no hay una
-        // sección "En castellano" aparte, que se confundía con el filtro "Solo español".
-        val fromSites = sites.await().map { it to SourceProvider.TORRENTIO }
-        val fromSearches = searches.awaitAll().zip(listOf(SourceProvider.KNABEN, SourceProvider.THEPIRATEBAY))
-            .flatMap { (list, p) -> list.map { it to p } }
-        Log.w("Catalog", "Castellano: ${fromSites.size} de webs españolas + ${fromSearches.size} de búsquedas ${matcher.queries}")
-        (fromSites + fromSearches)
-            .distinctBy { it.first.infoHash?.lowercase() }
-            .mapNotNull { (dto, origin) -> dto.toStreamSource(item)?.copy(provider = texts.get(origin.sectionResource)) }
-            .filter { it.spanishAudioScore >= SpanishAudio.CASTELLANO_MIN }
-            .filter { season == null || episode == null || canPickFile() || isSingleEpisode(it.title, season, episode) }
-            .map { if (season != null) it.copy(season = season, episode = episode) else it }
-            .sortedWith(
-                compareByDescending<StreamSource> { it.spanishAudioScore }
-                    .thenByDescending { it.quality.rank }
-                    .thenByDescending { it.seeders ?: 0 },
-            )
-    }
-
-    private suspend fun castellanoSearch(p: SourceProvider, matcher: CastellanoMatcher): List<TorrentioStreamDto> {
-        val base = checkNotNull(p.baseUrl)
-        val found = mutableListOf<TorrentioStreamDto>()
-        for (query in matcher.queries) {
-            if (p == SourceProvider.THEPIRATEBAY) {
-                val q = java.net.URLEncoder.encode(query.replace(Regex("[^A-Za-z0-9\\s.-]+"), ""), "UTF-8")
-                val arr = org.json.JSONArray(torrentio.raw("$base/q.php?q=$q&cat=0").string())
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    val name = o.optString("name")
-                    val hash = o.optString("info_hash")
-                    if (o.optString("id") == "0" || hash.isBlank() || hash.all { it == '0' } || !matcher.accepts(name)) continue
-                    found += scraperDto(p, name, hash, o.optLong("size"), o.optInt("seeders"))
-                }
-            } else {
-                // Sin categoría: las webs españolas suben a menudo sin clasificar.
-                val body = org.json.JSONObject()
-                    .put("search_type", "100%").put("search_field", "title").put("query", query)
-                    .put("order_by", "seeders").put("order_direction", "desc").put("size", 150).put("hide_xxx", true)
-                    .toString().toRequestBody("application/json".toMediaType())
-                val hits = org.json.JSONObject(torrentio.postJson("$base/v1", body).string()).optJSONArray("hits")
-                for (i in 0 until (hits?.length() ?: 0)) {
-                    val h = hits!!.getJSONObject(i)
-                    val name = h.optString("title")
-                    val hash = h.optString("hash").ifBlank { Regex("btih:([a-fA-F0-9]{40})").find(h.optString("magnetUrl"))?.groupValues?.get(1).orEmpty() }
-                    if (hash.length != 40 || !matcher.accepts(name)) continue
-                    found += scraperDto(p, name, hash, h.optLong("bytes"), h.optInt("seeders"))
-                }
-            }
-        }
-        return found
-    }
-
-    /**
-     * Torrentio acierta la serie por su id de IMDb salvo en las webs españolas (MejorTorrent, Wolfmax4k…), que busca
-     * por título: en "Juego de tronos" colaba "El juego de la pirámide". Solo se filtran las de esas webs.
-     */
-    private suspend fun List<TorrentioStreamDto>.withoutOtherShows(item: CatalogItem): List<TorrentioStreamDto> {
-        fun TorrentioStreamDto.text() = title.ifBlank { description.orEmpty() }
-        if (none { SPANISH_SITE.containsMatchIn(it.text()) }) return this
-        val titles = showTitlesFor(item)
-        return filter { dto ->
-            !SPANISH_SITE.containsMatchIn(dto.text()) ||
-                ShowNameFilter.matches(
-                    dto.text().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
-                    titles,
-                    movie = item.type != MediaType.TV,
-                )
-        }.also { kept ->
-            if (kept.size != size) Log.w("Catalog", "Webs españolas: ${size - kept.size} fuentes de otro título descartadas")
-        }
-    }
-
-    private suspend fun scraperStreams(p: SourceProvider, item: CatalogItem, streamId: String): List<StreamSource> {
-        val pickFile = canPickFile()
-        val parts = streamId.split(':')
-        val season = parts.getOrNull(1)?.toIntOrNull()
-        val episode = parts.getOrNull(2)?.toIntOrNull()
-        val episodeTag = if (season != null && episode != null) "S%02dE%02d".format(season, episode) else null
-        val seasonTag = season?.let { "S%02d".format(it) }
-        val base = checkNotNull(p.baseUrl)
-        val title = releaseTitle(item)
-        val wanted = normalize(title)
-        val queries = if (episodeTag != null) listOf("$title $episodeTag", "$title $seasonTag") else listOf("$title ${item.year ?: ""}".trim())
-        val absolute = if (season != null && episode != null) absoluteEpisode(item, season, episode) else null
-        val anime = item.genres.any { it.contains("anim", ignoreCase = true) } || animeSeasons.containsKey(item.key)
-        val allQueries = if (absolute != null) queries + "$title ${"%02d".format(absolute)}" else queries
-        val packRx = season?.let { Regex("(?i)(\\bS0*$it\\b(?!\\s*E\\d)|season\\s*0*$it\\b|temporada\\s*0*$it\\b|complete)") }
-        var seen = 0
-        val titleRx = Regex(
-            "^(?:\\[[^\\]]*\\]\\s*)*" + title.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotBlank() }
-                .joinToString("[\\W_]+") { Regex.escape(it) } +
-                "[\\W_]+(?:\\(?(?:19|20)\\d{2}|s\\d|season|temporada|complete|\\d{3,4}p|\\d+x\\d)",
-            RegexOption.IGNORE_CASE,
-        )
-        val absoluteRx = absolute?.let {
-            Regex(
-                "^(?:\\[[^\\]]*\\]\\s*)*" + title.split(Regex("[^\\p{L}\\p{N}]+")).filter { w -> w.isNotBlank() }
-                    .joinToString("[\\W_]+") { w -> Regex.escape(w) } +
-                    "[\\W_]+(?:e|ep|episode|episodio)?\\s*0*$it(?:v\\d)?(?!\\d|\\s*[-~]\\s*\\d)",
-                RegexOption.IGNORE_CASE,
-            )
-        }
-        fun accepts(name: String): Boolean {
-            seen++
-            if (!normalize(name).contains(wanted)) return false
-            if (absoluteRx?.containsMatchIn(name) == true) return true
-            if (!titleRx.containsMatchIn(name)) return false
-            if (episodeTag == null) return item.year == null || name.contains(item.year.toString())
-            // Los packs de temporada solo si la app sabe elegir el capítulo dentro (resolución propia).
-            return name.contains(episodeTag, ignoreCase = true) || (pickFile && packRx?.containsMatchIn(name) == true)
-        }
-        val found = mutableListOf<TorrentioStreamDto>()
-        when (p) {
-            else -> for (query in allQueries) {
-                if (p == SourceProvider.NYAA && !anime) break
-                val enc = java.net.URLEncoder.encode(query, "UTF-8")
-                when (p) {
-                    SourceProvider.THEPIRATEBAY -> {
-                        val q = java.net.URLEncoder.encode(query.replace(Regex("[^A-Za-z0-9\\s.-]+"), ""), "UTF-8")
-                        val arr = org.json.JSONArray(torrentio.raw("$base/q.php?q=$q&cat=0").string())
-                        for (i in 0 until arr.length()) {
-                            val o = arr.getJSONObject(i)
-                            val name = o.optString("name")
-                            val hash = o.optString("info_hash")
-                            if (o.optString("id") == "0" || hash.isBlank() || hash.all { it == '0' } || !accepts(name)) continue
-                            found += scraperDto(p, name, hash, o.optLong("size"), o.optInt("seeders"))
-                        }
-                    }
-                    SourceProvider.KNABEN -> {
-                        val body = org.json.JSONObject()
-                            .put("search_type", "100%").put("search_field", "title").put("query", query)
-                            .put("order_by", "seeders").put("order_direction", "desc").put("size", 150).put("hide_xxx", true)
-                            .put("categories", org.json.JSONArray().put(if (episodeTag != null) 2000000 else 3000000).apply { if (anime) put(6000000) })
-                            .toString().toRequestBody("application/json".toMediaType())
-                        val hits = org.json.JSONObject(torrentio.postJson("$base/v1", body).string()).optJSONArray("hits")
-                        for (i in 0 until (hits?.length() ?: 0)) {
-                            val h = hits!!.getJSONObject(i)
-                            val name = h.optString("title")
-                            val hash = h.optString("hash").ifBlank { Regex("btih:([a-fA-F0-9]{40})").find(h.optString("magnetUrl"))?.groupValues?.get(1).orEmpty() }
-                            if (hash.length != 40 || !accepts(name)) continue
-                            found += scraperDto(p, name, hash, h.optLong("bytes"), h.optInt("seeders"))
-                        }
-                    }
-                    else -> {
-                        val url = when (p) {
-                            else -> "$base/?f=0&c=0_0&q=$enc"
-                        }
-                        val html = torrentio.page(url, BROWSER_UA).string()
-                        MAGNET.findAll(html).forEach { m ->
-                            val params = m.groupValues[2].replace("&amp;", "&")
-                            val name = Regex("[?&]dn=([^&]+)").find(params)?.groupValues?.get(1)
-                                ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) } ?: return@forEach
-                            if (!accepts(name)) return@forEach
-                            val size = Regex("[?&]xl=(\\d+)").find(params)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-                            found += scraperDto(p, name, m.groupValues[1], size, 0)
-                        }
-                    }
-                }
-            }
-        }
-        Log.w("Catalog", "${texts.get(p.titleResource)}: ${found.size} aceptadas de $seen (consultas: $allQueries)")
-        return found.distinctBy { it.infoHash }.mapNotNull { it.toStreamSource(item) }
-            .map { if (season != null) it.copy(season = season, episode = episode) else it }
-            .sortedByDescending { it.seeders ?: 0 }
-    }
-
-    /**
-     * Base64 de la configuración sin "/" ni "+" (rompen la ruta de la URL): como JSON admite espacios al final, se
-     * añaden hasta que el resultado sea limpio.
-     */
-    private fun cometConfigPath(json: String): String {
-        var padded = json
-        repeat(8) {
-            val b64 = android.util.Base64.encodeToString(padded.toByteArray(), android.util.Base64.NO_WRAP)
-            if ('/' !in b64 && '+' !in b64) return b64
-            padded += " "
-        }
-        return android.util.Base64.encodeToString(json.toByteArray(), android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE)
-    }
-
-    /**
-     * Con resolución propia la app elige el capítulo dentro de un pack de temporada; a través de Torrentio, sin saber
-     * el número de archivo, saldría el vídeo más grande del pack (otro capítulo): ahí solo valen los sueltos.
-     */
-    private suspend fun canPickFile(): Boolean = settings.debridService.first().supportsDirectMagnetResolution
-
-    private fun isSingleEpisode(name: String, season: Int, episode: Int): Boolean =
-        Regex("(?i)s0*$season\\W?e0*$episode(?!\\d)|(?<!\\d)$season[x.]0*$episode(?!\\d)").containsMatchIn(name)
-
-    private suspend fun cometStreams(item: CatalogItem, type: String, streamId: String): List<StreamSource> {
-        // Comet resuelve él mismo con el servicio que se le diga: el activo, con su clave.
-        val debrid = settings.debridService.first()
-        val token = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() } ?: return emptyList()
-        // Formato actual de Comet: idiomas/resoluciones van como objetos (si se mandan como lista, como antes, Comet
-        // rechaza toda la configuración: "OBSOLETE CONFIGURATION"). Se omiten y Comet usa sus valores por defecto.
-        val params = org.json.JSONObject()
-            .put("cachedOnly", false)
-            .put("removeTrash", true)
-            .put("resultFormat", org.json.JSONArray().put("all"))
-            .put("maxResultsPerResolution", 0)
-            .put("maxSize", 0)
-            .put("debridServices", org.json.JSONArray().put(org.json.JSONObject().put("service", debrid.cometKey).put("apiKey", token)))
-            .put("enableTorrent", false)
-            .put("deduplicateStreams", true)
-            .put("debridStreamProxyPassword", "")
-            .toString()
-        val b64 = cometConfigPath(params)
-        return aioStreams("${SourceProvider.COMET.baseUrl}/$b64", item, type, streamId, label = "Comet")
-    }
-
-    private suspend fun releaseTitle(item: CatalogItem): String = releaseTitleLock.withLock {
-        releaseTitles[item.key]?.let { return@withLock it }
-        val title = runCatching {
-            val id = item.id.toInt()
-            if (item.type == MediaType.TV) {
-                tmdb.tvDetails(id, key).also { d ->
-                    showTitles[item.key] = buildList {
-                        add(item.title); add(d.name); d.original_name?.let(::add)
-                        d.translations?.translations.orEmpty()
-                            .filter { it.iso_639_1 == "es" || it.iso_639_1 == "en" }
-                            .forEach { t -> t.data?.name?.let(::add) }
-                    }.filter { it.isNotBlank() }.distinct()
-                    if (d.original_language == "ja" && d.genres.any { it.id == 16 }) {
-                        animeSeasons[item.key] = d.seasons.filter { it.season_number > 0 }.associate { it.season_number to it.episode_count }
-                    }
-                }.let { englishTitle(it.translations) ?: it.original_name }
-            } else {
-                tmdb.movieDetails(id, key).also { d ->
-                    showTitles[item.key] = buildList {
-                        add(item.title); add(d.title); d.original_title?.let(::add)
-                        d.translations?.translations.orEmpty()
-                            .filter { it.iso_639_1 == "es" || it.iso_639_1 == "en" }
-                            .forEach { t -> t.data?.title?.let(::add) }
-                    }.filter { it.isNotBlank() }.distinct()
-                }.let { englishTitle(it.translations) ?: it.original_title }
-            }
-        }.getOrNull()?.takeIf { it.isNotBlank() }
-        title?.also { releaseTitles[item.key] = it } ?: item.title
-    }
-
-    private val animeSeasons = java.util.concurrent.ConcurrentHashMap<String, Map<Int, Int>>()
-
-    private val showTitles = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
-
-    private val seasonStarts = java.util.concurrent.ConcurrentHashMap<String, Int>()
-
-    private suspend fun absoluteEpisode(item: CatalogItem, season: Int, episode: Int): Int? {
-        val counts = animeSeasons[item.key] ?: return null
-        val start = seasonStarts.getOrPut("${item.key}:$season") {
-            runCatching { tmdb.tvSeason(item.id.toInt(), season, key).episodes.minOfOrNull { it.episode_number } }
-                .getOrNull() ?: 1
-        }
-        if (start > 1) return episode
-        val before = (1 until season).map { counts[it] ?: return null }
-        return before.sum() + episode
-    }
-
-    private val releaseTitleLock = Mutex()
-    private val releaseTitles = java.util.concurrent.ConcurrentHashMap<String, String>()
-
-    private fun normalize(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
-
-    private fun scraperDto(p: SourceProvider, name: String, hash: String, size: Long, seeders: Int) = TorrentioStreamDto(
-        name = "Bambi\n$name",
-        title = "$name\n👤 $seeders 💾 ${"%.2f".format(java.util.Locale.US, size / 1_073_741_824.0)} GB ⚙️ ${texts.get(p.titleResource)}",
-        infoHash = hash.lowercase(),
-    )
-
-    private fun addonLabel(base: String, count: Int): String =
-        if (count <= 1) texts.get(StringsR.string.data_the_stremio_addon)
-        else base.removePrefix("https://").removePrefix("http://").substringBefore('/').substringBefore('.')
-
-    private suspend fun aioStreams(base: String, item: CatalogItem, type: String, streamId: String, label: String = texts.get(StringsR.string.data_the_stremio_addon)): List<StreamSource> {
-        val streams = torrentio.streamsAt("$base/stream/$type/$streamId.json").streams.withoutOtherShows(item)
-        streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, label, texts)) }
-        return streams.mapNotNull { s ->
-            val link = s.url?.takeIf { it.startsWith("http") } ?: return@mapNotNull s.toStreamSource(item)
-            val hash = s.infoHash ?: "aio%08x".format(link.hashCode())
-            s.copy(infoHash = hash).toStreamSource(item)?.copy(
-                resolveUrl = link,
-                debrid = label,
-                isCached = s.name.contains("⚡") || s.name.contains("+]"),
-            )
-        }
-    }
-
-    private suspend fun torrentioStreams(p: SourceProvider, item: CatalogItem, type: String, streamId: String): List<StreamSource> {
-        val debrid = settings.debridService.first()
-        val base = checkNotNull(p.baseUrl)
-        val language = if (settings.spanishFirst.first()) "language=spanish" else null
-        if (!debrid.viaTorrentio) {
-            val streams = when {
-                p != SourceProvider.TORRENTIO -> torrentio.streamsAt("$base/stream/$type/$streamId.json")
-                language != null -> torrentio.streamsWithConfig(language, type, streamId)
-                else -> torrentio.streams(type, streamId)
-            }
-            return streams.streams.withoutOtherShows(item).mapNotNull { it.toStreamSource(item) }
-        }
-        if (p == SourceProvider.PEERFLIX) {
-            val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
-                ?: error(texts.get(StringsR.string.data_debrid_key_missing, debrid.title))
-            return aioStreams("$base/${torrentioConfig(debrid, key)}", item, type, streamId, label = debrid.title)
-        }
-        if (!p.torrentioStyle) return emptyList()
-        val key = store.getSecret(TokenStore.keyNameFor(debrid.apiService))?.takeIf { it.isNotBlank() }
-            ?: error(texts.get(StringsR.string.data_debrid_key_missing, debrid.title))
-        val config = listOfNotNull(language, torrentioConfig(debrid, key)).joinToString("|")
-        val streams = if (p == SourceProvider.TORRENTIO) torrentio.streamsWithConfig(config, type, streamId).streams
-        else torrentio.streamsAt("$base/$config/stream/$type/$streamId.json").streams
-        val sources = streams.withoutOtherShows(item).mapNotNull { it.toDebridSource(item, debrid) }
-        if (sources.isEmpty()) {
-            streams.firstOrNull { it.isDebridError() }?.let { error(debridErrorMessage(it.title, debrid.title, texts)) }
-        }
-        return sources
-    }
-
-    private fun TorrentioStreamDto.toDebridSource(item: CatalogItem, debrid: DebridService): StreamSource? {
-        val link = url?.takeIf { it.contains("/resolve/") } ?: return null
-        val (hash, idx) = parseResolveUrl(link) ?: return null
-        return copy(infoHash = hash, fileIdx = fileIdx ?: idx).toStreamSource(item)?.copy(
-            resolveUrl = link,
-            debrid = debrid.title,
-            isCached = name.startsWith("[${debrid.shortName}+]"),
-        )
-    }
-
-    private suspend fun resolveImdb(item: CatalogItem): String? {
-        val numericId = item.id.toIntOrNull() ?: return null
-        return runCatching {
-            if (item.type == MediaType.TV) {
-                tmdb.tvExternalIds(numericId, key).imdb_id
-            } else {
-                tmdb.movieExternalIds(numericId, key).imdb_id
-            }
-        }.getOrNull()
-    }
-
-    private fun englishTitle(t: TmdbTranslationsDto?): String? =
-        t?.translations?.firstOrNull { it.iso_639_1 == "en" }?.data
-            ?.let { it.title ?: it.name }
-            ?.takeIf { it.isNotBlank() }
+    /** Las fuentes de un título: cada buscador está en `streams/` ([StreamSearch]). */
+    override fun getStreams(item: CatalogItem, episode: Episode?): Flow<StreamResults> = streamSearch.streams(item, episode)
 
     private fun pickLogo(images: TmdbImagesDto?): String? = TmdbImages.logo(images, Lang.current.code)
 
     private fun poster(path: String) = TmdbImages.poster(path)
     private fun backdrop(path: String) = TmdbImages.backdrop(path)
 
-    // --- Mapeo Torrentio stream -> StreamSource ---
-
-    private fun TorrentioStreamDto.toStreamSource(item: CatalogItem): StreamSource? {
-        val hash = infoHash ?: return null
-        val text = title.ifBlank { description.orEmpty() }
-        if (UNSUPPORTED_CODEC.containsMatchIn("$name $text")) return null
-        val isAv1 = AV1_CODEC.containsMatchIn("$name $text")
-        val fileName = behaviorHints?.filename
-        val firstLine = text.lineSequence().firstOrNull { it.isNotBlank() } ?: item.title
-        // Addons con formato propio (AIOStreams): la primera línea puede ser solo "🎞 HEVC"; vale más el archivo.
-        val releaseName = if (fileName != null && firstLine.count { it.isLetterOrDigit() } < 10) fileName else firstLine
-        val magnet = "magnet:?xt=urn:btih:${hash.lowercase()}&dn=${Uri.encode(fileName ?: releaseName)}"
-        return StreamSource(
-            id = "$hash:${fileIdx ?: 0}",
-            title = releaseName,
-            infoHash = hash,
-            fileIdx = fileIdx,
-            magnet = magnet,
-            quality = Quality.fromName("$name $text"),
-            hdrType = HdrType.fromName("$name $text"),
-            sizeBytes = parseSize(text),
-            seeders = availability ?: parseSeeders(text),
-            isCached = false,
-            fileName = fileName,
-            languages = parseLanguages("$name\n$text"),
-            videoCodec = if (isAv1) VideoCodec.AV1 else null,
-            audioCodecs = AudioCodec.parse("$name $text ${fileName.orEmpty()}"),
-            softwareDecode = isAv1,
-        )
-    }
-
-    private fun parseLanguages(text: String): List<String> {
-        val codePoints = ArrayList<Int>()
-        var i = 0
-        while (i < text.length) {
-            val cp = text.codePointAt(i)
-            codePoints.add(cp)
-            i += Character.charCount(cp)
-        }
-        val result = mutableListOf<String>()
-        var j = 0
-        while (j < codePoints.size - 1) {
-            val a = codePoints[j]
-            val b = codePoints[j + 1]
-            if (a in 0x1F1E6..0x1F1FF && b in 0x1F1E6..0x1F1FF) {
-                val country = "${'A' + (a - 0x1F1E6)}${'A' + (b - 0x1F1E6)}"
-                result += FLAG_TO_LANGUAGE[country] ?: country
-                j += 2
-            } else {
-                j++
-            }
-        }
-        if (result.isEmpty() && text.contains("multi", ignoreCase = true)) result += "MULTI"
-        return result.distinct()
-    }
-
-    private fun parseSize(text: String): Long {
-        val match = SIZE_REGEX.find(text) ?: return 0L
-        val value = match.groupValues[1].toDoubleOrNull() ?: return 0L
-        val unit = match.groupValues[2].lowercase()
-        val multiplier = when {
-            unit.contains("g") -> 1024L * 1024L * 1024L
-            unit.contains("m") -> 1024L * 1024L
-            else -> 1024L
-        }
-        return (value * multiplier).toLong()
-    }
-
-    private fun parseSeeders(text: String): Int? =
-        SEEDERS_REGEX.find(text)?.groupValues?.get(1)?.toIntOrNull()
-
     private companion object {
         val KIDS_GENRES = setOf(16, 10751, 10762)
         const val MAX_CAST = 20
         const val MAX_TRAILERS = 8
         const val MAX_PERSON_CREDITS = 40
-        const val PROVIDER_TIMEOUT_MS = 25_000L
-        const val BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-        val MAGNET = Regex("magnet:\\?xt=urn:btih:([a-fA-F0-9]{40})([^\"'<>\\s]*)")
-        val SIZE_REGEX = Regex("([\\d.]+)\\s*(GB|GiB|MB|MiB)", RegexOption.IGNORE_CASE)
-        val SEEDERS_REGEX = Regex("👤\\s*(\\d+)")
-        /** Webs españolas de Torrentio: las busca por título, no por id de IMDb. */
-        val SPANISH_SITE = Regex("⚙️\\s*(MejorTorrent|Wolfmax4k|Cinecalidad)", RegexOption.IGNORE_CASE)
-        /** Torrentio limitado a las webs españolas, con el castellano delante. */
-        const val SPANISH_SITES_CONFIG = "providers=mejortorrent,wolfmax4k,cinecalidad|language=spanish"
-        val UNSUPPORTED_CODEC = Regex("(?<![a-z0-9])(x266|vvc|h\\.?266)(?![a-z0-9])", RegexOption.IGNORE_CASE)
-        val AV1_CODEC = Regex("(?<![a-z0-9])av1(?![a-z0-9])", RegexOption.IGNORE_CASE)
-        val FLAG_TO_LANGUAGE = mapOf(
-            "ES" to "ES", "MX" to "LAT", "AR" to "LAT", "GB" to "EN", "US" to "EN",
-            "IT" to "IT", "FR" to "FR", "DE" to "DE", "PT" to "PT", "BR" to "PT-BR",
-            "RU" to "RU", "UA" to "UK", "JP" to "JA", "KR" to "KO", "CN" to "ZH",
-            "IN" to "HI", "NL" to "NL", "PL" to "PL",
-        )
     }
 }
 
