@@ -26,15 +26,15 @@
     <string name="service_used_tmdb">Catálogo, portadas, sinopsis, temporadas y edades</string>
     <string name="service_used_subdl">Más subtítulos externos</string>
     <string name="service_used_aiostreams">Más fuentes: AIOStreams o cualquier addon de Stremio (pega la URL de su manifiesto; varios, separados por espacios)</string>
-    <string name="service_used_torrentio">Reproduce las fuentes (a través de Torrentio)</string>
+    <string name="service_used_torrentio">Reproduce las fuentes</string>
     <string name="provider_torrentio">Torrentio</string>
+    <string name="provider_castellano">En castellano</string>
     <string name="provider_peerflix">Peerflix</string>
     <string name="provider_knaben">Knaben</string>
     <string name="provider_pirate_bay">The Pirate Bay</string>
     <string name="provider_nyaa">Nyaa</string>
     <string name="provider_comet">Comet</string>
     <string name="provider_aiostreams">Addon de Stremio</string>
-    <string name="provider_ithil">Ithil</string>
     <string name="resolve_debrid_service">el servicio debrid</string>
     <string name="resolve_requesting_link">Pidiendo el enlace a %1$s…</string>
     <string name="resolve_looking_library">Buscando en tu librería de %1$s…</string>

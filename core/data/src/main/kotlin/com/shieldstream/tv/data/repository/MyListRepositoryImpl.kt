@@ -52,12 +52,15 @@ class MyListRepositoryImpl @Inject constructor(
     override fun contains(type: MediaType, id: String): Boolean =
         _entries.value.any { it.type == type && it.id == id }
 
-    override fun add(type: MediaType, id: String) {
-        if (contains(type, id)) return
-        val current = store
-        current.prefs.edit().putLong(MyListEntry.keyOf(type, id), System.currentTimeMillis()).apply()
-        _entries.value = load()
-        _changes.tryEmit(MyListChange(current.profileId, type, id, added = true))
+    override fun add(type: MediaType, id: String) = addFor(store.profileId, type, id)
+
+    override fun addFor(profileId: String, type: MediaType, id: String) {
+        val prefs = prefsFor(profileId)
+        val key = MyListEntry.keyOf(type, id)
+        if (prefs.contains(key)) return
+        prefs.edit().putLong(key, System.currentTimeMillis()).apply()
+        if (profileId == store.profileId) _entries.value = load()
+        _changes.tryEmit(MyListChange(profileId, type, id, added = true))
     }
 
     override fun remove(type: MediaType, id: String) {

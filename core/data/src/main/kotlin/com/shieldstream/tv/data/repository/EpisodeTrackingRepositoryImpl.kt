@@ -32,6 +32,8 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
     private val _notified = MutableStateFlow(prefs.stringSet(NOTIFIED))
     override val notifiedEpisodeKeys: StateFlow<Set<String>> = _notified.asStateFlow()
     private val _notifications = MutableStateFlow(prefs.getBoolean(NOTIFICATIONS, false))
+    private val _hidden = MutableStateFlow(prefs.stringSet(HIDDEN))
+    override val hiddenShowIds: StateFlow<Set<String>> = _hidden.asStateFlow()
     override val notificationsEnabled: StateFlow<Boolean> = _notifications.asStateFlow()
 
     init {
@@ -42,6 +44,7 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
                 _dismissed.value = prefs.stringSet(DISMISSED)
                 _notified.value = prefs.stringSet(NOTIFIED)
                 _notifications.value = prefs.getBoolean(NOTIFICATIONS, false)
+                _hidden.value = prefs.stringSet(HIDDEN)
             }
         }
     }
@@ -49,6 +52,8 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
     override fun isFollowing(showId: String): Boolean = showId in _followed.value
 
     override fun setFollowing(showId: String, following: Boolean) {
+        // Seguirla a mano la vuelve a traer a Episodios aunque se hubiera quitado.
+        if (following) setHidden(showId, false)
         val updated = if (following) _followed.value + showId else _followed.value - showId
         if (updated == _followed.value) return
         prefs.edit().putStringSet(FOLLOWED, updated).apply()
@@ -60,6 +65,18 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
         val updated = _dismissed.value + keys
         prefs.edit().putStringSet(DISMISSED, updated).apply()
         _dismissed.value = updated
+    }
+
+    override fun setHidden(showId: String, hidden: Boolean) {
+        val updated = if (hidden) _hidden.value + showId else _hidden.value - showId
+        if (updated == _hidden.value) return
+        prefs.edit().putStringSet(HIDDEN, updated).apply()
+        _hidden.value = updated
+        if (hidden && showId in _followed.value) {
+            val unfollowed = _followed.value - showId
+            prefs.edit().putStringSet(FOLLOWED, unfollowed).apply()
+            _followed.value = unfollowed
+        }
     }
 
     override fun setNotificationsEnabled(enabled: Boolean) {
@@ -83,6 +100,7 @@ class EpisodeTrackingRepositoryImpl @Inject constructor(
         private const val DISMISSED = "dismissed"
         private const val NOTIFIED = "notified"
         private const val NOTIFICATIONS = "notifications"
+        private const val HIDDEN = "hidden_shows"
     }
 }
 

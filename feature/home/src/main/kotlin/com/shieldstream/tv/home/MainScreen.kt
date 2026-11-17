@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ContinueInfo
@@ -27,6 +28,7 @@ import com.shieldstream.tv.model.HomeFilter
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.shieldstream.tv.ui.component.TopBar
 import com.shieldstream.tv.ui.component.TopTab
+import com.shieldstream.tv.ui.component.downloadIndicatorState
 import com.shieldstream.tv.ui.component.onBackKey
 
 @Composable
@@ -36,9 +38,12 @@ fun MainScreen(
     onContinue: (CatalogItem, ContinueInfo) -> Unit,
     onOpenNewEpisode: (CatalogItem, Episode) -> Unit,
     onUpNext: (CatalogItem, Episode) -> Unit,
+    onPlaySomething: (CatalogItem, EpisodeTarget?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     profileInitial: String? = null,
     profileAvatar: Int = 0,
+    profileImage: String? = null,
     onSwitchProfile: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(TopTab.HOME) }
@@ -53,6 +58,8 @@ fun MainScreen(
         else -> HomeFilter.ALL
     }
     val episodeCenter: EpisodeCenterViewModel = hiltViewModel()
+    val downloadsViewModel: DownloadsViewModel = hiltViewModel()
+    val downloadList by downloadsViewModel.downloads.collectAsState()
     val episodeState by episodeCenter.uiState.collectAsState()
     LaunchedEffect(tab) { if (tab == TopTab.EPISODES) episodeCenter.activate() }
     val focusTopBar: () -> Unit = { runCatching { topBarRequester.requestFocus() } }
@@ -71,7 +78,10 @@ fun MainScreen(
             modifier = modifier.onFocusChanged { topBarFocused = it.hasFocus },
             profileInitial = profileInitial,
             profileAvatar = profileAvatar,
+            profileImage = profileImage,
             onProfile = onSwitchProfile,
+            downloads = downloadIndicatorState(downloadList),
+            onDownloads = onOpenDownloads,
         )
     }
 
@@ -108,6 +118,7 @@ fun MainScreen(
                     onContinueClick = onContinue,
                     onNewEpisodeClick = onOpenNewEpisode,
                     onUpNextClick = onUpNext,
+                    onPlaySomething = onPlaySomething,
                     onOpenCategory = { category = it },
                     onContentReady = episodeCenter::activate,
                     topBar = topBar,

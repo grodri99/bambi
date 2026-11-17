@@ -13,7 +13,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 // APK para publicar en GitHub: si existe .public_build con "1", se compila SIN ninguna clave ni dato privado
-// (ni las claves iniciales, ni el secreto de Trakt, ni la configuración de Ithil), pase lo que pase en local.properties.
+// (ni las claves iniciales ni el secreto de Trakt), pase lo que pase en local.properties.
 val publicBuild: Boolean = rootProject.file(".public_build").let { it.exists() && it.readText().trim() == "1" }
 val seedKeys: Boolean = !publicBuild && localProps.getProperty("seedKeys")?.trim()?.lowercase() == "true"
 fun seed(name: String): String = if (seedKeys) localProps.getProperty(name) ?: "" else ""
@@ -24,9 +24,6 @@ val tmdbApiKey: String = seed("tmdbApiKey")
 val traktClientId: String = localProps.getProperty("traktClientId")?.trim() ?: ""
 val traktClientSecret: String = privateProp("traktClientSecret")
 val traktRedirectUri: String = localProps.getProperty("traktRedirectUri")?.trim() ?: "urn:ietf:wg:oauth:2.0:oob"
-val ithilMetadataUrl: String = privateProp("ithilMetadataUrl")
-val ithilIndexKey: String = privateProp("ithilIndexKey")
-val ithilArchivePrefix: String = privateProp("ithilArchivePrefix")
 
 android {
     namespace = "com.shieldstream.tv"
@@ -46,9 +43,6 @@ android {
         buildConfigField("String", "TRAKT_CLIENT_ID", "\"$traktClientId\"")
         buildConfigField("String", "TRAKT_CLIENT_SECRET", "\"$traktClientSecret\"")
         buildConfigField("String", "TRAKT_REDIRECT_URI", "\"$traktRedirectUri\"")
-        buildConfigField("String", "ITHIL_METADATA_URL", "\"$ithilMetadataUrl\"")
-        buildConfigField("String", "ITHIL_INDEX_KEY", "\"$ithilIndexKey\"")
-        buildConfigField("String", "ITHIL_ARCHIVE_PREFIX", "\"$ithilArchivePrefix\"")
     }
 
     buildFeatures {
@@ -121,6 +115,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.okhttp)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.tvprovider)
     implementation(libs.coil)

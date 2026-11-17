@@ -1,7 +1,6 @@
 package com.shieldstream.tv.ui.component
 
 import com.shieldstream.tv.ui.theme.AppColors
-import com.shieldstream.tv.ui.theme.AppShapes
 import androidx.annotation.StringRes
 import com.shieldstream.tv.strings.localizedStringResource
 import com.shieldstream.tv.strings.R as StringsR
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.res.painterResource
 import com.shieldstream.tv.ui.R
 import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,8 +71,12 @@ fun TopBar(
     modifier: Modifier = Modifier,
     profileInitial: String? = null,
     profileAvatar: Int = 0,
+    profileImage: String? = null,
     onProfile: () -> Unit = {},
     newEpisodeCount: Int = 0,
+    /** Indicador de descargas arriba a la derecha (solo si hay alguna en marcha); al pulsarlo abre Descargas. */
+    downloads: DownloadIndicatorState? = null,
+    onDownloads: () -> Unit = {},
 ) {
     Box(
         modifier
@@ -93,7 +97,7 @@ fun TopBar(
             Image(
                 painter = painterResource(R.drawable.bambi_wordmark),
                 contentDescription = null,
-                modifier = Modifier.height(14.dp),
+                modifier = Modifier.height(22.dp),
             )
         }
         Row(
@@ -117,8 +121,11 @@ fun TopBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (downloads != null) {
+                DownloadIndicator(state = downloads, onClick = onDownloads)
+            }
             if (profileInitial != null) {
-                ProfileButton(initial = profileInitial, avatar = profileAvatar, onClick = onProfile)
+                ProfileButton(initial = profileInitial, avatar = profileAvatar, image = profileImage, onClick = onProfile)
             }
             TopBarItem(
                 icon = AppIcons.Settings,
@@ -131,7 +138,7 @@ fun TopBar(
 }
 
 @Composable
-private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
+private fun ProfileButton(initial: String, avatar: Int, image: String?, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale = if (LocalLightweightUi.current) {
         if (focused) 1.12f else 1f
@@ -153,7 +160,7 @@ private fun ProfileButton(initial: String, avatar: Int, onClick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused }
             .tvClickable(onClick = onClick),
     ) {
-        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp, shape = RoundedCornerShape(6.dp))
+        ProfileAvatar(initial = initial, avatar = avatar, size = 32.dp, shape = RoundedCornerShape(6.dp), image = image)
     }
 }
 
@@ -207,15 +214,15 @@ private fun TopBarItem(
                         fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Medium,
                     ),
                 )
+                // Hay novedades: un punto rojo, sin número (como en Netflix).
                 if (badgeCount > 0) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        modifier = Modifier
-                            .background(AppColors.Alert, AppShapes.Pill)
-                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    Spacer(Modifier.width(5.dp))
+                    Box(
+                        Modifier
+                            .align(Alignment.Top)
+                            .padding(top = 2.dp)
+                            .size(8.dp)
+                            .background(AppColors.Alert, CircleShape),
                     )
                 }
             }

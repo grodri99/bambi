@@ -160,4 +160,19 @@
     <string name="subtitle_color_red">Rojo</string>
     <string name="subtitle_color_black">Negro</string>
     <string name="subtitle_color_transparent">Ninguno</string>
+    <string name="subtitle_color_shade">Negro translúcido</string>
+    <string name="subtitle_font">Fuente</string>
+    <string name="subtitle_font_default">Normal</string>
+    <string name="subtitle_font_serif">Con serifa</string>
+    <string name="subtitle_font_mono">Monoespaciada</string>
+    <string name="subtitle_font_condensed">Estrecha</string>
+    <string name="subtitle_font_bold">Negrita</string>
+    <string name="subtitle_edge">Tipo de borde</string>
+    <string name="subtitle_edge_outline">Contorno</string>
+    <string name="subtitle_edge_shadow">Sombra</string>
+    <string name="subtitle_live_title">Editar subtítulos</string>
+    <string name="subtitle_live_hint">Izquierda/derecha cambia el valor. El vídeo queda en pausa mientras editas.</string>
+    <string name="subtitle_sample">Subtítulo de ejemplo
+Así se verán los subtítulos</string>
+    <string name="subtitle_reset">Restablecer</string>
 </resources>

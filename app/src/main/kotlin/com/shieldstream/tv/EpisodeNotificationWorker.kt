@@ -41,7 +41,7 @@ class EpisodeNotificationWorker @AssistedInject constructor(
     @SuppressLint("MissingPermission") // areNotificationsEnabled and runCatching handle denied or revoked access.
     override suspend fun doWork(): Result {
         if (!tracking.notificationsEnabled.value) return Result.success()
-        val followed = tracking.followedShowIds.value
+        val followed = tracking.followedShowIds.value - tracking.hiddenShowIds.value
         if (followed.isEmpty()) return Result.success()
         trakt.syncActive(force = false)
         val statuses = followed.mapNotNull { showId ->

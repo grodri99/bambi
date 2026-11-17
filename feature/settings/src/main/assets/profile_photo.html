@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bambi</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; background: #0b0c10; color: #fff; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; }
+  main { width: min(420px, 100% - 32px); text-align: center; padding: 28px 0; }
+  .logo { width: 64px; height: 64px; border-radius: 14px; }
+  h1 { font-size: 22px; margin: 14px 0 6px; }
+  p { color: #a7a9b4; margin: 0 0 22px; }
+  .preview { width: 220px; height: 220px; margin: 0 auto 22px; border-radius: 30px; background: #1a1c24; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #555; font-size: 64px; }
+  .preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  label.button { display: block; background: #e50914; color: #fff; font-weight: 700; padding: 16px; border-radius: 12px; cursor: pointer; }
+  label.button.busy { opacity: .6; pointer-events: none; }
+  input { display: none; }
+  .status { margin-top: 16px; min-height: 24px; font-weight: 600; }
+  .ok { color: #46d369; } .error { color: #ff6b6b; }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="/logo.png" alt="">
+  <h1>{{TITLE}}</h1>
+  <p>{{HINT}}</p>
+  <div class="preview" id="preview">+</div>
+  <label class="button" id="pick">{{PICK}}<input type="file" id="file" accept="image/*"></label>
+  <div class="status" id="status"></div>
+</main>
+<script>
+  const token = location.hash.slice(1);
+  const fileInput = document.getElementById('file');
+  const pick = document.getElementById('pick');
+  const statusEl = document.getElementById('status');
+  const preview = document.getElementById('preview');
+  const SIZE = 640;
+
+  function show(text, kind) { statusEl.textContent = text; statusEl.className = 'status ' + (kind || ''); }
+
+  async function load(file) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {}
+    }
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    pick.classList.add('busy');
+    show('{{SENDING}}');
+    try {
+      const image = await load(file);
+      const w = image.width, h = image.height, side = Math.min(w, h);
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(image, (w - side) / 2, (h - side) / 2, side, side, 0, 0, SIZE, SIZE);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+      if (!blob) throw new Error('blob');
+      preview.innerHTML = '';
+      const shown = document.createElement('img');
+      shown.src = URL.createObjectURL(blob);
+      preview.appendChild(shown);
+      const response = await fetch('/api/photo', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'image/jpeg' },
+        body: blob,
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      show('{{DONE}}', 'ok');
+    } catch (e) {
+      show('{{ERROR}}', 'error');
+    } finally {
+      pick.classList.remove('busy');
+      fileInput.value = '';
+    }
+  });
+</script>
+</body>
+</html>

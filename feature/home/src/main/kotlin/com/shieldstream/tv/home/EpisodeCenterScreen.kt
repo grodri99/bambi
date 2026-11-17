@@ -17,6 +17,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import com.shieldstream.tv.model.ShowEpisodeStatus
+import com.shieldstream.tv.ui.component.AppIcons
+import com.shieldstream.tv.ui.component.ActionMenuItem
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +42,8 @@ fun EpisodeCenterScreen(
     viewModel: EpisodeCenterViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Mantener OK en una serie: descartar sus episodios nuevos o quitarla de Episodios.
+    var menuFor by remember { mutableStateOf<ShowEpisodeStatus?>(null) }
     LaunchedEffect(Unit) { viewModel.activate() }
     // Sin margen lateral en la columna: lo lleva cada texto y las filas como contentPadding, para que el
     // póster enfocado (crece al enfocarse) no quede cortado por el borde izquierdo de la fila.
@@ -77,18 +85,10 @@ fun EpisodeCenterScreen(
                                             label = label,
                                             count = status.availableEpisodes.size,
                                             onClick = { onOpenEpisode(status.item, episode) },
-                                            onLongClick = { viewModel.dismiss(status) },
+                                            onLongClick = { menuFor = status },
                                         )
                                     }
                                 }
-                            }
-                            item(key = "dismiss_hint") {
-                                Text(
-                                    text = localizedStringResource(StringsR.string.home_hold_ok_to_dismiss),
-                                    color = Color.White.copy(alpha = 0.45f),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(start = EdgeStart),
-                                )
                             }
                         }
                         if (s.upcoming.isNotEmpty()) {
@@ -110,15 +110,39 @@ fun EpisodeCenterScreen(
                                             label = label,
                                             count = 0,
                                             onClick = { onOpenEpisode(status.item, episode) },
+                                            onLongClick = { menuFor = status },
                                         )
                                     }
                                 }
                             }
                         }
+                        item(key = "dismiss_hint") {
+                            Text(
+                                text = localizedStringResource(StringsR.string.home_hold_ok_to_dismiss),
+                                color = Color.White.copy(alpha = 0.45f),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(start = EdgeStart),
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+    menuFor?.let { status ->
+        val dismissText = localizedStringResource(StringsR.string.home_dismiss_new_episodes)
+        val hideText = localizedStringResource(StringsR.string.home_remove_from_episodes)
+        ActionMenuDialog(
+            title = status.item.title,
+            actions = buildList {
+                if (status.availableEpisodes.isNotEmpty()) {
+                    add(ActionMenuItem(dismissText, AppIcons.Check) { viewModel.dismiss(status); menuFor = null })
+                }
+                add(ActionMenuItem(hideText, null) { viewModel.hide(status); menuFor = null })
+            },
+            onDismiss = { menuFor = null },
+            consumeOpeningKeyRelease = true,
+        )
     }
 }
 

@@ -114,7 +114,9 @@ internal class SourceFailoverController(
             return SourceFailoverAction.AudioAccepted
         }
         Log.i("PlayerVM", "Sin audio en castellano (${known.distinct()}): ${source.title.take(80)}")
-        val next = (queueIndex + 1 until queue.size).firstOrNull { queue[it].spanishAudioScore > 0 }
+        // Primero una que diga castellano de verdad; si no hay, cualquiera que apunte a español.
+        val next = (queueIndex + 1 until queue.size).firstOrNull { queue[it].advertisesSpanishAudio }
+            ?: (queueIndex + 1 until queue.size).firstOrNull { queue[it].spanishAudioScore > 0 }
         if (next == null || spanishSkips >= MAX_SPANISH_SKIPS) {
             return if (spanishOnly) {
                 SourceFailoverAction.FatalError(texts.get(StringsR.string.player_no_sources_with_verified_spanish_audio_available))

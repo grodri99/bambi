@@ -86,14 +86,15 @@ import androidx.media3.ui.PlayerView
 import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.PlaybackMediaBadges
 import com.shieldstream.tv.ui.component.onBackKey
+import com.shieldstream.tv.ui.theme.AppColors
 import kotlinx.coroutines.delay
-
-private val NetflixRed = Color(0xFFE50914)
+import kotlinx.coroutines.flow.first
 
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     onBack: () -> Unit,
+    onSleepTimerFinished: () -> Unit = onBack,
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val player by viewModel.player.collectAsStateWithLifecycle()
@@ -106,12 +107,24 @@ fun PlayerScreen(
     val subtitleTiming by viewModel.subtitleTiming.collectAsStateWithLifecycle()
     val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
+    val videoFit by viewModel.videoFit.collectAsStateWithLifecycle()
+    val tracksPanelCard by viewModel.tracksPanelCard.collectAsStateWithLifecycle()
+    val sleepTimer by viewModel.sleepTimer.collectAsStateWithLifecycle()
+    val sleepTimerRemainingMinutes by viewModel.sleepTimerRemainingMinutes.collectAsStateWithLifecycle()
     val thumbnailsEnabled by viewModel.seekThumbnails.collectAsStateWithLifecycle()
     val nextUp by viewModel.nextUp.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val skipPrompt by viewModel.skipPrompt.collectAsStateWithLifecycle()
     val texts = rememberTexts()
     LaunchedEffect(Unit) { viewModel.goNext.collect { onBack() } }
+    LaunchedEffect(Unit) { viewModel.backToSources.collect { onBack() } }
+    LaunchedEffect(Unit) {
+        viewModel.sleepTimerFinished.collect {
+            delay(1_500)
+            onSleepTimerFinished()
+        }
+    }
     LaunchedEffect(notice) {
         if (notice != null) {
             delay(3_500)
@@ -172,6 +185,40 @@ fun PlayerScreen(
         } ?: false
     }
     val thumbs = rememberSeekThumbnails(mediaUri, pqHdr, active = scrubbing)
+
+    // Bandas negras grabadas dentro de un vídeo 16:9 (remux): el reproductor no las ve, así que se miden en unos
+    // fotogramas la primera vez que se pide Ampliar/Estirar con ese archivo y se amplía la superficie de vídeo.
+    var videoSize by remember(player) { mutableStateOf(player?.videoSize ?: androidx.media3.common.VideoSize.UNKNOWN) }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) {
+                videoSize = size
+            }
+        }
+        player?.addListener(listener)
+        onDispose { player?.removeListener(listener) }
+    }
+    val frameIs16x9 = videoSize.width > 0 && videoSize.height > 0 &&
+        kotlin.math.abs(videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height - 16f / 9f) < 0.03f
+    val itemUri = player?.currentMediaItem?.localConfiguration?.uri
+    var letterboxScale by remember(itemUri) { mutableStateOf<Float?>(null) }
+    val wantsNoBars = videoFit != com.shieldstream.tv.model.VideoFit.FIT
+    LaunchedEffect(itemUri, wantsNoBars, frameIs16x9) {
+        val p = player
+        if (!wantsNoBars || !frameIs16x9 || letterboxScale != null || itemUri == null || p == null) return@LaunchedEffect
+        val format = p.videoFormat
+        if (format?.codecs?.let { it.startsWith("dvhe.05") || it.startsWith("dvh1.05") } == true) {
+            letterboxScale = 1f
+            return@LaunchedEffect
+        }
+        val duration = androidx.compose.runtime.snapshotFlow { playback.durationMs }.first { it > 0 }
+        delay(1_500)
+        val pq = format?.let {
+            it.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084 || it.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION
+        } ?: false
+        letterboxScale = LetterboxDetector.measureScale(context, itemUri, pq, duration)
+    }
+    val barScale = if (frameIs16x9) letterboxScale ?: 1f else 1f
     LaunchedEffect(player) { scrubMs = null }
 
     fun showControls() {
@@ -376,6 +423,20 @@ fun PlayerScreen(
                 factory = { playerView },
                 update = { view ->
                     view.player = exoPlayer
+                    view.resizeMode = when (videoFit) {
+                        com.shieldstream.tv.model.VideoFit.FIT -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        com.shieldstream.tv.model.VideoFit.ZOOM -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        com.shieldstream.tv.model.VideoFit.STRETCH -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                    }
+                    view.videoSurfaceView?.let { surface ->
+                        val (sx, sy) = when (videoFit) {
+                            com.shieldstream.tv.model.VideoFit.FIT -> 1f to 1f
+                            com.shieldstream.tv.model.VideoFit.ZOOM -> barScale to barScale
+                            com.shieldstream.tv.model.VideoFit.STRETCH -> 1f to barScale
+                        }
+                        surface.scaleX = sx
+                        surface.scaleY = sy
+                    }
                     val evaluating = (externalSubs as? ExternalSubsState.Results)?.evaluating == true
                     view.subtitleView?.applySubtitleAppearance(subtitleAppearance)
                     view.subtitleView?.visibility = if (activeExternal != null || evaluating) View.GONE else View.VISIBLE
@@ -447,6 +508,17 @@ fun PlayerScreen(
                         tracksOpen = false
                         syncOpen = true
                     },
+                    playbackSpeed = playbackSpeed,
+                    videoFit = videoFit,
+                    onCycleVideoFit = viewModel::cycleVideoFit,
+                    cardStyle = tracksPanelCard,
+                    onCycleSpeed = viewModel::cyclePlaybackSpeed,
+                    sleepTimer = sleepTimer,
+                    sleepTimerRemainingMinutes = sleepTimerRemainingMinutes,
+                    onCycleSleepTimer = viewModel::cycleSleepTimer,
+                    onAudioSelected = viewModel::rememberAudioLanguage,
+                    onSubtitleSelected = viewModel::rememberSubtitleLanguage,
+                    onSubtitlesOff = viewModel::rememberSubtitlesOff,
                 )
             }
         }
@@ -633,13 +705,13 @@ private fun SeekBar(playback: PlaybackState, positionMs: Long) {
         Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.25f)))
         if (played != null && buffered != null) {
             Box(Modifier.fillMaxWidth(buffered).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.45f)))
-            Box(Modifier.fillMaxWidth(played).height(4.dp).clip(RoundedCornerShape(2.dp)).background(NetflixRed))
+            Box(Modifier.fillMaxWidth(played).height(4.dp).clip(RoundedCornerShape(2.dp)).background(AppColors.Accent))
             Box(
                 Modifier
                     .offset(x = maxWidth * played - 7.dp)
                     .size(14.dp)
                     .clip(CircleShape)
-                    .background(NetflixRed),
+                    .background(AppColors.Accent),
             )
         }
     }
@@ -662,7 +734,7 @@ private fun StatusOverlay(title: String, message: String, loading: Boolean) {
             Spacer(Modifier.height(20.dp))
         }
         if (loading) {
-            CircularProgressIndicator(color = NetflixRed, modifier = Modifier.size(40.dp))
+            CircularProgressIndicator(color = AppColors.Accent, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(16.dp))
         }
         Text(

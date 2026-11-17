@@ -11,6 +11,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -26,7 +27,10 @@ import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SubtitleRepository
 import com.shieldstream.tv.domain.WatchProgressRepository
 import com.shieldstream.tv.domain.ScrobbleAction
+import com.shieldstream.tv.domain.TrackMemoryRepository
 import com.shieldstream.tv.domain.TraktRepository
+import com.shieldstream.tv.media.AudioOutputSwitch
+import com.shieldstream.tv.media.EncodedAudio
 import com.shieldstream.tv.media.Media3Factory
 import com.shieldstream.tv.media.PlaybackPolicyProvider
 import com.shieldstream.tv.media.VideoFormatInspector
@@ -68,6 +72,13 @@ sealed interface NextUpUiState {
     data class Showing(val label: String, val secondsLeft: Int) : NextUpUiState
 }
 
+/** Opciones del temporizador de apagado del reproductor. */
+sealed interface SleepTimer {
+    data object Off : SleepTimer
+    data class Minutes(val minutes: Int) : SleepTimer
+    data object EndOfEpisode : SleepTimer
+}
+
 @OptIn(UnstableApi::class)
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -81,6 +92,7 @@ class PlayerViewModel @Inject constructor(
     private val subtitles: SubtitleRepository,
     private val trakt: TraktRepository,
     private val skipSegmentsRepository: SkipSegmentsRepository,
+    private val trackMemory: TrackMemoryRepository,
     private val texts: Texts,
 ) : ViewModel() {
 
@@ -113,6 +125,7 @@ class PlayerViewModel @Inject constructor(
 
     private var segments: SkipSegments = SkipSegments.NONE
     private var segmentsJob: Job? = null
+    private val autoSkipped = mutableSetOf<String>()
     private var prefetched = false
     private var nextUpShownAt = -1L
     private val _skipPrompt = MutableStateFlow<SkipPromptUiState>(SkipPromptUiState.Hidden)
@@ -122,16 +135,49 @@ class PlayerViewModel @Inject constructor(
     val nextUp: StateFlow<NextUpUiState> = _nextUp.asStateFlow()
     private val _goNext = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val goNext: SharedFlow<Unit> = _goNext.asSharedFlow()
+
+    private val _backToSources = MutableSharedFlow<Unit>(replay = 1)
+
+    /** Se cierra el reproductor para elegir otra fuente (la elegida a mano falló y no se cambia sola). */
+    val backToSources: SharedFlow<Unit> = _backToSources.asSharedFlow()
+
+    /**
+     * La fuente no se puede reproducir. Si se eligió a mano con el cambio automático desactivado, no se prueba otra:
+     * se cierra y la ficha vuelve a abrir la lista con el motivo. Si no, la pantalla de error de siempre.
+     */
+    private fun sourceFailed(message: String) {
+        if (playbackSnapshot?.manualPick == true) {
+            Log.i("PlayerVM", "Fuente elegida a mano falló, vuelta a la lista: $message")
+            holder.reportPickedSourceFailed(message.lineSequence().lastOrNull { it.isNotBlank() } ?: message)
+            _backToSources.tryEmit(Unit)
+        } else {
+            _uiState.value = PlayerUiState.Error(message)
+        }
+    }
     private var nextUpDismissed = false
     private var wentNext = false
     private val autoNext: StateFlow<Boolean> = settings.autoNextEpisode.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Formato de imagen: con bandas, ampliado (recorta) o estirado. Se guarda para lo siguiente que se vea. */
+    val videoFit: StateFlow<com.shieldstream.tv.model.VideoFit> = settings.videoFit
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.shieldstream.tv.model.VideoFit.FIT)
+
+    fun cycleVideoFit() {
+        val next = videoFit.value.next()
+        viewModelScope.launch { settings.setVideoFit(next) }
+    }
+    private val autoSkipIntro: StateFlow<Boolean> = settings.autoSkipIntro.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // --- Castellano de verdad ---------------------------------------------------------------------------
     private val spanishOnly = profiles.active.value.spanishOnlySources
     private val spanishFirst = profiles.active.value.spanishFirst || spanishOnly
     private val subtitlePreference = profiles.active.value.subtitlePreference
+    /** Clave estable del título para recordar audio/subtítulos (la misma en todos los episodios). */
+    // Misma clave para todos los episodios: el IMDb de la serie o, si falta, su título (la etiqueta incluye el episodio).
+    private val trackMemoryKey = mediaSnapshot?.let { it.imdbId ?: "${it.type.name}:${it.title}" } ?: playbackSnapshot?.label
     private val _subtitleAppearance = MutableStateFlow(profiles.active.value.subtitleAppearance)
     val subtitleAppearance: StateFlow<SubtitleAppearance> = _subtitleAppearance.asStateFlow()
+    val tracksPanelCard: StateFlow<Boolean> = settings.tracksPanelCard.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val experimentalSubtitleSync = profiles.active.value.experimentalSubtitleSync
     val matchContentFrameRate = profiles.active.value.matchContentFrameRate
     private val frameRateProbe = EarlyFrameRateProbe(media3Factory.dataSourceFactory)
@@ -150,6 +196,11 @@ class PlayerViewModel @Inject constructor(
     private var resumePositionMs = 0L
 
     private var playbackRetries = 0
+    private var rememberedTracksApplied = false
+    /** Con velocidad != 1x se fuerza PCM (sin passthrough) para que ExoPlayer pueda aplicarla. */
+    private var forcePcmAudio = false
+    private var audioOutput = AudioOutputSwitch()
+    private var audioSwitchJob: Job? = null
 
     private var saverJob: Job? = null
 
@@ -173,6 +224,12 @@ class PlayerViewModel @Inject constructor(
         notify = { _notice.value = it },
         referenceReader = Media3EmbeddedReferenceReader(media3Factory.dataSourceFactory),
         experimentalSyncEnabled = experimentalSubtitleSync,
+        preferredSubtitle = {
+            trackMemoryKey?.let(trackMemory::subtitle)?.takeUnless { it == TrackMemoryRepository.SUBTITLES_OFF }
+        },
+        subtitlesOff = {
+            trackMemoryKey?.let(trackMemory::subtitle) == TrackMemoryRepository.SUBTITLES_OFF
+        },
     )
     val externalSubs: StateFlow<ExternalSubsState> = subtitleCoordinator.externalSubs
     val activeExternal: StateFlow<ActiveExternalSubtitle?> = subtitleCoordinator.activeExternal
@@ -198,7 +255,10 @@ class PlayerViewModel @Inject constructor(
         val imdb = m.imdbId ?: return
         val season = m.season ?: return
         val episode = m.episode ?: return
-        viewModelScope.launch { segments = skipSegmentsRepository.episode(imdb, season, episode) }
+        viewModelScope.launch {
+            segments = skipSegmentsRepository.episode(imdb, season, episode)
+            autoSkipped.clear()
+        }
     }
 
     private fun playFrom(from: Int) {
@@ -213,7 +273,7 @@ class PlayerViewModel @Inject constructor(
                         _notice.value = event.notice
                         playFrom(event.index)
                     }
-                    is SourceResolutionEvent.Error -> _uiState.value = PlayerUiState.Error(event.message)
+                    is SourceResolutionEvent.Error -> sourceFailed(event.message)
                 }
             }
         }
@@ -231,6 +291,8 @@ class PlayerViewModel @Inject constructor(
         trackSelectionToRestore = null // Es otra fuente: las pistas de la anterior no aplican.
         launchPlayer(event.url, startPositionMs = resumeAt)
         if (resumeAt > 0) _notice.value = texts.get(StringsR.string.player_resume_from, formatTime(resumeAt))
+        // Si no es la primera de la cola es que alguna falló: se dice a cuál se ha pasado (calidad, HDR, idioma).
+        if (event.index > 0) _notice.value = texts.get(StringsR.string.player_switched_source, describeSource(source))
         _uiState.value = PlayerUiState.Playing
         startProgressSaver()
         startSegmentsWatcher()
@@ -238,6 +300,140 @@ class PlayerViewModel @Inject constructor(
 
     fun clearNotice() {
         _notice.value = null
+    }
+
+    private fun describeSource(source: com.shieldstream.tv.model.StreamSource): String = listOfNotNull(
+        source.quality.label.takeIf { source.quality != com.shieldstream.tv.model.Quality.UNKNOWN },
+        source.hdrType.label.takeIf { source.isHdr },
+        texts.get(StringsR.string.player_castellano).takeIf { source.advertisesSpanishAudio },
+    ).joinToString(" · ").ifBlank { source.title.take(40) }
+
+    fun rememberAudioLanguage(language: String?) {
+        val key = trackMemoryKey ?: return
+        if (!language.isNullOrBlank()) trackMemory.saveAudio(key, language)
+    }
+
+    fun rememberSubtitleLanguage(language: String?) {
+        val key = trackMemoryKey ?: return
+        if (!language.isNullOrBlank()) trackMemory.saveSubtitle(key, language)
+    }
+
+    fun rememberSubtitlesOff() {
+        trackMemoryKey?.let(trackMemory::saveSubtitlesOff)
+    }
+
+    // --- Velocidad y temporizador de apagado -------------------------------------------------------------
+    private val _playbackSpeed = MutableStateFlow(1f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    /** Pasa a la siguiente velocidad (1x → 1,25x → 1,5x → 2x → 0,75x → 1x). */
+    fun cyclePlaybackSpeed() {
+        val next = PLAYBACK_SPEEDS[(PLAYBACK_SPEEDS.indexOf(_playbackSpeed.value) + 1) % PLAYBACK_SPEEDS.size]
+        _playbackSpeed.value = next
+        // Sin reproductor todavía: se crea ya con esta velocidad (y en PCM si no es 1x).
+        val player = _player.value ?: return
+        player.setPlaybackSpeed(next)
+        maybeSwitchAudioModeForSpeed(player)
+    }
+
+    /**
+     * Con audio directo (Dolby/DTS al amplificador) el reloj lo marca el audio y la velocidad no se aplica: hay que
+     * decodificar a PCM. Solo se recrea el reproductor si el audio actual es de ese tipo; con AAC/Opus/PCM basta con
+     * setPlaybackSpeed. Al volver a 1x se recupera el audio directo (surround).
+     */
+    private fun maybeSwitchAudioModeForSpeed(player: ExoPlayer) {
+        val wantsPcm = _playbackSpeed.value != 1f
+        if (wantsPcm == forcePcmAudio) return
+        val audioMime = player.audioFormat?.sampleMimeType ?: player.currentTracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            ?.let { group -> (0 until group.length).firstOrNull(group::isTrackSelected)?.let { group.getTrackFormat(it).sampleMimeType } }
+        if (!EncodedAudio.isPassthroughCapable(audioMime)) return
+        if (wantsPcm) _notice.value = texts.get(StringsR.string.player_speed_stereo_notice)
+        switchAudioOutput(player, wantsPcm)
+    }
+
+    /**
+     * Cambia entre audio directo y PCM sin recrear el reproductor: se cambia la salida y se desactiva y reactiva
+     * solo la pista de audio, para que el decodificador de audio se vuelva a montar. El vídeo sigue; como mucho hay
+     * un instante sin sonido.
+     */
+    private fun switchAudioOutput(player: ExoPlayer, pcm: Boolean) {
+        forcePcmAudio = pcm
+        audioOutput.pcmOnly = pcm
+        audioSwitchJob?.cancel()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+            .build()
+        audioSwitchJob = viewModelScope.launch {
+            // Tiene que dar tiempo a que el hilo de reproducción aplique la desactivación antes de reactivar.
+            delay(AUDIO_SWITCH_GAP_MS)
+            if (_player.value !== player) return@launch
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                .build()
+        }
+    }
+
+    private val _sleepTimer = MutableStateFlow<SleepTimer>(SleepTimer.Off)
+    val sleepTimer: StateFlow<SleepTimer> = _sleepTimer.asStateFlow()
+    /** Minutos que quedan, redondeados hacia arriba (null si no hay cuenta atrás). */
+    private val _sleepTimerRemainingMinutes = MutableStateFlow<Int?>(null)
+    val sleepTimerRemainingMinutes: StateFlow<Int?> = _sleepTimerRemainingMinutes.asStateFlow()
+    private var sleepTimerJob: Job? = null
+    private val _sleepTimerFinished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val sleepTimerFinished: SharedFlow<Unit> = _sleepTimerFinished.asSharedFlow()
+
+    /** Pasa a la siguiente opción (desactivado → 15 → 30 → 45 → 60 → 90 → fin del episodio → desactivado). */
+    fun cycleSleepTimer() {
+        val next = when (val current = _sleepTimer.value) {
+            SleepTimer.Off -> SleepTimer.Minutes(15)
+            is SleepTimer.Minutes -> when (current.minutes) {
+                15 -> SleepTimer.Minutes(30)
+                30 -> SleepTimer.Minutes(45)
+                45 -> SleepTimer.Minutes(60)
+                60 -> SleepTimer.Minutes(90)
+                else -> SleepTimer.EndOfEpisode
+            }
+            SleepTimer.EndOfEpisode -> SleepTimer.Off
+        }
+        setSleepTimer(next)
+    }
+
+    private fun setSleepTimer(timer: SleepTimer) {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimer.value = timer
+        when (timer) {
+            SleepTimer.Off, SleepTimer.EndOfEpisode -> _sleepTimerRemainingMinutes.value = null
+            is SleepTimer.Minutes -> {
+                _sleepTimerRemainingMinutes.value = timer.minutes
+                sleepTimerJob = viewModelScope.launch {
+                    var remaining = timer.minutes * 60_000L
+                    while (isActive && remaining > 0) {
+                        val step = minOf(remaining, 5_000L)
+                        delay(step)
+                        remaining -= step
+                        val minutesLeft = ((remaining + 59_999L) / 60_000L).toInt()
+                        if (minutesLeft != _sleepTimerRemainingMinutes.value) {
+                            _sleepTimerRemainingMinutes.value = minutesLeft
+                        }
+                    }
+                    if (isActive) finishSleepTimer()
+                }
+            }
+        }
+    }
+
+    /** Para la reproducción y avisa a la pantalla para volver a Inicio. */
+    private fun finishSleepTimer() {
+        if (_sleepTimer.value == SleepTimer.Off) return
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimer.value = SleepTimer.Off
+        _sleepTimerRemainingMinutes.value = null
+        _player.value?.pause()
+        _notice.value = texts.get(StringsR.string.player_sleep_timer_paused)
+        _sleepTimerFinished.tryEmit(Unit)
     }
 
     // -----------------------------------------------------------------------
@@ -293,6 +489,19 @@ class PlayerViewModel @Inject constructor(
     private fun updateSkipPrompt(position: Long) {
         val recap = segments.recap
         val intro = segments.intro
+        if (autoSkipIntro.value) {
+            // Cada tramo se salta solo una vez: si alguien vuelve atrás a propósito, se le deja verlo.
+            val auto = listOfNotNull(recap?.let { "recap" to it }, intro?.let { "intro" to it })
+                .firstOrNull { (name, seg) -> position in seg && seg.endMs - position > 2_000 && name !in autoSkipped }
+            if (auto != null) {
+                val (name, seg) = auto
+                autoSkipped += name
+                _player.value?.seekTo(seg.endMs)
+                _notice.value = texts.get(if (name == "recap") StringsR.string.player_recap_skipped else StringsR.string.player_intro_skipped)
+                if (_skipPrompt.value != SkipPromptUiState.Hidden) _skipPrompt.value = SkipPromptUiState.Hidden
+                return
+            }
+        }
         val prompt = when {
             recap != null && position in recap && recap.endMs - position > 2_000 ->
                 SkipPromptUiState.Showing(texts.get(StringsR.string.player_skip_recap), recap.endMs)
@@ -358,7 +567,7 @@ class PlayerViewModel @Inject constructor(
             is SourceFailoverAction.FatalError -> {
                 player.stop()
                 resolvedUrl = null
-                _uiState.value = PlayerUiState.Error(action.message)
+                sourceFailed(action.message)
             }
             is SourceFailoverAction.SwitchSource -> switchSource(player, action, savePosition = true)
         }
@@ -390,6 +599,10 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun playNextNow() {
+        if (_sleepTimer.value == SleepTimer.EndOfEpisode) {
+            finishSleepTimer()
+            return
+        }
         val next = nextSnapshot ?: return
         if (wentNext) return
         wentNext = true
@@ -451,6 +664,10 @@ class PlayerViewModel @Inject constructor(
     fun onStop() {
         playbackVisible = false
         subtitleCoordinator.onPlaybackStopped()
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimer.value = SleepTimer.Off
+        _sleepTimerRemainingMinutes.value = null
         playerGeneration++
         playerCreationJob?.cancel()
         playerCreationJob = null
@@ -501,7 +718,10 @@ class PlayerViewModel @Inject constructor(
         earlyFrameRate = if (matchContentFrameRate) frameRateProbe.probe(url) else null
         if (matchContentFrameRate) trace("frame_rate_probe_finished", "rate=$earlyFrameRate")
         if (!playbackVisible || generation != playerGeneration) return
-        val player = media3Factory.createPlayer(policy)
+        forcePcmAudio = _playbackSpeed.value != 1f
+        audioSwitchJob?.cancel()
+        audioOutput = AudioOutputSwitch(forcePcmAudio)
+        val player = media3Factory.createPlayer(policy, audioOutput)
         trace("player_created")
         if (matchContentFrameRate) {
             // PlayerScreen coordinates non-seamless Activity and surface display-mode changes.
@@ -567,13 +787,18 @@ class PlayerViewModel @Inject constructor(
                         diagnostics.onReady(player.currentPosition)
                         updateVideoInfo()
                         subtitleCoordinator.onPlayerReady(player, player.currentTracks)
+                        applyRememberedAudio(player, player.currentTracks)
                         checkSpanishAudio(player, player.currentTracks)
                         if (checkErrorSlate(player)) return
                     }
                     if (playbackState == Player.STATE_ENDED) {
                         markCurrentFinished()
                         scrobble(ScrobbleAction.STOP, fraction = 1f)
-                        if (!nextUpDismissed && autoNext.value) playNextNow()
+                        if (_sleepTimer.value == SleepTimer.EndOfEpisode) {
+                            finishSleepTimer()
+                        } else if (!nextUpDismissed && autoNext.value) {
+                            playNextNow()
+                        }
                     }
                 }
 
@@ -594,9 +819,7 @@ class PlayerViewModel @Inject constructor(
                         player.prepare()
                         player.playWhenReady = !spanishOnly || sourceFailover.spanishChecked
                     } else {
-                        _uiState.value = PlayerUiState.Error(
-                            texts.get(StringsR.string.player_playback_stopped, error.errorCodeName),
-                        )
+                        sourceFailed(texts.get(StringsR.string.player_playback_stopped, error.errorCodeName))
                     }
                 }
 
@@ -615,13 +838,21 @@ class PlayerViewModel @Inject constructor(
 
                 override fun onTracksChanged(tracks: Tracks) {
                     subtitleCoordinator.onTracksChanged(player, tracks)
+                    applyRememberedAudio(player, tracks)
                     checkSpanishAudio(player, tracks)
+                    // Se eligió la velocidad antes de saber qué audio traía la fuente.
+                    // (Fuera del callback: recrear libera este mismo reproductor.)
+                    if (_playbackSpeed.value != 1f) {
+                        viewModelScope.launch { if (_player.value === player) maybeSwitchAudioModeForSpeed(player) }
+                    }
                 }
 
             },
         )
+        rememberedTracksApplied = false
         player.setMediaItem(buildMediaItem(url), startPositionMs)
         sourceFailover.onPlayerCreated()
+        if (_playbackSpeed.value != 1f) player.setPlaybackSpeed(_playbackSpeed.value) // al cambiar de fuente se mantiene
         _player.value = player
         if (earlyFrameRate != null) {
             earlyPreparationPending = player
@@ -633,6 +864,27 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /** Aplica una sola vez la pista de audio recordada para esta serie/película. */
+    private fun applyRememberedAudio(player: ExoPlayer, tracks: Tracks) {
+        if (rememberedTracksApplied) return
+        val key = trackMemoryKey ?: return
+        val language = trackMemory.audio(key) ?: return
+        val match = tracks.groups
+            .filter { it.type == C.TRACK_TYPE_AUDIO }
+            .firstNotNullOfOrNull { group ->
+                (0 until group.length)
+                    .firstOrNull { index ->
+                        group.isTrackSupported(index) &&
+                            group.getTrackFormat(index).language?.let { it == language || it.startsWith("$language-") } == true
+                    }
+                    ?.let { group to it }
+            } ?: return
+        rememberedTracksApplied = true
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(TrackSelectionOverride(match.first.mediaTrackGroup, match.second))
+            .build()
+    }
+
     private fun trace(stage: String, details: String = "") {
         val startedAtNs = playbackSnapshot?.requestedAtNs ?: return
         if (startedAtNs == 0L) return
@@ -642,6 +894,8 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         playbackVisible = false
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
         playerGeneration++
         playerCreationJob?.cancel()
         earlyPreparationPending = null
@@ -654,6 +908,8 @@ class PlayerViewModel @Inject constructor(
     }
 
     private companion object {
+        val PLAYBACK_SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.75f)
+        const val AUDIO_SWITCH_GAP_MS = 120L
         const val STARTUP_TRACE_TAG = "StartupTrace"
         const val NEXT_UP_COUNTDOWN_MS = 10_000L
         const val NEXT_UP_FALLBACK_MIN_MS = 20_000L

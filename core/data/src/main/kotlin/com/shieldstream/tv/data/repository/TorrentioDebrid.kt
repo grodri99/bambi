@@ -45,7 +45,16 @@ internal fun parseResolveUrl(url: String): Pair<String, Int?>? {
 class TorrentioLinkResolverImpl @Inject constructor(
     base: OkHttpClient,
     private val texts: Texts,
+    private val store: com.shieldstream.tv.data.security.TokenStore,
 ) : TorrentioLinkResolver {
+
+    override fun resolveUrlFor(service: DebridService, infoHash: String, fileIdx: Int?, fileName: String?): String? {
+        val key = store.getSecret(com.shieldstream.tv.data.security.TokenStore.keyNameFor(service.apiService))
+            ?.takeIf { it.isNotBlank() } ?: return null
+        // Mismo formato que los enlaces que da Torrentio: /resolve/servicio/clave/hash/info/índice/archivo.
+        return "$TORRENTIO_BASE/resolve/${service.torrentioKey}/${Uri.encode(key)}/${infoHash.lowercase()}/null/" +
+            "${fileIdx ?: "null"}/${Uri.encode(fileName ?: "video")}"
+    }
 
     private val client = base.newBuilder()
         .followRedirects(false)
@@ -118,6 +127,7 @@ class TorrentioLinkResolverImpl @Inject constructor(
 
     private companion object {
         const val MAX_HOPS = 4
+        const val TORRENTIO_BASE = "https://torrentio.strem.fun"
     }
 }
 

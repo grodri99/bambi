@@ -14,6 +14,10 @@ data class Profile(
     val subtitleAppearance: SubtitleAppearance = SubtitleAppearance(),
     val experimentalSubtitleSync: Boolean = true,
     val matchContentFrameRate: Boolean = true,
+    /** Acento de la app para este perfil (progreso, focos, indicadores). */
+    val theme: ProfileTheme = ProfileTheme.BAMBI,
+    /** Icono de perfil (URL de imagen). Sin él, la inicial sobre el color de [avatar]. */
+    val avatarImage: String? = null,
 ) {
     val initial: String get() = name.trim().firstOrNull()?.uppercase() ?: "?"
 
@@ -24,6 +28,20 @@ data class Profile(
 
         const val DEFAULT_ID = "default"
     }
+}
+
+/** Acentos disponibles para la estética de cada perfil. */
+enum class ProfileTheme(
+    val accent: Long,
+    val accentDark: Long,
+    val onAccent: Long = 0xFFFFFFFF,
+) {
+    BAMBI(0xFFE50914, 0xFF8C0610),
+    OCEAN(0xFF2F80ED, 0xFF1B4C95),
+    FOREST(0xFF27AE60, 0xFF14683A),
+    GOLD(0xFFF2C94C, 0xFFC08A12, onAccent = 0xFF1A1A1A),
+    VIOLET(0xFF9B51E0, 0xFF5B2A8C),
+    ROSE(0xFFEB5794, 0xFF9B2459),
 }
 
 object ProfilePin {

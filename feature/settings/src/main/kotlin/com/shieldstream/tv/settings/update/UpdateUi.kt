@@ -1,7 +1,5 @@
 package com.shieldstream.tv.settings.update
 
-import com.shieldstream.tv.ui.theme.AppShapes
-
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.localizedStringResource
 import androidx.compose.foundation.background
@@ -52,7 +50,6 @@ private val Red = Color(0xFFE50914)
 @Composable
 fun UpdatePrompt(
     viewModel: UpdateViewModel = hiltViewModel(),
-    ithilViewModel: IthilUpdateViewModel = hiltViewModel(),
 ) {
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) {
@@ -60,10 +57,7 @@ fun UpdatePrompt(
         onPauseOrDispose { }
     }
     val visible = prompt as? UpdatePromptUiState.Visible
-    if (visible == null) {
-        IthilUpdatePrompt(ithilViewModel)
-        return
-    }
+    if (visible == null) return
     val context = LocalContext.current
     Dialog(
         onDismissRequest = viewModel::later,
@@ -120,37 +114,6 @@ fun UpdatePrompt(
                     Buttons(primary = localizedStringResource(StringsR.string.settings_retry), onPrimary = viewModel::update, secondary = localizedStringResource(StringsR.string.settings_not_now), onSecondary = viewModel::later)
                 }
                 else -> Unit
-            }
-        }
-    }
-}
-
-@Composable
-fun IthilUpdatePrompt(viewModel: IthilUpdateViewModel = hiltViewModel()) {
-    val prompt by viewModel.prompt.collectAsStateWithLifecycle()
-    val available = prompt ?: return
-    Dialog(
-        onDismissRequest = viewModel::later,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Column(
-            Modifier
-                .width(620.dp)
-                .background(Panel, AppShapes.Panel)
-                .border(1.dp, Color.White.copy(alpha = 0.08f), AppShapes.Panel)
-                .padding(32.dp),
-        ) {
-            UpdateBody(
-                title = localizedStringResource(StringsR.string.settings_ithil_update_available_title, available.update.version),
-                subtitle = localizedStringResource(StringsR.string.settings_ithil_update_available_message),
-                update = null,
-            ) {
-                Buttons(
-                    primary = localizedStringResource(StringsR.string.settings_update),
-                    onPrimary = viewModel::update,
-                    secondary = localizedStringResource(StringsR.string.settings_not_now),
-                    onSecondary = viewModel::later,
-                )
             }
         }
     }

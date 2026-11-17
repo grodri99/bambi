@@ -1,5 +1,14 @@
 package com.shieldstream.tv.settings
 
+import androidx.lifecycle.ViewModel
+import com.shieldstream.tv.domain.DownloadsRepository
+import com.shieldstream.tv.model.StorageOption
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
+import javax.inject.Inject
 import com.shieldstream.tv.ui.theme.AppShapes
 
 import com.shieldstream.tv.strings.R as StringsR
@@ -13,12 +22,10 @@ import com.shieldstream.tv.strings.labelResource
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.shieldstream.tv.domain.SourceProvider
-import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.ui.component.restartApp
 import com.shieldstream.tv.model.AppLanguage
 import com.shieldstream.tv.model.AudioCodec
@@ -111,6 +118,7 @@ fun SettingsScreen(
     onOpenSetup: () -> Unit = {},
     onOpenPhoneConfig: () -> Unit = {},
     onOpenAddons: () -> Unit = {},
+    onOpenRequests: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -118,11 +126,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val sourceExclusions by viewModel.sourceExclusions.collectAsStateWithLifecycle()
-    val ithilState by viewModel.ithilState.collectAsStateWithLifecycle()
-    val ithilUnlocked by viewModel.ithilUnlocked.collectAsStateWithLifecycle()
+    val brokenSourceCount by viewModel.brokenSourceCount.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
+    val pendingRequestCount by viewModel.pendingRequestCount.collectAsStateWithLifecycle()
     val subtitleAppearance by viewModel.subtitleAppearance.collectAsStateWithLifecycle()
     val matchContentFrameRate by viewModel.matchContentFrameRate.collectAsStateWithLifecycle()
-    val ithilUnlockedMessage = localizedStringResource(StringsR.string.settings_ithil_unlocked)
     Box(
         Modifier
             .fillMaxSize()
@@ -148,26 +156,18 @@ fun SettingsScreen(
                     onSubtitleAppearance = viewModel::setSubtitleAppearance,
                     onOpenSetup = onOpenSetup,
                     onOpenPhoneConfig = onOpenPhoneConfig,
+                    onOpenRequests = onOpenRequests,
+                    showRequests = isAdmin,
+                    pendingRequestCount = pendingRequestCount,
                     onLanguage = { language -> viewModel.setLanguage(language) { restartApp(context) } },
                     providers = providers,
                     onToggleProvider = viewModel::toggleProvider,
                     sourceExclusions = sourceExclusions,
+                    brokenSourceCount = brokenSourceCount,
+                    onRestoreBrokenSources = viewModel::restoreBrokenSources,
                     onToggleQuality = viewModel::toggleExcludedQuality,
                     onToggleHdrType = viewModel::toggleExcludedHdrType,
                     onToggleAudioCodec = viewModel::toggleExcludedAudioCodec,
-                    ithilState = ithilState,
-                    ithilUnlocked = ithilUnlocked,
-                    onDownloadIthil = viewModel::downloadIthil,
-                    onDeleteIthil = viewModel::deleteIthil,
-                    onAboutClick = {
-                        if (viewModel.onIthilUnlockTap()) {
-                            Toast.makeText(
-                                context,
-                                ithilUnlockedMessage,
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
                 )
                 s.editor?.let { editor ->
                     KeyEditorDialog(
@@ -198,23 +198,22 @@ private fun SettingsList(
     onSubtitleAppearance: (SubtitleAppearance) -> Unit,
     onOpenSetup: () -> Unit,
     onOpenPhoneConfig: () -> Unit,
+    onOpenRequests: () -> Unit,
+    showRequests: Boolean,
+    pendingRequestCount: Int,
     onLanguage: (AppLanguage) -> Unit,
     providers: Set<SourceProvider>,
     onToggleProvider: (SourceProvider) -> Unit,
     sourceExclusions: SourceExclusions,
+    brokenSourceCount: Int,
+    onRestoreBrokenSources: () -> Unit,
     onToggleQuality: (Quality) -> Unit,
     onToggleHdrType: (HdrType) -> Unit,
     onToggleAudioCodec: (AudioCodec) -> Unit,
-    ithilState: IthilLibraryState,
-    ithilUnlocked: Boolean,
-    onDownloadIthil: () -> Unit,
-    onDeleteIthil: () -> Unit,
-    onAboutClick: () -> Unit,
 ) {
     val requesters = remember { ApiService.entries.associateWith { FocusRequester() } }
     val debridRequester = remember { FocusRequester() }
     var lastEdited by rememberSaveable { mutableStateOf<ApiService?>(null) }
-    var subtitleAppearanceExpanded by rememberSaveable { mutableStateOf(false) }
     var qualityExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
     var videoExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
     var audioExclusionsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -227,7 +226,6 @@ private fun SettingsList(
     val debridUi = state.services.first { it.service == state.debrid.apiService }
     val otherServices = state.services.filter { !it.service.isDebrid }
     val providerSections = SourceProvider.entries
-        .filter { it != SourceProvider.ITHIL || ithilUnlocked }
         .map { it to localizedStringResource(it.sectionResource) }
     ProvideMinimalScroll(margin = 56.dp) {
         LazyColumn(
@@ -265,7 +263,9 @@ private fun SettingsList(
             }
             item {
                 Text(
-                    if (state.debrid.viaTorrentio) {
+                    if (state.debrid.viaTorrentio && state.debrid.supportsDirectMagnetResolution) {
+                        localizedStringResource(StringsR.string.settings_native_debrid_explanation, state.debrid.title)
+                    } else if (state.debrid.viaTorrentio) {
                         localizedStringResource(StringsR.string.settings_torrentio_debrid_explanation, state.debrid.title)
                     } else {
                         localizedStringResource(StringsR.string.settings_real_debrid_connects_directly_from_the_shield)
@@ -299,13 +299,9 @@ private fun SettingsList(
                 val enabled = providerSections.filter { it.second == section }.all { it.first in providers }
                 ProviderCard(provider, enabled = enabled, onClick = { onToggleProvider(provider) })
             }
-            if (ithilUnlocked) {
+            if (brokenSourceCount > 0) {
                 item {
-                    IthilLibraryCard(
-                        state = ithilState,
-                        onDownload = onDownloadIthil,
-                        onDelete = onDeleteIthil,
-                    )
+                    BrokenSourcesCard(count = brokenSourceCount, onRestore = onRestoreBrokenSources)
                 }
             }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_source_exclusions)) }
@@ -394,108 +390,11 @@ private fun SettingsList(
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
+            item { PlaybackPriorityCard() }
+            item { PreferredQualityCard() }
+            item { SwitchPickedSourceCard() }
             item { MatchContentFrameRateCard(enabled = matchContentFrameRate, onChange = onMatchContentFrameRate) }
             item { ExperimentalSyncCard(enabled = state.experimentalSubtitleSync, onChange = onExperimentalSync) }
-            item {
-                SubtitleAppearanceHeaderCard(
-                    appearance = subtitleAppearance,
-                    expanded = subtitleAppearanceExpanded,
-                    onClick = { subtitleAppearanceExpanded = !subtitleAppearanceExpanded },
-                )
-            }
-            if (subtitleAppearanceExpanded) {
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_size),
-                    value = localizedStringResource(StringsR.string.subtitle_size_value, subtitleAppearance.sizePercent),
-                    onShift = { delta ->
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(
-                                sizePercent = (subtitleAppearance.sizePercent + delta * SubtitleAppearance.SIZE_STEP)
-                                    .coerceIn(SubtitleAppearance.MIN_SIZE, SubtitleAppearance.MAX_SIZE),
-                            ),
-                        )
-                    },
-                )
-            }
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_position),
-                    value = localizedStringResource(
-                        StringsR.string.subtitle_position_value,
-                        subtitleAppearance.verticalPositionPercent,
-                    ),
-                    onShift = { delta ->
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(
-                                verticalPositionPercent = (
-                                    subtitleAppearance.verticalPositionPercent + delta * SubtitleAppearance.POSITION_STEP
-                                ).coerceIn(SubtitleAppearance.MIN_POSITION, SubtitleAppearance.MAX_POSITION),
-                            ),
-                        )
-                    },
-                )
-            }
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_text_color),
-                    value = localizedStringResource(subtitleAppearance.textColor.labelResource),
-                    swatch = subtitleAppearance.textColor,
-                    onShift = { delta ->
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(
-                                textColor = subtitleAppearance.textColor.shift(SubtitleAppearance.textColors, delta),
-                            ),
-                        )
-                    },
-                )
-            }
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_background_color),
-                    value = localizedStringResource(subtitleAppearance.backgroundColor.labelResource),
-                    swatch = subtitleAppearance.backgroundColor,
-                    onShift = { delta ->
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(
-                                backgroundColor = subtitleAppearance.backgroundColor.shift(
-                                    SubtitleAppearance.backgroundColors,
-                                    delta,
-                                ),
-                            ),
-                        )
-                    },
-                )
-            }
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_outline_color),
-                    value = localizedStringResource(subtitleAppearance.outlineColor.labelResource),
-                    swatch = subtitleAppearance.outlineColor,
-                    onShift = { delta ->
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(
-                                outlineColor = subtitleAppearance.outlineColor.shift(SubtitleAppearance.outlineColors, delta),
-                            ),
-                        )
-                    },
-                )
-            }
-            item {
-                SubtitleAppearanceCard(
-                    title = localizedStringResource(StringsR.string.subtitle_embedded_style),
-                    value = localizedStringResource(
-                        if (subtitleAppearance.applyEmbeddedStyles) StringsR.string.subtitle_style_original
-                        else StringsR.string.subtitle_style_custom
-                    ),
-                    onShift = {
-                        onSubtitleAppearance(
-                            subtitleAppearance.copy(applyEmbeddedStyles = !subtitleAppearance.applyEmbeddedStyles),
-                        )
-                    },
-                )
-            }
-            }
             item {
                 DeviceOptimizationCard(
                     optimization = state.optimization,
@@ -512,6 +411,10 @@ private fun SettingsList(
                 )
             }
             item { AutoNextCard() }
+            item { AutoSkipIntroCard() }
+            item { ShowCastCard() }
+            item { TracksPanelStyleCard() }
+            item { DownloadStorageCard() }
             item { EpisodeNotificationsCard() }
             item {
                 BufferCard(
@@ -521,11 +424,72 @@ private fun SettingsList(
                 )
             }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_about)) }
-            item { AboutCard(onClick = onAboutClick) }
+            item { AboutCard() }
             item { UpdateCard() }
+            if (showRequests) {
+                item { FamilyRequestsCard(count = pendingRequestCount, onClick = onOpenRequests) }
+            }
             item { PhoneConfigCard(onClick = onOpenPhoneConfig) }
             item { SetupGuideCard(onClick = onOpenSetup) }
         }
+    }
+}
+
+@Composable
+private fun FamilyRequestsCard(count: Int, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (focused) CardFocused else CardColor, CardShape)
+            .border(if (focused) 2.dp else 1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.08f), CardShape)
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 18.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                localizedStringResource(StringsR.string.settings_family_requests),
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+            Text(
+                localizedStringResource(StringsR.string.settings_family_requests_pending, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Muted,
+            )
+        }
+        Text("OK ›", color = Muted, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun BrokenSourcesCard(count: Int, onRestore: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (focused) CardFocused else CardColor, CardShape)
+            .border(if (focused) 2.dp else 1.dp, if (focused) Color.White else Color.White.copy(alpha = 0.08f), CardShape)
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick = onRestore)
+            .padding(horizontal = 24.dp, vertical = 18.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                localizedStringResource(StringsR.string.settings_broken_sources, count),
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            )
+            Text(
+                localizedStringResource(StringsR.string.settings_broken_sources_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Muted,
+            )
+        }
+        Text(localizedStringResource(StringsR.string.settings_restore), color = Muted, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -561,77 +525,6 @@ private fun FocusCard(
             .padding(horizontal = 24.dp, vertical = 18.dp),
     ) {
         content(focused)
-    }
-}
-
-@Composable
-private fun SubtitleAppearanceHeaderCard(
-    appearance: SubtitleAppearance,
-    expanded: Boolean,
-    onClick: () -> Unit,
-) {
-    FocusCard(onClick = onClick) { focused ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = localizedStringResource(StringsR.string.subtitle_appearance),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                )
-                Text(
-                    text = localizedStringResource(StringsR.string.subtitle_size_value, appearance.sizePercent) +
-                        " · " + localizedStringResource(appearance.textColor.labelResource),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Muted,
-                )
-            }
-            Text(
-                text = if (expanded) "▾" else "▸",
-                style = MaterialTheme.typography.headlineSmall,
-                color = if (focused) Color.White else Muted,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SubtitleAppearanceCard(
-    title: String,
-    value: String,
-    swatch: SubtitleColor? = null,
-    onShift: (Int) -> Unit,
-) {
-    FocusCard(
-        onClick = { onShift(1) },
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            when (event.key) {
-                Key.DirectionLeft -> { onShift(-1); true }
-                Key.DirectionRight -> { onShift(1); true }
-                else -> false
-            }
-        },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                modifier = Modifier.weight(1f),
-            )
-            if (swatch != null) {
-                Box(Modifier.size(20.dp).background(Color(swatch.argb), CircleShape))
-                Spacer(Modifier.width(12.dp))
-            }
-            Arrow("◀", enabled = it)
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 18.dp),
-            )
-            Arrow("▶", enabled = it)
-        }
     }
 }
 
@@ -1055,6 +948,166 @@ private fun AutoNextCard(viewModel: SettingsViewModel = hiltViewModel()) {
 }
 
 @Composable
+private fun SwitchPickedSourceCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.switchFromPickedSource.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.setSwitchFromPickedSource(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.setSwitchFromPickedSource(true); true }
+                Key.DirectionRight -> { viewModel.setSwitchFromPickedSource(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_switch_picked_source),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_switch_picked_source_detail),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShowCastCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.showCast.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.setShowCast(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.setShowCast(true); true }
+                Key.DirectionRight -> { viewModel.setShowCast(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_show_cast),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_show_cast_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TracksPanelStyleCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.tracksPanelCard.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.setTracksPanelCard(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.setTracksPanelCard(false); true }
+                Key.DirectionRight -> { viewModel.setTracksPanelCard(true); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_tracks_panel),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_tracks_panel_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_tracks_panel_transparent), selected = !enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_tracks_panel_card), selected = enabled)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoSkipIntroCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.autoSkipIntro.collectAsStateWithLifecycle()
+    FocusCard(
+        onClick = { viewModel.setAutoSkipIntro(!enabled) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.setAutoSkipIntro(true); true }
+                Key.DirectionRight -> { viewModel.setAutoSkipIntro(false); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.settings_auto_skip_intro),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.settings_auto_skip_intro_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Row(
+                Modifier
+                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                    .padding(4.dp),
+            ) {
+                SegmentOption(localizedStringResource(StringsR.string.settings_on), selected = enabled)
+                SegmentOption(localizedStringResource(StringsR.string.settings_off_9847b4), selected = !enabled)
+            }
+        }
+    }
+}
+
+@Composable
 private fun EpisodeNotificationsCard(viewModel: SettingsViewModel = hiltViewModel()) {
     val enabled by viewModel.episodeNotifications.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -1417,6 +1470,7 @@ private fun ProviderCard(provider: SourceProvider, enabled: Boolean, onClick: ()
 
 @Composable
 private fun providerNote(p: SourceProvider): String = when (p) {
+    SourceProvider.CASTELLANO -> localizedStringResource(StringsR.string.settings_castellano_finder)
     SourceProvider.TORRENTIO -> localizedStringResource(StringsR.string.settings_the_main_finder_like_in_stremio)
     SourceProvider.PEERFLIX -> localizedStringResource(StringsR.string.settings_spanish_torrents_from_spanish_sites_dontorrent_mejortorrent)
     SourceProvider.KNABEN -> localizedStringResource(StringsR.string.settings_bambi_s_own_finders_together_the_pirate)
@@ -1424,7 +1478,6 @@ private fun providerNote(p: SourceProvider): String = when (p) {
     SourceProvider.NYAA -> localizedStringResource(StringsR.string.settings_own_anime_finder_cocoscrapers_real_debrid_only)
     SourceProvider.COMET -> localizedStringResource(StringsR.string.settings_comet_with_your_real_debrid_token_sent)
     SourceProvider.AIOSTREAMS -> localizedStringResource(StringsR.string.settings_any_stremio_addon_aiostreams_comet_mediafusion_paste)
-    SourceProvider.ITHIL -> localizedStringResource(StringsR.string.settings_ithil_indexed_sources_through_alldebrid)
 }
 
 @Composable
@@ -1516,7 +1569,7 @@ private fun Arrow(symbol: String, enabled: Boolean) {
 }
 
 @Composable
-private fun AboutCard(onClick: () -> Unit) {
+private fun AboutCard() {
     val context = LocalContext.current
     val version = remember {
         runCatching {
@@ -1525,7 +1578,7 @@ private fun AboutCard(onClick: () -> Unit) {
         }.getOrNull() ?: "?"
     }
     val testing = context.packageName.endsWith(".debug")
-    FocusCard(onClick = onClick) { _ ->
+    FocusCard { _ ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
@@ -1703,3 +1756,152 @@ private fun KeyEditorDialog(
 
 private const val MIN_BUFFER = 20
 private const val MAX_BUFFER = 100
+
+@HiltViewModel
+class DownloadStorageViewModel @Inject constructor(
+    private val downloads: DownloadsRepository,
+) : ViewModel() {
+    private val _options = MutableStateFlow(downloads.storageOptions())
+    val options: StateFlow<List<StorageOption>> = _options.asStateFlow()
+    val selected: StateFlow<String?> = downloads.storagePath
+
+    /** Vuelve a mirar qué discos hay (por si se acaba de enchufar o quitar un USB). */
+    fun refresh() {
+        _options.value = downloads.storageOptions()
+    }
+
+    fun shift(delta: Int) {
+        refresh()
+        val options = _options.value
+        if (options.isEmpty()) return
+        val index = options.indexOfFirst { it.path == selected.value }.coerceAtLeast(0)
+        downloads.selectStorage(options[((index + delta) % options.size + options.size) % options.size].path)
+    }
+}
+
+/** Ajustes → Carpeta de descargas: memoria interna o un USB/tarjeta, con el espacio libre de cada uno. */
+@Composable
+internal fun DownloadStorageCard(viewModel: DownloadStorageViewModel = hiltViewModel()) {
+    val options by viewModel.options.collectAsStateWithLifecycle()
+    val selected by viewModel.selected.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.refresh() }
+    val current = options.firstOrNull { it.path == selected } ?: options.firstOrNull()
+    FocusCard(
+        onClick = { viewModel.shift(1) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { viewModel.shift(-1); true }
+                Key.DirectionRight -> { viewModel.shift(1); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    localizedStringResource(StringsR.string.downloads_storage),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                Text(
+                    localizedStringResource(StringsR.string.downloads_storage_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    localizedStringResource(StringsR.string.downloads_storage_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted.copy(alpha = 0.8f),
+                )
+            }
+            Spacer(Modifier.width(24.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = if (options.size > 1) "‹  ${current?.label.orEmpty()}  ›" else current?.label.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                current?.let {
+                    Text(
+                        localizedStringResource(StringsR.string.downloads_storage_free, storageGb(it.freeBytes), storageGb(it.totalBytes)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun storageGb(bytes: Long): String = String.format(Locale.getDefault(), "%.1f GB", bytes / 1_073_741_824.0)
+
+/** Ajustes → Al pulsar Reproducir: calidad primero, castellano primero o solo castellano (del perfil activo). */
+@Composable
+private fun PlaybackPriorityCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val priority by viewModel.playbackPriority.collectAsStateWithLifecycle()
+    val all = com.shieldstream.tv.model.PlaybackPriority.entries
+    CyclingSettingCard(
+        title = localizedStringResource(StringsR.string.settings_play_priority),
+        hint = localizedStringResource(StringsR.string.settings_play_priority_hint),
+        value = localizedStringResource(
+            when (priority) {
+                com.shieldstream.tv.model.PlaybackPriority.QUALITY_FIRST -> StringsR.string.settings_play_priority_quality
+                com.shieldstream.tv.model.PlaybackPriority.SPANISH_FIRST -> StringsR.string.settings_play_priority_spanish
+                com.shieldstream.tv.model.PlaybackPriority.SPANISH_ONLY -> StringsR.string.settings_play_priority_spanish_only
+            },
+        ),
+        onShift = { d -> viewModel.setPlaybackPriority(all[((all.indexOf(priority) + d) % all.size + all.size) % all.size]) },
+    )
+}
+
+/** Ajustes → Calidad preferida: la mejor que no pase de este tope va primero. */
+@Composable
+private fun PreferredQualityCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val quality by viewModel.preferredQuality.collectAsStateWithLifecycle()
+    val all = com.shieldstream.tv.model.PreferredQuality.entries
+    CyclingSettingCard(
+        title = localizedStringResource(StringsR.string.settings_preferred_quality),
+        hint = localizedStringResource(StringsR.string.settings_preferred_quality_hint),
+        value = localizedStringResource(
+            when (quality) {
+                com.shieldstream.tv.model.PreferredQuality.DV_4K -> StringsR.string.settings_quality_dv_4k
+                com.shieldstream.tv.model.PreferredQuality.HDR_4K -> StringsR.string.settings_quality_hdr_4k
+                com.shieldstream.tv.model.PreferredQuality.UHD_SDR -> StringsR.string.settings_quality_4k_sdr
+                com.shieldstream.tv.model.PreferredQuality.FHD -> StringsR.string.settings_quality_1080
+                com.shieldstream.tv.model.PreferredQuality.HD -> StringsR.string.settings_quality_720
+            },
+        ),
+        onShift = { d -> viewModel.setPreferredQuality(all[((all.indexOf(quality) + d) % all.size + all.size) % all.size]) },
+    )
+}
+
+@Composable
+private fun CyclingSettingCard(title: String, hint: String, value: String, onShift: (Int) -> Unit) {
+    FocusCard(
+        onClick = { onShift(1) },
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            when (event.key) {
+                Key.DirectionLeft -> { onShift(-1); true }
+                Key.DirectionRight -> { onShift(1); true }
+                else -> false
+            }
+        },
+    ) { _ ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                Text(hint, style = MaterialTheme.typography.bodyMedium, color = Muted)
+            }
+            Spacer(Modifier.width(24.dp))
+            Text(
+                "‹  $value  ›",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+            )
+        }
+    }
+}

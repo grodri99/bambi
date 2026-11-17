@@ -17,8 +17,14 @@ enum class DebridService(
 
     val viaTorrentio: Boolean get() = this != REAL_DEBRID
 
-    /** These services have an in-app magnet resolver; scrapers do not need Torrentio. */
-    val supportsDirectMagnetResolution: Boolean get() = this == REAL_DEBRID || this == ALLDEBRID
+    /**
+     * Resolución propia de magnets en la app (sin Torrentio). Con el resto, los torrents de los buscadores propios se
+     * resuelven a través de Torrentio con la clave del servicio (ver [TorrentioLinkResolver.resolveUrlFor]).
+     */
+    val supportsDirectMagnetResolution: Boolean get() = this == REAL_DEBRID || this == ALLDEBRID || this == TORBOX
+
+    /** Nombre del servicio en la configuración de Comet (el mismo que usa Torrentio). */
+    val cometKey: String get() = torrentioKey
 
     companion object {
         fun of(service: ApiService): DebridService? = entries.firstOrNull { it.apiService == service }
@@ -35,11 +41,21 @@ sealed interface DebridLink {
 
 interface TorrentioLinkResolver {
     suspend fun resolve(url: String, service: String): DebridLink
+
+    /**
+     * Enlace de Torrentio que resuelve este torrent con la clave de [service], para los servicios sin resolución propia
+     * en la app. Sin archivo concreto, Torrentio da el vídeo más grande. Null si no hay clave.
+     */
+    fun resolveUrlFor(service: DebridService, infoHash: String, fileIdx: Int?, fileName: String?): String? = null
 }
 
-const val ITHIL_ALLDEBRID = "AllDebrid / Ithil"
-
 enum class SourceProvider(val baseUrl: String?, val torrentioStyle: Boolean) {
+    /**
+     * Buscador propio de Bambi para castellano: junta las webs españolas de Torrentio (MejorTorrent, Wolfmax4k,
+     * Cinecalidad) y búsquedas con el título en español en Knaben y The Pirate Bay, y deja solo lo que es de este
+     * título y dice traer castellano. Va el primero para que su sección salga arriba.
+     */
+    CASTELLANO(null, false),
     TORRENTIO("https://torrentio.strem.fun", true),
     PEERFLIX("https://addon.peerflix.mov", true),
     KNABEN("https://api.knaben.org", false),
@@ -47,11 +63,10 @@ enum class SourceProvider(val baseUrl: String?, val torrentioStyle: Boolean) {
     NYAA("https://nyaa.si", false),
     COMET("https://comet.elfhosted.com", false),
     AIOSTREAMS(null, false),
-    ITHIL(null, false),
     ;
 }
 
 fun enabledSourceProviders(savedProvidersOff: Set<SourceProvider>?): Set<SourceProvider> =
     SourceProvider.entries.toSet() -
-        (if (savedProvidersOff == null) setOf(SourceProvider.COMET, SourceProvider.ITHIL) else emptySet()) -
+        (if (savedProvidersOff == null) setOf(SourceProvider.COMET) else emptySet()) -
         savedProvidersOff.orEmpty()

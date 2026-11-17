@@ -26,7 +26,7 @@
     <string name="home_episodes">Episodes</string>
     <string name="home_finding_episodes">Finding episodes…</string>
     <string name="home_available_now">Available now</string>
-    <string name="home_hold_ok_to_dismiss">Hold OK to dismiss</string>
+    <string name="home_hold_ok_to_dismiss">Hold OK on a show to dismiss its episodes or remove it from Episodes</string>
     <string name="home_next_30_days">Next 30 days</string>
     <string name="home_view_details">View details</string>
     <string name="home_remove">Remove</string>
@@ -53,4 +53,14 @@
     <string name="home_category_load_error">Error loading “%1$s”</string>
     <string name="home_continue_episode_remaining">S%1$s:E%2$s · %3$s</string>
     <string name="home_remaining">%1$s left</string>
+    <string name="home_surprise_me">Surprise me</string>
+    <string name="home_play_something">Play something</string>
+    <string name="home_ask_an_adult">Ask an adult</string>
+    <string name="home_ask_an_adult_hint">These titles are not for kids profiles. If an adult approves one, it will appear in your My List.</string>
+    <string name="home_ask_an_adult_action">Ask an adult</string>
+    <string name="home_request_sent">Request sent. An adult will see it in Settings.</string>
+    <string name="home_requested">Requested</string>
+    <string name="home_locked">Locked</string>
+    <string name="home_dismiss_new_episodes">Dismiss new episodes</string>
+    <string name="home_remove_from_episodes">Remove from Episodes</string>
 </resources>

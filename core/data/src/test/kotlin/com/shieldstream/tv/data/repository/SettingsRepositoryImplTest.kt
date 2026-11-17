@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,6 +76,31 @@ class SettingsRepositoryImplTest {
 
         assertEquals(exclusions, settings.sourceExclusions.first())
         assertEquals(exclusions, repository().sourceExclusions.first())
+    }
+
+    @Test
+    fun `show cast defaults on and persists across reloads`() = runTest {
+        assertTrue(repository().showCast.first())
+        val settings = repository()
+        settings.setShowCast(false)
+
+        assertFalse(settings.showCast.first())
+        assertFalse(repository().showCast.first())
+    }
+
+    @Test
+    fun `broken sources persist and can be cleared`() = runTest {
+        assertTrue(repository().brokenSourceIds.first().isEmpty())
+        val settings = repository()
+        settings.markSourceBroken("provider:one")
+        settings.markSourceBroken("provider:two")
+
+        assertEquals(setOf("provider:one", "provider:two"), settings.brokenSourceIds.first())
+        assertEquals(setOf("provider:one", "provider:two"), repository().brokenSourceIds.first())
+
+        settings.clearBrokenSources()
+
+        assertTrue(repository().brokenSourceIds.first().isEmpty())
     }
 
     @Test

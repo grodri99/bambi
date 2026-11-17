@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo de arranque: el mismo rojo radial que la intro (IntroScreen: RedCore → RedMid → RedEdge). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:centerX="0.5"
+        android:centerY="0.46"
+        android:gradientRadius="110%p"
+        android:startColor="#FFDD0302"
+        android:centerColor="#FFB30201"
+        android:endColor="#FF7A0100" />
+</shape>

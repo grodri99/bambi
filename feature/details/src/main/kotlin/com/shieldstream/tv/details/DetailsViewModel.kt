@@ -1,12 +1,15 @@
 package com.shieldstream.tv.details
 
+import kotlinx.coroutines.flow.stateIn
+
+import kotlinx.coroutines.flow.SharingStarted
+
 import com.shieldstream.tv.strings.R as StringsR
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.CatalogRepository
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
-import com.shieldstream.tv.domain.ITHIL_ALLDEBRID
 import com.shieldstream.tv.domain.PrioritizeSourcesUseCase
 import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.MyListRepository
@@ -87,9 +90,15 @@ sealed interface DetailsUiState {
         val spanishFirst: Boolean = false,
         val spanishOnly: Boolean = false,
         val sourceExclusions: SourceExclusions = SourceExclusions(),
+        /** Fuentes descartadas por el usuario, por id estable de fuente. */
+        val brokenSources: Set<String> = emptySet(),
+        /** Mostrar la fila de reparto y equipo (Ajustes). */
+        val showCast: Boolean = true,
         val inMyList: Boolean = false,
         val following: Boolean = false,
         val ratings: TraktRatingsState = TraktRatingsState.Idle,
+        /** Resto de películas de la saga (sin la actual), cuando la hay. */
+        val collection: com.shieldstream.tv.model.CollectionDetails? = null,
     ) : DetailsUiState {
         val isSeries: Boolean get() = details.item.type == MediaType.TV
 
@@ -105,11 +114,21 @@ sealed interface DetailsEvent {
     data object OpenPlayer : DetailsEvent
 }
 
+/**
+ * Clave con la que se marca una fuente rota: el hash del torrent, para que el mismo fichero se oculte venga del
+ * buscador que venga. Las marcas antiguas usaban el id de la fuente y se siguen respetando.
+ */
+internal fun StreamSource.brokenKey(): String = infoHash.trim().lowercase().ifBlank { id }
+
+internal fun StreamSource.isMarkedBroken(broken: Set<String>): Boolean = brokenKey() in broken || id in broken
+
 private fun DetailsUiState.Content.eligibleSources(
     sources: List<StreamSource>,
     includeExcluded: Boolean = false,
 ): List<StreamSource> = sources.filter {
-    (includeExcluded || !sourceExclusions.excludes(it)) && (!spanishOnly || it.advertisesSpanishAudio)
+    !it.isMarkedBroken(brokenSources) &&
+        (includeExcluded || !sourceExclusions.excludes(it)) &&
+        (!spanishOnly || it.advertisesSpanishAudio)
 }
 
 @HiltViewModel
@@ -126,7 +145,18 @@ class DetailsViewModel @Inject constructor(
     private val tracking: EpisodeTrackingRepository,
     private val texts: Texts,
     private val sourceProcessingDispatcher: SourceProcessingDispatcher,
+    private val downloads: com.shieldstream.tv.domain.DownloadsRepository,
+    private val planner: DownloadPlanner,
+    private val debridCache: com.shieldstream.tv.domain.DebridCacheRepository,
 ) : ViewModel() {
+
+    /** Descargas (para enseñar el estado en la ficha y reproducir lo descargado). */
+    val downloadList: StateFlow<List<com.shieldstream.tv.model.Download>> = downloads.downloads
+    val plannerProgress: StateFlow<PlannerProgress?> = planner.progress
+
+    init {
+        viewModelScope.launch { planner.messages.collect { msg -> updateContent { it.copy(message = msg) } } }
+    }
 
     private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
@@ -181,10 +211,59 @@ class DetailsViewModel @Inject constructor(
 
     fun isBlocked(source: StreamSource): Boolean = source.resolveUrl == null && realDebridRepository.isBlocked(source.infoHash)
 
+    /** Descarta una fuente para este dispositivo y la quita de la lista al momento. */
+    fun markSourceBroken(source: StreamSource) {
+        viewModelScope.launch {
+            settings.markSourceBroken(source.brokenKey())
+            updateContent { c ->
+                val ready = c.sources as? SourcesState.Ready
+                c.copy(
+                    brokenSources = c.brokenSources + source.brokenKey(),
+                    sources = if (ready != null) {
+                        ready.copy(sources = ready.sources.filterNot { it.brokenKey() == source.brokenKey() })
+                    } else {
+                        c.sources
+                    },
+                    message = texts.get(StringsR.string.details_source_marked_broken),
+                )
+            }
+        }
+    }
+
     fun toggleSpanishOnly() {
         val enabled = !(content()?.spanishOnly ?: return)
         updateContent { it.copy(spanishOnly = enabled) }
         viewModelScope.launch { settings.setSpanishOnlySources(enabled) }
+    }
+
+    private fun loadCollection(id: Int, currentId: String) {
+        viewModelScope.launch {
+            val collection = runCatching { catalogRepository.getCollection(id) }.getOrNull() ?: return@launch
+            if (collection.parts.none { it.id != currentId }) return@launch
+            updateContent { it.copy(collection = collection) }
+        }
+    }
+
+    /** Un episodio al azar de toda la serie (de las temporadas ya emitidas) y a reproducir. */
+    fun playRandomEpisode() {
+        val c = content() ?: return
+        if (!c.isSeries) return
+        viewModelScope.launch {
+            val seasons = c.details.seasons.filter { it.episodeCount > 0 }
+            if (seasons.isEmpty()) return@launch
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+            repeat(3) {
+                val season = seasons.random()
+                val episodes = runCatching { catalogRepository.getEpisodes(c.details.item, season.number) }
+                    .getOrDefault(emptyList())
+                    .filter { e -> e.airDate.isNullOrBlank() || e.airDate!! <= today }
+                if (episodes.isNotEmpty()) {
+                    val episode = episodes.random()
+                    selectSeason(season.number, preferredEpisode = episode.number, playImmediately = true)
+                    return@launch
+                }
+            }
+        }
     }
 
     fun toggleMyList() {
@@ -332,6 +411,8 @@ class DetailsViewModel @Inject constructor(
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
             val sourceExclusions = settings.sourceExclusions.first()
+            val brokenSources = settings.brokenSourceIds.first()
+            val showCast = settings.showCast.first()
             if (request.playImmediately) {
                 updateContent {
                     it.copy(
@@ -341,6 +422,8 @@ class DetailsViewModel @Inject constructor(
                         spanishFirst = spanishFirst,
                         spanishOnly = spanishOnly,
                         sourceExclusions = sourceExclusions,
+                        brokenSources = brokenSources,
+                        showCast = showCast,
                     )
                 }
             } else {
@@ -351,9 +434,12 @@ class DetailsViewModel @Inject constructor(
                     spanishFirst = spanishFirst,
                     spanishOnly = spanishOnly,
                     sourceExclusions = sourceExclusions,
+                    brokenSources = brokenSources,
+                    showCast = showCast,
                 )
             }
             detailsLoaded = true
+            details.collection?.let { ref -> loadCollection(ref.id, details.item.id) }
             if (prefetchAutoplay) {
                 if (item.type == MediaType.MOVIE) {
                     when (content()?.sources) {
@@ -475,6 +561,7 @@ class DetailsViewModel @Inject constructor(
             playEpisode(ep, fromStart)
             return
         }
+        if (playDownloaded(c, episode = null, fromStart = fromStart)) return
         when (val s = c.sources) {
             is SourcesState.Ready -> if (c.eligibleSources(s.sources).isEmpty() && s.pending.isNotEmpty()) {
                 pendingFromStart = fromStart
@@ -493,6 +580,10 @@ class DetailsViewModel @Inject constructor(
     fun playEpisode(episode: Episode, fromStart: Boolean = false) {
         val c = content() ?: return
         pendingFromStart = fromStart
+        if (playDownloaded(c.copy(selectedEpisode = episode), episode, fromStart)) {
+            updateContent { it.copy(selectedEpisode = episode) }
+            return
+        }
         val sameEpisode = c.selectedEpisode == episode
         val ready = c.sources as? SourcesState.Ready
         if (sameEpisode && ready != null) {
@@ -514,20 +605,59 @@ class DetailsViewModel @Inject constructor(
         loadSources(c.selectedEpisode)
     }
 
+    /**
+     * Fuente elegida a mano: se reproduce esa (aunque esté excluida o no sea castellano: la has elegido tú) y, si
+     * falla, se salta a la más parecida (mismo idioma, resolución, HDR, audio...) entre las que están en el debrid
+     * y respetan tus filtros, no simplemente a la siguiente de la lista.
+     */
     fun playSource(source: StreamSource) {
-        val ready = content()?.sources as? SourcesState.Ready ?: return
-        startPlayback(
-            ready.sources,
-            startIndex = ready.sources.indexOf(source).coerceAtLeast(0),
-            fromStart = false,
-            useSavedSource = false,
-            includeExcluded = true,
-        )
+        val c = content() ?: return
+        val ready = c.sources as? SourcesState.Ready ?: return
+        val episode = c.selectedEpisode?.takeIf { c.isSeries }
+        val key = downloadKey(c, episode) ?: return
+        // Con el cambio automático desactivado (Ajustes), solo esa: si falla, se avisa y se vuelve aquí.
+        val switchIfFails = switchFromPickedSource.value
+        val queue = if (switchIfFails) {
+            val rest = c.eligibleSources(ready.sources.filter { it.id != source.id })
+                .filter { it.isCached || it.directUrl != null }
+                .distinctBy { it.infoHash.lowercase().ifBlank { it.id } }
+            (listOf(source) + com.shieldstream.tv.model.SourceSimilarity.orderBySimilarity(source, rest)).take(MAX_QUEUE)
+        } else {
+            listOf(source)
+        }
+        updateContent { it.copy(pendingPlay = false) }
+        handoff(c, episode, key, fromStart = false, queue = queue, manualPick = !switchIfFails)
+    }
+
+    private val switchFromPickedSource: StateFlow<Boolean> = settings.switchFromPickedSource
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    private val _reopenSources = MutableStateFlow(false)
+
+    /** True cuando hay que volver a abrir la lista de fuentes (la elegida a mano falló); la pantalla lo consume. */
+    val reopenSources: StateFlow<Boolean> = _reopenSources.asStateFlow()
+
+    fun sourcesReopened() {
+        _reopenSources.value = false
+    }
+
+    /** La fuente que se reproduce al pulsar Reproducir (la primera de la cola automática), para marcarla en la lista. */
+    fun autoPlaySource(): StreamSource? {
+        val c = content() ?: return null
+        val ready = c.sources as? SourcesState.Ready ?: return null
+        val key = downloadKey(c, c.selectedEpisode?.takeIf { c.isSeries }) ?: return null
+        val savedId = watchProgress.get(key)?.sourceId
+        val eligible = c.eligibleSources(ready.sources)
+        return eligible.firstOrNull { it.id == savedId } ?: eligible.firstOrNull()
     }
 
     fun consumeMessage() = updateContent { it.copy(message = null) }
 
     fun onScreenResumed() {
+        holder.consumePickedSourceFailure()?.let { reason ->
+            updateContent { it.copy(message = texts.get(StringsR.string.details_picked_source_failed, reason)) }
+            _reopenSources.value = true
+        }
         val next = holder.consumeNextRequest() ?: return
         val c = content() ?: return
         val loaded = (c.episodes as? EpisodesState.Ready)?.episodes
@@ -562,6 +692,8 @@ class DetailsViewModel @Inject constructor(
             val spanishFirst = settings.spanishFirst.first()
             val spanishOnly = settings.spanishOnlySources.first()
             val sourceExclusions = settings.sourceExclusions.first()
+            val brokenSources = settings.brokenSourceIds.first()
+            val preferredQuality = settings.preferredQuality.first()
             val optimization = settings.deviceOptimization.first()
             val capabilities = deviceCapabilities.capabilities
             val hardwareCodecs = when (optimization) {
@@ -573,15 +705,26 @@ class DetailsViewModel @Inject constructor(
                     spanishFirst = spanishFirst,
                     spanishOnly = spanishOnly,
                     sourceExclusions = sourceExclusions,
+                    brokenSources = brokenSources,
                 )
             }
-            var rdCached: Set<String>? = null
+            // Lo que el servicio activo ya tiene listo, para marcar ⚡ las fuentes de los buscadores propios. Los
+            // buscadores van llegando poco a poco: se pregunta solo por los torrents nuevos de cada tanda.
+            val checkedHashes = HashSet<String>()
+            val debridCached = HashSet<String>()
             catalogRepository.getStreams(c.details.item, episode)
                 .map { result ->
-                    if (rdCached == null && result.sources.any { it.resolveUrl == null }) {
-                        rdCached = runCatching { realDebridRepository.cachedHashes() }.getOrDefault(emptySet())
+                    val unchecked = result.sources.filter { it.resolveUrl == null }.map { it.infoHash.lowercase() }
+                        .filter { it !in checkedHashes }.distinct()
+                    if (unchecked.isNotEmpty()) {
+                        checkedHashes += unchecked
+                        val ready = runCatching { debridCache.cachedAmong(unchecked) }
+                            .onFailure { android.util.Log.w("Details", "Caché del debrid: ${it.message}") }
+                            .getOrDefault(emptySet())
+                        debridCached += ready
+                        android.util.Log.i("Details", "Caché del debrid: ${ready.size} listos de ${unchecked.size} torrents nuevos")
                     }
-                    val knownCached = rdCached.orEmpty() + result.sources.filter { it.isCached }.map { it.infoHash.lowercase() }
+                    val knownCached = debridCached + result.sources.filter { it.isCached }.map { it.infoHash.lowercase() }
                     val enriched = result.sources.map {
                         if (it.resolveUrl == null) it.copy(isCached = it.infoHash.lowercase() in knownCached) else it
                     }
@@ -589,7 +732,8 @@ class DetailsViewModel @Inject constructor(
                         enriched,
                         capabilities.supportedHdr,
                         hardwareVideoCodecs = hardwareCodecs,
-                        preferSpanish = spanishFirst,
+                        preferSpanish = spanishFirst || spanishOnly,
+                        preferred = preferredQuality,
                     )
                 }
                 // Keep provider parsing, snapshot construction, enrichment and sorting off the UI thread.
@@ -648,7 +792,7 @@ class DetailsViewModel @Inject constructor(
         val queue = c.eligibleSources(ordered.drop(startIndex), includeExcluded)
             .distinctBy { it.infoHash.lowercase() }
             .filterIndexed { index, s ->
-                index == 0 || s.resolveUrl == null || s.isCached || s.debrid == ITHIL_ALLDEBRID
+                index == 0 || s.resolveUrl == null || s.isCached
             }
             .take(MAX_QUEUE)
         if (queue.isEmpty()) {
@@ -665,6 +809,70 @@ class DetailsViewModel @Inject constructor(
             }
             return
         }
+        handoff(c, episode, key, fromStart, queue)
+    }
+
+    /** Lo ya descargado se reproduce del disco, sin esperar a buscar fuentes (funciona sin conexión). */
+    private fun playDownloaded(c: DetailsUiState.Content, episode: Episode?, fromStart: Boolean): Boolean {
+        val key = downloadKey(c, episode) ?: return false
+        val path = downloads.localFileFor(key) ?: return false
+        val local = StreamSource(
+            id = "LOCAL:$key",
+            title = texts.get(StringsR.string.downloads_local_source),
+            infoHash = "",
+            fileIdx = null,
+            magnet = "",
+            quality = com.shieldstream.tv.model.Quality.UNKNOWN,
+            hdrType = com.shieldstream.tv.model.HdrType.SDR,
+            sizeBytes = java.io.File(path).length(),
+            seeders = null,
+            isCached = true,
+            directUrl = android.net.Uri.fromFile(java.io.File(path)).toString(),
+            provider = texts.get(StringsR.string.downloads_title),
+        )
+        handoff(c, episode, key, fromStart, listOf(local))
+        return true
+    }
+
+    private fun downloadKey(c: DetailsUiState.Content, episode: Episode?): String? {
+        val item = c.details.item
+        return if (c.isSeries) {
+            val ep = episode ?: c.selectedEpisode ?: return null
+            WatchProgress.episodeKey(item.id, ep.season, ep.number)
+        } else {
+            WatchProgress.movieKey(item.id)
+        }
+    }
+
+    /**
+     * Descarga la película, o los episodios indicados (uno, los siguientes, una temporada...), con el tope de calidad
+     * elegido. La preparación sigue aunque se salga de la ficha.
+     */
+    fun download(episodes: List<Episode> = emptyList(), quality: com.shieldstream.tv.model.DownloadQuality = com.shieldstream.tv.model.DownloadQuality.BEST) {
+        val c = content() ?: return
+        if (c.isSeries && episodes.isEmpty()) return
+        message(StringsR.string.downloads_preparing)
+        planner.plan(c.details.item, c.details.originalTitle, episodes, quality)
+    }
+
+    fun pauseDownload(id: String) = downloads.pause(id)
+    fun resumeDownload(id: String) = downloads.resume(id)
+    fun deleteDownload(id: String) {
+        downloads.delete(id)
+        message(StringsR.string.downloads_deleted)
+    }
+
+    private fun message(id: Int) = updateContent { it.copy(message = texts.get(id)) }
+
+    private fun handoff(
+        c: DetailsUiState.Content,
+        episode: Episode?,
+        key: String,
+        fromStart: Boolean,
+        queue: List<StreamSource>,
+        manualPick: Boolean = false,
+    ) {
+        val item = c.details.item
         val label = episode?.let { "${item.title} · ${texts.episodeCode(it)} · ${it.title}" } ?: item.title
         val media = PlaybackMedia(
             type = item.type,
@@ -685,6 +893,7 @@ class DetailsViewModel @Inject constructor(
             media = media,
             next = episode?.let { nextEpisodeAfter(c, it) },
             requestedAtNs = requestedAtNs,
+            manualPick = manualPick,
         )
         _events.tryEmit(DetailsEvent.OpenPlayer)
     }

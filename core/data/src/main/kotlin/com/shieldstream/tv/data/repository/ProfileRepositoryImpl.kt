@@ -11,6 +11,7 @@ import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitleColor
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.model.ProfileAvatars
+import com.shieldstream.tv.model.ProfileTheme
 import com.shieldstream.tv.model.SubtitlePreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -124,8 +125,12 @@ class ProfileRepositoryImpl @Inject constructor(
         val subtitleBackgroundColor: SubtitleColor? = null,
         val subtitleOutlineColor: SubtitleColor? = null,
         val subtitleApplyEmbeddedStyles: Boolean? = null,
+        val subtitleFont: com.shieldstream.tv.model.SubtitleFont? = null,
+        val subtitleEdge: com.shieldstream.tv.model.SubtitleEdge? = null,
         val experimentalSubtitleSync: Boolean? = null,
         val matchContentFrameRate: Boolean? = null,
+        val theme: ProfileTheme? = null,
+        val avatarImage: String? = null,
     ) {
         fun toProfile(legacyFirst: Boolean, legacyOnly: Boolean, legacyHidden: Set<String>) = Profile(
             id, name, avatar, traktUser, pinHash, kids,
@@ -140,9 +145,13 @@ class ProfileRepositoryImpl @Inject constructor(
                 backgroundColor = subtitleBackgroundColor ?: SubtitleColor.TRANSPARENT,
                 outlineColor = subtitleOutlineColor ?: SubtitleColor.BLACK,
                 applyEmbeddedStyles = subtitleApplyEmbeddedStyles ?: true,
+                font = subtitleFont ?: com.shieldstream.tv.model.SubtitleFont.DEFAULT,
+                edge = subtitleEdge ?: com.shieldstream.tv.model.SubtitleEdge.OUTLINE,
             ).normalized(),
             experimentalSubtitleSync = experimentalSubtitleSync ?: true,
             matchContentFrameRate = matchContentFrameRate ?: true,
+            theme = theme ?: ProfileTheme.BAMBI,
+            avatarImage = avatarImage,
         )
 
         companion object {
@@ -163,8 +172,12 @@ class ProfileRepositoryImpl @Inject constructor(
                 subtitleBackgroundColor = p.subtitleAppearance.backgroundColor,
                 subtitleOutlineColor = p.subtitleAppearance.outlineColor,
                 subtitleApplyEmbeddedStyles = p.subtitleAppearance.applyEmbeddedStyles,
+                subtitleFont = p.subtitleAppearance.font,
+                subtitleEdge = p.subtitleAppearance.edge,
                 experimentalSubtitleSync = p.experimentalSubtitleSync,
                 matchContentFrameRate = p.matchContentFrameRate,
+                theme = p.theme,
+                avatarImage = p.avatarImage,
             )
         }
     }

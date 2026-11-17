@@ -33,6 +33,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.SubtitleView
 import com.shieldstream.tv.model.SubtitleAppearance
+import com.shieldstream.tv.ui.theme.AppColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -91,7 +92,7 @@ internal fun SubtitleSyncBar(timing: SubtitleTiming, status: SyncStatus, modifie
             Spacer(Modifier.width(24.dp))
             Text(
                 text = timing.describe(texts),
-                color = Color(0xFFE50914),
+                color = AppColors.Accent,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
         }

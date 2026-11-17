@@ -70,4 +70,27 @@
     <string name="details_show_all">Mostrar todas</string>
     <string name="details_hide_excluded">Aplicar exclusiones</string>
     <string name="details_no_sources_match_exclusions">Ninguna fuente supera tus filtros de exclusión</string>
+    <string name="details_trailer">Tráiler</string>
+    <string name="details_cast">Reparto y equipo</string>
+    <string name="details_collection">%1$s</string>
+    <string name="details_directed_by">Dirigida por %1$s</string>
+    <string name="details_created_by">Creada por %1$s</string>
+    <string name="details_random_episode">Episodio al azar</string>
+    <string name="person_error">No se ha podido cargar esta persona.</string>
+    <string name="person_movies">Películas</string>
+    <string name="person_shows">Series</string>
+    <string name="person_no_titles">No hay títulos disponibles.</string>
+    <string name="person_dept_acting">Interpretación</string>
+    <string name="person_dept_directing">Dirección</string>
+    <string name="person_dept_writing">Guion</string>
+    <string name="person_dept_production">Producción</string>
+    <string name="details_mark_source_broken">Marcar fuente como rota</string>
+    <string name="details_source_marked_broken">Fuente descartada</string>
+    <string name="details_hold_ok_to_mark_source_broken">Mantén OK en una fuente para descartarla</string>
+    <string name="details_crew_director">Dirección</string>
+    <string name="details_crew_creator">Creación</string>
+    <string name="details_more_episode">Episodio %1$s</string>
+    <string name="details_more_series">Serie</string>
+    <string name="details_plays_on_play">▶ SE REPRODUCE AL PULSAR REPRODUCIR</string>
+    <string name="details_picked_source_failed">Esa fuente no funciona: %1$s Elige otra.</string>
 </resources>

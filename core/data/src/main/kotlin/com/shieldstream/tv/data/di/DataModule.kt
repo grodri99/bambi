@@ -32,12 +32,10 @@ import com.shieldstream.tv.data.skip.IntroDbRepository
 import com.shieldstream.tv.domain.SkipSegmentsRepository
 import com.shieldstream.tv.data.repository.MyListRepositoryImpl
 import com.shieldstream.tv.domain.MyListRepository
-import com.shieldstream.tv.domain.IthilLibraryRepository
-import com.shieldstream.tv.data.repository.IthilLibraryRepositoryImpl
-import com.shieldstream.tv.data.repository.IthilUpdateRepositoryImpl
-import com.shieldstream.tv.domain.IthilUpdateRepository
-import com.shieldstream.tv.data.repository.IthilAccessRepositoryImpl
-import com.shieldstream.tv.domain.IthilAccessRepository
+import com.shieldstream.tv.domain.RequestRepository
+import com.shieldstream.tv.domain.TrackMemoryRepository
+import com.shieldstream.tv.data.repository.TrackMemoryRepositoryImpl
+import com.shieldstream.tv.data.repository.RequestRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -55,6 +53,14 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindAllDebridRepository(impl: AllDebridRepositoryImpl): AllDebridRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTorBoxRepository(impl: com.shieldstream.tv.data.repository.TorBoxRepositoryImpl): com.shieldstream.tv.domain.TorBoxRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDebridCacheRepository(impl: com.shieldstream.tv.data.repository.DebridCacheRepositoryImpl): com.shieldstream.tv.domain.DebridCacheRepository
 
     @Binds
     @Singleton
@@ -114,14 +120,10 @@ abstract class DataModule {
 
     @Binds
     @Singleton
-    abstract fun bindIthilLibraryRepository(impl: IthilLibraryRepositoryImpl): IthilLibraryRepository
+    abstract fun bindRequestRepository(impl: RequestRepositoryImpl): RequestRepository
 
     @Binds
     @Singleton
-    abstract fun bindIthilUpdateRepository(impl: IthilUpdateRepositoryImpl): IthilUpdateRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindIthilAccessRepository(impl: IthilAccessRepositoryImpl): IthilAccessRepository
+    abstract fun bindTrackMemoryRepository(impl: TrackMemoryRepositoryImpl): TrackMemoryRepository
 
 }

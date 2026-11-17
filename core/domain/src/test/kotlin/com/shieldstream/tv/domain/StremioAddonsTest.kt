@@ -22,6 +22,22 @@ class StremioAddonsTest {
     }
 
     @Test
+    fun `commas inside an addon configuration do not split the url`() {
+        val torrentio = "https://torrentio.strem.fun/providers=mejortorrent,wolfmax4k,cinecalidad|language=spanish/manifest.json"
+        val other = "https://example.com/abc/manifest.json"
+
+        assertEquals(listOf(torrentio), StremioAddons.parse(torrentio).map { it.manifestUrl })
+        assertEquals(
+            "https://torrentio.strem.fun/providers=mejortorrent,wolfmax4k,cinecalidad|language=spanish",
+            StremioAddons.parse(torrentio).single().baseUrl,
+        )
+        // Varias seguidas se siguen separando por espacios, saltos de línea, o coma justo tras "manifest.json".
+        assertEquals(listOf(torrentio, other), StremioAddons.parse("$torrentio, $other").map { it.manifestUrl })
+        assertEquals(listOf(torrentio, other), StremioAddons.parse("$torrentio\n$other").map { it.manifestUrl })
+        assertEquals(listOf(torrentio, other), StremioAddons.parse(StremioAddons.serialize(StremioAddons.parse("$torrentio $other"))).map { it.manifestUrl })
+    }
+
+    @Test
     fun `invalid existing values remain visible instead of being discarded`() {
         val addons = StremioAddons.parse("not-a-url https://valid.example/manifest.json")
 

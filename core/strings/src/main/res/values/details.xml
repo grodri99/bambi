@@ -70,4 +70,27 @@
     <string name="details_show_all">Show all</string>
     <string name="details_hide_excluded">Apply exclusions</string>
     <string name="details_no_sources_match_exclusions">No sources match your exclusion settings</string>
+    <string name="details_trailer">Trailer</string>
+    <string name="details_cast">Cast &amp; crew</string>
+    <string name="details_collection">%1$s</string>
+    <string name="details_directed_by">Directed by %1$s</string>
+    <string name="details_created_by">Created by %1$s</string>
+    <string name="details_random_episode">Random episode</string>
+    <string name="person_error">Couldn\'t load this person.</string>
+    <string name="person_movies">Movies</string>
+    <string name="person_shows">Series</string>
+    <string name="person_no_titles">No titles available.</string>
+    <string name="person_dept_acting">Actor/actress</string>
+    <string name="person_dept_directing">Director</string>
+    <string name="person_dept_writing">Writer</string>
+    <string name="person_dept_production">Producer</string>
+    <string name="details_mark_source_broken">Mark source as broken</string>
+    <string name="details_source_marked_broken">Source discarded</string>
+    <string name="details_hold_ok_to_mark_source_broken">Hold OK on a source to discard it</string>
+    <string name="details_crew_director">Director</string>
+    <string name="details_crew_creator">Creator</string>
+    <string name="details_more_episode">Episode %1$s</string>
+    <string name="details_more_series">Show</string>
+    <string name="details_plays_on_play">▶ PLAYS WHEN YOU PRESS PLAY</string>
+    <string name="details_picked_source_failed">That source doesn\'t work: %1$s Pick another one.</string>
 </resources>

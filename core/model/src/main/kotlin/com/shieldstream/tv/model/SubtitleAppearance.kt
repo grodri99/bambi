@@ -7,6 +7,8 @@ data class SubtitleAppearance(
     val backgroundColor: SubtitleColor = SubtitleColor.TRANSPARENT,
     val outlineColor: SubtitleColor = SubtitleColor.BLACK,
     val applyEmbeddedStyles: Boolean = true,
+    val font: SubtitleFont = SubtitleFont.DEFAULT,
+    val edge: SubtitleEdge = SubtitleEdge.OUTLINE,
 ) {
     fun normalized(): SubtitleAppearance = copy(
         sizePercent = sizePercent.coerceIn(MIN_SIZE, MAX_SIZE) / SIZE_STEP * SIZE_STEP,
@@ -31,6 +33,7 @@ data class SubtitleAppearance(
         )
         val backgroundColors = listOf(
             SubtitleColor.TRANSPARENT,
+            SubtitleColor.SHADE,
             SubtitleColor.BLACK,
             SubtitleColor.WHITE,
         )
@@ -50,4 +53,17 @@ enum class SubtitleColor(val argb: Long) {
     RED(0xFFFF5A5F),
     BLACK(0xFF000000),
     TRANSPARENT(0x00000000),
+    /** Negro semitransparente: el recuadro clásico detrás del texto. */
+    SHADE(0xA6000000),
+}
+
+enum class SubtitleFont { DEFAULT, SERIF, MONOSPACE, CONDENSED, BOLD }
+
+/** Cómo se separa el texto del vídeo cuando el color del borde no es "Ninguno". */
+enum class SubtitleEdge { OUTLINE, SHADOW }
+
+/** Siguiente/anterior valor de una lista cíclica (para cambiar opciones con izquierda/derecha). */
+fun <T> T.cycle(values: List<T>, delta: Int): T {
+    val index = values.indexOf(this).coerceAtLeast(0)
+    return values[((index + delta) % values.size + values.size) % values.size]
 }

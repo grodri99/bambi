@@ -9,13 +9,11 @@ import com.shieldstream.tv.model.AppLanguage
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.shieldstream.tv.domain.ApiKeysRepository
+import com.shieldstream.tv.domain.ProfileRepository
+import com.shieldstream.tv.domain.RequestRepository
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
-import com.shieldstream.tv.domain.IthilDownloadScheduler
-import com.shieldstream.tv.domain.IthilUpdateRepository
-import com.shieldstream.tv.domain.IthilAccessRepository
-import com.shieldstream.tv.domain.IthilLibraryState
 import com.shieldstream.tv.domain.KeyCheck
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.StremioAddons
@@ -34,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -91,14 +90,12 @@ class SettingsViewModel @Inject constructor(
     private val playbackPolicies: PlaybackPolicyProvider,
     private val episodeTracking: EpisodeTrackingRepository,
     private val texts: Texts,
-    private val ithilUpdates: IthilUpdateRepository,
-    private val ithilScheduler: IthilDownloadScheduler,
-    private val ithilAccess: IthilAccessRepository,
+    private val profiles: ProfileRepository,
+    private val requests: RequestRepository,
 ) : ViewModel() {
 
     private val statuses = MutableStateFlow<Map<ApiService, ServiceStatus>>(emptyMap())
     private val editor = MutableStateFlow<KeyEditor?>(null)
-    private val ithilUnlockGesture = IthilUnlockGesture()
 
     private val playback = combine(
         settings.maxBufferSeconds,
@@ -211,6 +208,24 @@ class SettingsViewModel @Inject constructor(
     val sourceExclusions: StateFlow<SourceExclusions> = settings.sourceExclusions
         .stateIn(viewModelScope, SharingStarted.Eagerly, SourceExclusions())
 
+    val brokenSourceCount: StateFlow<Int> = settings.brokenSourceIds
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /** El primer perfil creado administra las peticiones familiares. */
+    /** Cualquier perfil adulto revisa las peticiones de los infantiles (solo se muestra si hay alguna). */
+    val isAdmin: StateFlow<Boolean> = combine(profiles.active, requests.requests) { active, pending ->
+        !active.kids && pending.isNotEmpty()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val pendingRequestCount: StateFlow<Int> = requests.requests
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    fun restoreBrokenSources() {
+        viewModelScope.launch { settings.clearBrokenSources() }
+    }
+
     fun toggleExcludedQuality(quality: Quality) {
         viewModelScope.launch {
             val current = settings.sourceExclusions.first()
@@ -259,26 +274,6 @@ class SettingsViewModel @Inject constructor(
             val group = SourceProvider.entries.filter { texts.get(it.sectionResource) == texts.get(p.sectionResource) }.toSet()
             val next = if (group.all { it in current }) current - group else current + group
             if (next.isNotEmpty()) settings.setSourceProviders(next)
-        }
-    }
-
-    val ithilState: StateFlow<IthilLibraryState> = ithilUpdates.state
-    val ithilUnlocked: StateFlow<Boolean> = ithilAccess.unlocked
-
-    fun onIthilUnlockTap(): Boolean {
-        if (ithilAccess.isUnlocked || !ithilUnlockGesture.registerTap(System.currentTimeMillis())) return false
-        ithilAccess.unlock()
-        return true
-    }
-
-    fun downloadIthil() = ithilScheduler.downloadNow()
-
-    fun deleteIthil() {
-        ithilScheduler.cancelDownloads()
-        viewModelScope.launch {
-            ithilUpdates.delete()
-            val providers = settings.sourceProviders.first() - SourceProvider.ITHIL
-            if (providers.isNotEmpty()) settings.setSourceProviders(providers)
         }
     }
 
@@ -343,6 +338,60 @@ class SettingsViewModel @Inject constructor(
 
     fun setAutoNextEpisode(enabled: Boolean) {
         viewModelScope.launch { settings.setAutoNextEpisode(enabled) }
+    }
+
+    val switchFromPickedSource: StateFlow<Boolean> = settings.switchFromPickedSource
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setSwitchFromPickedSource(enabled: Boolean) {
+        viewModelScope.launch { settings.setSwitchFromPickedSource(enabled) }
+    }
+
+    val autoSkipIntro: StateFlow<Boolean> = settings.autoSkipIntro
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setAutoSkipIntro(enabled: Boolean) {
+        viewModelScope.launch { settings.setAutoSkipIntro(enabled) }
+    }
+
+    val showCast: StateFlow<Boolean> = settings.showCast
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowCast(enabled: Boolean) {
+        viewModelScope.launch { settings.setShowCast(enabled) }
+    }
+
+    /** Prioridad al reproducir, sobre las dos opciones del perfil (castellano primero / solo castellano). */
+    val playbackPriority: StateFlow<com.shieldstream.tv.model.PlaybackPriority> = combine(
+        settings.spanishFirst,
+        settings.spanishOnlySources,
+    ) { first, only ->
+        when {
+            only -> com.shieldstream.tv.model.PlaybackPriority.SPANISH_ONLY
+            first -> com.shieldstream.tv.model.PlaybackPriority.SPANISH_FIRST
+            else -> com.shieldstream.tv.model.PlaybackPriority.QUALITY_FIRST
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.shieldstream.tv.model.PlaybackPriority.SPANISH_FIRST)
+
+    fun setPlaybackPriority(priority: com.shieldstream.tv.model.PlaybackPriority) {
+        viewModelScope.launch {
+            settings.setSpanishOnlySources(priority == com.shieldstream.tv.model.PlaybackPriority.SPANISH_ONLY)
+            settings.setSpanishFirst(priority != com.shieldstream.tv.model.PlaybackPriority.QUALITY_FIRST)
+        }
+    }
+
+    val preferredQuality: StateFlow<com.shieldstream.tv.model.PreferredQuality> = settings.preferredQuality
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.shieldstream.tv.model.PreferredQuality.DV_4K)
+
+    fun setPreferredQuality(quality: com.shieldstream.tv.model.PreferredQuality) {
+        viewModelScope.launch { settings.setPreferredQuality(quality) }
+    }
+
+    val tracksPanelCard: StateFlow<Boolean> = settings.tracksPanelCard
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setTracksPanelCard(enabled: Boolean) {
+        viewModelScope.launch { settings.setTracksPanelCard(enabled) }
     }
 
     fun setSeekThumbnails(enabled: Boolean) {

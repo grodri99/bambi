@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -24,6 +25,8 @@ fun ProfileAvatar(
     size: Dp,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(size * 0.14f),
+    /** Icono elegido para el perfil; mientras carga (o si falla) se ve la inicial sobre el color. */
+    image: String? = null,
 ) {
     val (start, end) = ProfileAvatars.colors[ProfileAvatars.safe(avatar)]
     val gradient = remember(start, end) {
@@ -41,5 +44,15 @@ fun ProfileAvatar(
             fontWeight = FontWeight.Black,
             fontSize = (size.value * 0.48f).sp,
         )
+        if (image != null) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val model = remember(image) { ProfileIconFiles.model(context, image) }
+            coil.compose.AsyncImage(
+                model = model,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.size(size).clip(shape),
+            )
+        }
     }
 }

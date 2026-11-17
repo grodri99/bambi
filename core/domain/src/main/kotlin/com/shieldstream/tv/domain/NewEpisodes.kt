@@ -20,14 +20,16 @@ object NewEpisodes {
         filter: HomeFilter,
         followedShowIds: Set<String> = emptySet(),
         maxItems: Int = MAX_CANDIDATES,
+        hiddenShowIds: Set<String> = emptySet(),
     ): List<String> {
         if (filter == HomeFilter.MOVIES) return emptyList()
+        // Solo series que se han visto de verdad: unos segundos (un vídeo de error del addon, una prueba) no cuentan.
         val watchedShows = progress.entries
-            .filter { (key, _) -> key.startsWith("tv:") }
+            .filter { (key, value) -> key.startsWith("tv:") && (value.isWatched || value.positionMs >= WatchProgress.MIN_RESUME_MS) }
             .sortedByDescending { it.value.updatedAt }
             .mapNotNull { (key, _) -> key.split(':').getOrNull(1) }
         val listedShows = myList.filter { it.type == MediaType.TV }.map { it.id }
-        return (watchedShows + followedShowIds + listedShows).distinct().take(maxItems)
+        return (watchedShows + followedShowIds + listedShows).distinct().filter { it !in hiddenShowIds }.take(maxItems)
     }
 
     fun dateWindow(now: Long): Pair<String, String> {

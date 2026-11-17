@@ -5,10 +5,89 @@
 Bambi 1.0.7 incorpora todas las funciones de [Franklix](https://github.com/javiermolinar/franklix) (fork de Bambi
 de Javier Molina, versiones 1.0.7 a 1.0.21 de su historial, abajo) con el aspecto de Bambi: barra superior en vez
 del menú lateral, rojo de Bambi en vez del estilo monocromo, logo, iconos y nombre de Bambi, letra del sistema y
-colores de perfil de siempre. Real-Debrid sigue siendo el debrid por defecto e Ithil viene activado de serie.
+colores de perfil de siempre. Real-Debrid sigue siendo el debrid por defecto.
 
 ### Novedades propias de esta versión
 
+- **Iconos de perfil:** OK sobre el avatar al editar un perfil abre un selector a pantalla completa con 978 iconos de
+  103 series, por filas como en Netflix; la primera opción deja la inicial sobre el color. Las imágenes no van en la
+  app: se cargan desde los servidores de Netflix (lista de URLs tomada de
+  [Bring-Back-Netflix-Icons](https://github.com/Angel2mp3/Bring-Back-Netflix-Icons), licencia MIT). Si alguna deja de
+  cargar, se ve la inicial. La primera vez que se abre la app (tras la intro, sin prisa) se guardan todos en la Shield
+  y desde entonces salen al instante, también sin conexión.
+- **Iconos propios de Bambi:** el selector empieza por un grupo «Bambi» con 7 ilustraciones del gatito (sentado,
+  asomándose, sonriendo, agazapado, con palomitas, jugando y dormido). Van dentro de la app: salen al instante y
+  sin conexión desde la primera vez.
+- **Foto propia en el perfil:** en el selector de iconos, «Subir foto» enseña un QR; con el móvil (misma wifi) se elige
+  una foto, se recorta en cuadrado en el propio móvil y aparece en el perfil al momento. Se guarda en la Shield.
+- **Cambiar de fuente si la elegida falla** (Ajustes → Reproducción, activado por defecto): desactivado, si una fuente
+  elegida a mano no funciona no se prueba otra; se vuelve a la ficha con la lista de fuentes abierta y el motivo.
+  «Reproducir» sigue saltando sola.
+- **Formato de imagen** (reproductor → pistas → Reproducción): Original (con bandas negras), Ampliar (sin bandas,
+  recorta los lados) o Estirar (sin bandas, deforma). Se recuerda para lo siguiente que se vea. Si las bandas vienen
+  grabadas dentro de un vídeo 16:9 (remux de Blu-ray), la primera vez se miden en unos fotogramas de la película y
+  se amplía en consecuencia.
+- **Quitar una serie de Episodios:** mantener OK sobre cualquier serie (disponible o próxima) abre un menú con
+  «Descartar episodios nuevos» y «Quitar de Episodios». Quitarla también deja de seguirla; vuelve si se sigue a mano
+  desde su ficha. Además, unos segundos vistos (un vídeo de error del addon, una prueba) ya no meten la serie en
+  Episodios: hacen falta 30 s o haberla terminado.
+- **Episodios:** la pestaña marca las novedades con un punto rojo en vez del número.
+- **Multidebrid de verdad en todas las fuentes:** The Pirate Bay, Knaben, Nyaa, el buscador de castellano y Comet ya
+  funcionan con el servicio que tengas activo, no solo con Real-Debrid. TorBox tiene resolución propia (como
+  Real-Debrid y AllDebrid): la Shield le pide el torrent, elige el capítulo dentro de los packs y pide el enlace; además
+  pregunta qué torrents tiene ya en caché para marcarlos con ⚡. Premiumize, Debrid-Link y Offcloud resuelven esos
+  torrents a través de Torrentio con tu clave (ahí solo se ofrecen capítulos sueltos, no packs, porque Torrentio no
+  sabría qué capítulo elegir). Comet usa el servicio y la clave activos.
+- **Nuevo logo:** el gatito negro jugando con la bobina de película y las palomitas, sobre rojo. Cambia el icono
+  de la app, el banner de Android TV, el logo de arriba a la izquierda, el selector de perfiles y el asistente.
+- **Nueva entrada animada:** sobre el rojo del logo crece una sombra y el gatito cae de espaldas desde arriba, se
+  aplasta, rebota y da un latigazo con la cola; saltan las palomitas de debajo, se balancea jugando con la bobina y
+  lanza la cinta, que se desenrolla ondeando por la pantalla; luego caen las letras de BAMBI. Mientras espera mueve
+  la cola y parpadea. La app ya se abre en rojo (antes eran unos segundos de negro). OK o Atrás la saltan.
+- **Nueva transición a la app:** en vez de los haces de luz y el fundido a negro, la pantalla se convierte en un
+  fotograma de una tira de película (se aleja y aparecen las perforaciones), la película avanza y el fotograma
+  siguiente es «¿Quién está viendo?», que vuelve a ocupar la pantalla. La intro al volver a la app hace lo mismo con la
+  pantalla en la que estabas.
+- **Intro sin tirones:** lo pesado del arranque (montar la pantalla de debajo, decodificar las piezas, preparar el
+  dibujo) se hace antes de que empiece a moverse; la precarga del Inicio decodifica menos imágenes a la vez y sin
+  bitmaps "hardware" mientras se ve la intro, y deja lo que no corre prisa para después. Medido en la Shield del
+  salón: 60 fps de principio a fin.
+- **Temporizador de apagado en el reproductor:** desactivado, 15, 30, 45, 60 o 90 minutos, o «al terminar el
+  episodio». Al vencer pausa la reproducción y vuelve a Inicio; con «al terminar el episodio» no encadena el siguiente.
+- **Velocidad de reproducción:** 0,75x, 1x, 1,25x, 1,5x y 2x desde el panel de Reproducción del mando. Si el audio
+  va en Dolby/DTS directo, se decodifica a PCM (con FFmpeg para DTS y TrueHD) para que la velocidad se aplique de
+  verdad, y al volver a 1x recupera el audio directo. Los subtítulos, internos o externos, van a la misma velocidad.
+- **Páginas de persona:** al tocar un actor o director se abre su ficha con foto, biografía y filmografía; cada
+  título lleva a su ficha normal para elegir fuente y reproducir.
+- **Reproduce algo:** botón en el Inicio que elige al azar lo siguiente que toca (A continuación, estrenos,
+  Seguir viendo, Mi lista o el catálogo) y lo abre listo para reproducir.
+- **Temas por perfil:** cada perfil elige su acento (Bambi, Océano, Bosque, Oro, Violeta o Rosa). El color
+  se aplica al progreso, focos, novedades, reproductor y fichas, y se guarda con el perfil.
+- **Marcar fuente rota:** mantén OK en una fuente para descartarla. Deja de ofrecerse al momento en todos los
+  buscadores que traigan ese mismo torrent, caduca a los 60 días y se puede restaurar desde Ajustes → Fuentes rotas.
+- **Elección de fuente, de una vez:** «Reproducir» reproduce la primera de la lista de Fuentes, marcada arriba
+  («▶ Se reproduce al pulsar Reproducir»). Ajustes → *Al pulsar Reproducir* (calidad primero / castellano primero /
+  solo castellano) y *Calidad preferida* (4K Dolby Vision, 4K HDR, 4K sin HDR, 1080p, 720p). La resolución manda
+  sobre el HDR y, dentro del castellano, la calidad sobre lo seguro que esté el detector. Las fuentes sin calidad en
+  el nombre la toman del fichero, así que las exclusiones ya no se cuelan. Si eliges una fuente a mano y falla, se
+  salta a la más parecida (idioma, resolución, HDR, audio, códec, tamaño) y el aviso dice a cuál.
+- **Descargas para ver sin conexión:** en la ficha, Más → Descargar… ofrece este episodio, los siguientes, la
+  temporada completa o solo lo no visto, con tope de calidad (la mejor, 1080p o 720p). Usa la mejor fuente que ya
+  esté en el debrid; el enlace se pide al empezar cada descarga (no caduca en la cola). Sigue en segundo plano y se
+  retoma si se corta. Indicador de progreso arriba a la derecha, que abre Descargas (pausar, reanudar, borrar,
+  reproducir). Lo descargado se reproduce desde el disco también desde la ficha. Ajustes → Carpeta de descargas.
+- **Panel «Más» rediseñado:** lista lateral por secciones (episodio / serie) que actúa sobre el episodio en el que
+  estabas, no solo el último abierto.
+- **Editor de subtítulos en vivo:** en el reproductor, Subtítulos → Apariencia pausa el vídeo y enseña un
+  subtítulo de ejemplo sobre la imagen mientras cambias tamaño, posición, fuente, color, fondo (también negro
+  translúcido), borde (contorno o sombra) y estilo incrustado. Al salir sigue la reproducción.
+- **Panel del reproductor:** Ajustes permite elegirlo transparente (como siempre) o en tarjeta.
+- **Reparto y equipo opcional:** Ajustes permite ocultar la fila de actores y directores en las fichas.
+- **Peticiones familiares:** en un perfil infantil, Buscar enseña bloqueado lo que no es infantil para pedírselo a
+  un adulto. Cualquier perfil adulto lo aprueba o descarta desde Ajustes; al aprobar se desbloquea para ese perfil y
+  entra en su Mi lista.
+- **Audio y subtítulos por serie:** la pista elegida a mano se recuerda por perfil y título (también «sin
+  subtítulos») y se vuelve a aplicar en el siguiente episodio.
 - **Interfaz de Bambi 1.0.6** con todas las funciones nuevas: portada con destacados y categorías al abrir el Inicio,
   pósteres estrechos con borde blanco, títulos de bloque en rojo, paleta azulada en Ajustes y perfiles, negritas y
   barra de progreso roja del reproductor de siempre. "A continuación" vuelve a mostrarse como póster.

@@ -54,6 +54,7 @@ val ApiService.usedForResource: Int
 @get:StringRes
 val SourceProvider.titleResource: Int
     get() = when (this) {
+        SourceProvider.CASTELLANO -> R.string.provider_castellano
         SourceProvider.TORRENTIO -> R.string.provider_torrentio
         SourceProvider.PEERFLIX -> R.string.provider_peerflix
         SourceProvider.KNABEN -> R.string.provider_knaben
@@ -61,7 +62,6 @@ val SourceProvider.titleResource: Int
         SourceProvider.NYAA -> R.string.provider_nyaa
         SourceProvider.COMET -> R.string.provider_comet
         SourceProvider.AIOSTREAMS -> R.string.provider_aiostreams
-        SourceProvider.ITHIL -> R.string.provider_ithil
     }
 
 @get:StringRes

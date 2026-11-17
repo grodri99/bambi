@@ -4,7 +4,6 @@ import com.shieldstream.tv.domain.CatalogRepository
 import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.EpisodeTrackingRepository
 import com.shieldstream.tv.domain.MyListRepository
-import com.shieldstream.tv.domain.ITHIL_ALLDEBRID
 import com.shieldstream.tv.domain.PrioritizeSourcesUseCase
 import com.shieldstream.tv.domain.RealDebridRepository
 import com.shieldstream.tv.domain.SelectedContentHolder
@@ -323,44 +322,6 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun `Ithil links stay queued for failover without allowing other uncached resolvers`() = runTest {
-        val item = CatalogItem(
-            id = "424242",
-            imdbId = null,
-            type = MediaType.MOVIE,
-            title = "Movie",
-            overview = "",
-            posterUrl = null,
-            backdropUrl = null,
-            year = 2001,
-            rating = null,
-        )
-        val sources = listOf("ithil-1", "other", "ithil-2").map { id ->
-            source(Episode(1, 1, "", "", null, null)).copy(
-                id = id,
-                infoHash = id,
-                directUrl = null,
-                resolveUrl = "https://video.test/$id",
-                isCached = false,
-                debrid = if (id.startsWith("ithil")) ITHIL_ALLDEBRID else "TorBox",
-            )
-        }
-        val catalog = mockk<CatalogRepository>()
-        coEvery { catalog.getDetails(item) } returns CatalogDetails(item = item)
-        every { catalog.getStreams(item, null) } returns flowOf(StreamResults(sources = sources))
-        val holder = SelectedContentHolder().apply { selectItem(item) }
-        val viewModel = viewModel(catalog, holder)
-        testScheduler.advanceUntilIdle()
-
-        viewModel.play()
-        testScheduler.advanceUntilIdle()
-
-        val queuedIds = holder.playback.value?.sources?.map { it.id }.orEmpty()
-        assertEquals(2, queuedIds.size)
-        assertEquals(setOf("ithil-1", "ithil-2"), queuedIds.toSet())
-    }
-
-    @Test
     fun `Trakt ratings load and update show and episode independently`() = runTest {
         val item = CatalogItem(
             id = "42",
@@ -476,6 +437,9 @@ class DetailsViewModelTest {
                 every { spanishFirst } returns flowOf(false)
                 every { spanishOnlySources } returns flowOf(false)
                 every { sourceExclusions } returns flowOf(exclusions)
+                every { brokenSourceIds } returns flowOf(emptySet())
+                every { preferredQuality } returns flowOf(com.shieldstream.tv.model.PreferredQuality.DV_4K)
+                every { showCast } returns flowOf(true)
                 every { deviceOptimization } returns flowOf(DeviceOptimization.AUTOMATIC)
             },
             trakt = trakt,
@@ -488,6 +452,15 @@ class DetailsViewModelTest {
             },
             texts = mockk<Texts>(relaxed = true),
             sourceProcessingDispatcher = SourceProcessingDispatcher(mainDispatcher.dispatcher),
+            downloads = mockk<com.shieldstream.tv.domain.DownloadsRepository>(relaxed = true) {
+                every { localFileFor(any()) } returns null
+                every { find(any()) } returns null
+            },
+            planner = mockk(relaxed = true) {
+                every { progress } returns MutableStateFlow(null)
+                every { messages } returns kotlinx.coroutines.flow.MutableSharedFlow()
+            },
+            debridCache = mockk(relaxed = true),
         )
 
     private fun source(episode: Episode) = StreamSource(

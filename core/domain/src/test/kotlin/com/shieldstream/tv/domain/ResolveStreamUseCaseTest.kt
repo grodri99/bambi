@@ -53,20 +53,6 @@ class ResolveStreamUseCaseTest {
     }
 
     @Test
-    fun `Ithil URL uses AllDebrid without calling Torrentio`() = runTest {
-        val fixture = Fixture()
-        fixture.allDebrid.result = DebridLink.Ready("https://cdn.test/video")
-
-        val states = fixture.useCase(
-            source(resolveUrl = "https://hoster.test/?abc", debrid = ITHIL_ALLDEBRID),
-        ).toList()
-
-        assertEquals(listOf("https://hoster.test/?abc"), fixture.allDebrid.requests)
-        assertTrue(fixture.torrentio.requests.isEmpty())
-        assertEquals(ResolveState.Ready("https://cdn.test/video"), states.last())
-    }
-
-    @Test
     fun `raw magnet uses AllDebrid when it is the selected service`() = runTest {
         val fixture = Fixture()
         fixture.selectedDebrid.value = DebridService.ALLDEBRID
@@ -84,15 +70,49 @@ class ResolveStreamUseCaseTest {
     }
 
     @Test
-    fun `raw magnet does not fall back to RealDebrid for an unsupported service`() = runTest {
+    fun `raw magnet without in-app resolver nor key does not fall back to RealDebrid`() = runTest {
         val fixture = Fixture()
-        fixture.selectedDebrid.value = DebridService.TORBOX
+        fixture.selectedDebrid.value = DebridService.PREMIUMIZE
 
         val states = fixture.useCase(source()).toList()
 
-        assertEquals(ResolveState.Failed("unsupported TorBox"), states.last())
+        assertEquals(ResolveState.Failed("unsupported Premiumize"), states.last())
         assertEquals(0, fixture.realDebrid.addMagnetCalls)
         assertEquals(0, fixture.allDebridTorrents.addMagnetCalls)
+        assertEquals(0, fixture.torBox.addMagnetCalls)
+    }
+
+    @Test
+    fun `raw magnet uses TorBox when it is the selected service`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.TORBOX
+        fixture.torBox.currentInfo = info(
+            status = RdTorrentInfo.STATUS_DOWNLOADED,
+            files = listOf(
+                file(id = 1, name = "Show.S01E01.mkv", selected = true).copy(link = "tb-e1"),
+                file(id = 2, name = "Show.S01E02.mkv", selected = true).copy(link = "tb-e2"),
+            ),
+        )
+
+        val states = fixture.useCase(source(season = 1, episode = 2)).toList()
+
+        assertEquals(ResolveState.Ready("unrestricted:tb-e2"), states.last())
+        assertEquals(1, fixture.torBox.addMagnetCalls)
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
+    }
+
+    @Test
+    fun `raw magnet goes through Torrentio for services without in-app resolver`() = runTest {
+        val fixture = Fixture()
+        fixture.selectedDebrid.value = DebridService.PREMIUMIZE
+        fixture.torrentio.resolveUrl = "https://torrentio.test/resolve/premiumize/key/hash/null/null/video"
+        fixture.torrentio.result = DebridLink.Ready("https://video.test/pm")
+
+        val states = fixture.useCase(source()).toList()
+
+        assertEquals(ResolveState.Ready("https://video.test/pm"), states.last())
+        assertEquals(fixture.torrentio.resolveUrl!! to "Premiumize", fixture.torrentio.requests.single())
+        assertEquals(0, fixture.realDebrid.addMagnetCalls)
     }
 
     @Test
@@ -221,12 +241,14 @@ class ResolveStreamUseCaseTest {
     private class Fixture {
         val realDebrid = FakeRealDebridRepository()
         val allDebridTorrents = FakeAllDebridRepository()
+        val torBox = FakeTorBoxRepository()
         val torrentio = FakeTorrentioLinkResolver()
         val allDebrid = FakeAllDebridLinkResolver()
         val selectedDebrid = MutableStateFlow(DebridService.REAL_DEBRID)
         val useCase = ResolveStreamUseCase(
             realDebrid,
             allDebridTorrents,
+            torBox,
             torrentio,
             allDebrid,
             selectedDebrid,
@@ -249,12 +271,15 @@ class ResolveStreamUseCaseTest {
 
     private class FakeTorrentioLinkResolver : TorrentioLinkResolver {
         var result: DebridLink = DebridLink.Problem("unexpected resolve", notCached = false)
+        var resolveUrl: String? = null
         val requests = mutableListOf<Pair<String, String>>()
 
         override suspend fun resolve(url: String, service: String): DebridLink {
             requests += url to service
             return result
         }
+
+        override fun resolveUrlFor(service: DebridService, infoHash: String, fileIdx: Int?, fileName: String?): String? = resolveUrl
     }
 
     private open class FakeMagnetDebridRepository : MagnetDebridRepository {
@@ -297,6 +322,11 @@ class ResolveStreamUseCaseTest {
 
     private class FakeAllDebridRepository : FakeMagnetDebridRepository(), AllDebridRepository {
         override val requiresFileSelection: Boolean = false
+    }
+
+    private class FakeTorBoxRepository : FakeMagnetDebridRepository(), TorBoxRepository {
+        override val requiresFileSelection: Boolean = false
+        override suspend fun cachedAmong(hashes: Collection<String>): Set<String> = emptySet()
     }
 
     private object TestResolveTexts : ResolveStreamTexts {

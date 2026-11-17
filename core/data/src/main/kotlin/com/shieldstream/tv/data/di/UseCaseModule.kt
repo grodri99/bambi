@@ -28,6 +28,7 @@ object UseCaseModule {
     fun provideResolveStreamUseCase(
         repo: RealDebridRepository,
         allDebridTorrents: AllDebridRepository,
+        torBox: com.shieldstream.tv.domain.TorBoxRepository,
         torrentio: TorrentioLinkResolver,
         allDebrid: AllDebridAuthRepository,
         settings: SettingsRepository,
@@ -35,6 +36,7 @@ object UseCaseModule {
     ): ResolveStreamUseCase = ResolveStreamUseCase(
         repo,
         allDebridTorrents,
+        torBox,
         torrentio,
         allDebrid,
         settings.debridService,

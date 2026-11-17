@@ -160,4 +160,19 @@
     <string name="subtitle_color_red">Red</string>
     <string name="subtitle_color_black">Black</string>
     <string name="subtitle_color_transparent">None</string>
+    <string name="subtitle_color_shade">Translucent black</string>
+    <string name="subtitle_font">Font</string>
+    <string name="subtitle_font_default">Normal</string>
+    <string name="subtitle_font_serif">Serif</string>
+    <string name="subtitle_font_mono">Monospace</string>
+    <string name="subtitle_font_condensed">Condensed</string>
+    <string name="subtitle_font_bold">Bold</string>
+    <string name="subtitle_edge">Edge style</string>
+    <string name="subtitle_edge_outline">Outline</string>
+    <string name="subtitle_edge_shadow">Shadow</string>
+    <string name="subtitle_live_title">Edit subtitles</string>
+    <string name="subtitle_live_hint">Left/right changes the value. The video stays paused while you edit.</string>
+    <string name="subtitle_sample">Sample subtitle
+This is how subtitles will look</string>
+    <string name="subtitle_reset">Reset</string>
 </resources>

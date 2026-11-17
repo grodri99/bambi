@@ -26,7 +26,7 @@
     <string name="home_episodes">Episodios</string>
     <string name="home_finding_episodes">Buscando episodios…</string>
     <string name="home_available_now">Disponibles ahora</string>
-    <string name="home_hold_ok_to_dismiss">Mantén OK para descartar</string>
+    <string name="home_hold_ok_to_dismiss">Mantén OK en una serie para descartar sus episodios o quitarla de Episodios</string>
     <string name="home_next_30_days">Próximos 30 días</string>
     <string name="home_view_details">Ver detalles</string>
     <string name="home_remove">Quitar</string>
@@ -53,4 +53,14 @@
     <string name="home_category_load_error">Error cargando «%1$s»</string>
     <string name="home_continue_episode_remaining">T%1$s:E%2$s · %3$s</string>
     <string name="home_remaining">Quedan %1$s</string>
+    <string name="home_surprise_me">Sorpréndeme</string>
+    <string name="home_play_something">Reproduce algo</string>
+    <string name="home_ask_an_adult">Pídeselo a un adulto</string>
+    <string name="home_ask_an_adult_hint">Estos títulos no son para perfiles infantiles. Si un adulto lo aprueba, aparecerá en tu Mi lista.</string>
+    <string name="home_ask_an_adult_action">Pedir a un adulto</string>
+    <string name="home_request_sent">Petición enviada. Un adulto la verá en Ajustes.</string>
+    <string name="home_requested">Pedido</string>
+    <string name="home_locked">Bloqueado</string>
+    <string name="home_dismiss_new_episodes">Descartar episodios nuevos</string>
+    <string name="home_remove_from_episodes">Quitar de Episodios</string>
 </resources>

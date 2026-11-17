@@ -55,11 +55,11 @@ class EpisodeCenterViewModel @Inject constructor(
         active,
         watchProgress.progress,
         myList.entries,
-        tracking.followedShowIds,
+        tracking.followedShowIds.combine(tracking.hiddenShowIds) { followed, hidden -> followed to hidden },
         tracking.dismissedEpisodeKeys,
-    ) { isActive, progress, list, followed, dismissed ->
+    ) { isActive, progress, list, (followed, hidden), dismissed ->
         isActive to EpisodeCenterQuery(
-            showIds = NewEpisodes.candidateIds(progress, list, HomeFilter.ALL, followed, maxItems = 50),
+            showIds = NewEpisodes.candidateIds(progress, list, HomeFilter.ALL, followed, maxItems = 50, hiddenShowIds = hidden),
             watchedKeys = progress.filterValues { it.isWatched }.keys,
             dismissedKeys = dismissed,
         )
@@ -82,6 +82,11 @@ class EpisodeCenterViewModel @Inject constructor(
 
     fun activate() {
         active.value = true
+    }
+
+    /** Quita la serie de Episodios (y deja de seguirla). Vuelve si se sigue a mano desde su ficha. */
+    fun hide(status: ShowEpisodeStatus) {
+        tracking.setHidden(status.item.id, true)
     }
 
     fun dismiss(status: ShowEpisodeStatus) {

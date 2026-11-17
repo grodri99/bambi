@@ -1,5 +1,6 @@
 <resources>
     <style name="Theme.ShieldStream" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <!-- Lo que se ve nada más abrir la app, mientras arranca: el rojo de la intro (MainActivity lo pone en negro). -->
+        <item name="android:windowBackground">@drawable/intro_window</item>
     </style>
 </resources>

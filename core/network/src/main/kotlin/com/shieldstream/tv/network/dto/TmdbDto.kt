@@ -49,6 +49,7 @@ data class TmdbSearchResultDto(
     val vote_average: Double = 0.0,
     val vote_count: Int = 0,
     val genre_ids: List<Int> = emptyList(),
+    val popularity: Double = 0.0,
 )
 
 @Serializable
@@ -121,6 +122,9 @@ data class TmdbMovieDetailDto(
     val images: TmdbImagesDto? = null,
     val translations: TmdbTranslationsDto? = null,
     val release_dates: TmdbReleaseDatesDto? = null,
+    val credits: TmdbCreditsDto? = null,
+    val videos: TmdbVideosDto? = null,
+    val belongs_to_collection: TmdbCollectionRefDto? = null,
 )
 
 @Serializable
@@ -152,6 +156,10 @@ data class TmdbTvDetailDto(
     val original_language: String? = null,
     val last_episode_to_air: TmdbEpisodeDto? = null,
     val next_episode_to_air: TmdbEpisodeDto? = null,
+    val credits: TmdbCreditsDto? = null,
+    val aggregate_credits: TmdbCreditsDto? = null,
+    val videos: TmdbVideosDto? = null,
+    val created_by: List<TmdbCrewDto> = emptyList(),
 )
 
 @Serializable
@@ -186,4 +194,96 @@ data class TmdbTranslationDto(
 data class TmdbTranslationDataDto(
     val title: String? = null,
     val name: String? = null,
+)
+
+@Serializable
+data class TmdbCreditsDto(
+    val cast: List<TmdbCastDto> = emptyList(),
+    val crew: List<TmdbCrewDto> = emptyList(),
+)
+
+@Serializable
+data class TmdbCastDto(
+    val id: Int = 0,
+    val name: String = "",
+    val character: String? = null,
+    val profile_path: String? = null,
+    val order: Int = 999,
+    val roles: List<TmdbRoleDto> = emptyList(),
+)
+
+@Serializable
+data class TmdbRoleDto(val character: String? = null)
+
+@Serializable
+data class TmdbCrewDto(
+    val id: Int = 0,
+    val name: String = "",
+    val job: String? = null,
+    val profile_path: String? = null,
+)
+
+@Serializable
+data class TmdbVideosDto(val results: List<TmdbVideoDto> = emptyList())
+
+@Serializable
+data class TmdbVideoDto(
+    val key: String = "",
+    val site: String = "",
+    val type: String = "",
+    val official: Boolean = false,
+    val iso_639_1: String? = null,
+    val name: String = "",
+)
+
+@Serializable
+data class TmdbCollectionRefDto(
+    val id: Int = 0,
+    val name: String = "",
+    val backdrop_path: String? = null,
+)
+
+@Serializable
+data class TmdbCollectionDto(
+    val id: Int = 0,
+    val name: String = "",
+    val overview: String = "",
+    val backdrop_path: String? = null,
+    val parts: List<TmdbSearchResultDto> = emptyList(),
+)
+
+@Serializable
+data class TmdbPersonDto(
+    val id: Int = 0,
+    val name: String = "",
+    val biography: String = "",
+    val profile_path: String? = null,
+    val known_for_department: String? = null,
+    val birthday: String? = null,
+    val place_of_birth: String? = null,
+    val combined_credits: TmdbCombinedCreditsDto? = null,
+)
+
+@Serializable
+data class TmdbCombinedCreditsDto(
+    val cast: List<TmdbSearchResultDto> = emptyList(),
+    val crew: List<TmdbPersonCrewCreditDto> = emptyList(),
+)
+
+@Serializable
+data class TmdbPersonCrewCreditDto(
+    val id: Int = 0,
+    val media_type: String = "",
+    val title: String? = null,
+    val name: String? = null,
+    val overview: String = "",
+    val poster_path: String? = null,
+    val backdrop_path: String? = null,
+    val release_date: String? = null,
+    val first_air_date: String? = null,
+    val vote_average: Double = 0.0,
+    val vote_count: Int = 0,
+    val popularity: Double = 0.0,
+    val job: String? = null,
+    val genre_ids: List<Int> = emptyList(),
 )

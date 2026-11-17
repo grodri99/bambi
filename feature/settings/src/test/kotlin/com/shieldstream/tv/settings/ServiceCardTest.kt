@@ -71,7 +71,7 @@ class ServiceCardTest {
         render(ServiceStatus.Bad(error))
 
         assertEquals(1, textLayout("AllDebrid").lineCount)
-        assertEquals(1, textLayout("Plays sources (through Torrentio)").lineCount)
+        assertEquals(1, textLayout("Plays the sources").lineCount)
         assertStatusBelowDetails(error)
         assertFullyVisible(error)
     }

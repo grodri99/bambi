@@ -108,7 +108,7 @@ fun ProfilePickerScreen(
         ) {
             Image(painterResource(R.drawable.bambi_logo), contentDescription = "Bambi", modifier = Modifier.size(40.dp))
             Spacer(Modifier.width(12.dp))
-            Image(painterResource(R.drawable.bambi_wordmark), contentDescription = null, modifier = Modifier.height(14.dp))
+            Image(painterResource(R.drawable.bambi_wordmark), contentDescription = null, modifier = Modifier.height(22.dp))
         }
 
         Column(
@@ -234,7 +234,7 @@ private fun ProfileTile(profile: Profile, manage: Boolean, onClick: () -> Unit, 
                 .border(4.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(TileSize * 0.16f))
                 .padding(6.dp),
         ) {
-            ProfileAvatar(initial = profile.initial, avatar = profile.avatar, size = TileSize)
+            ProfileAvatar(initial = profile.initial, avatar = profile.avatar, size = TileSize, image = profile.avatarImage)
             if (manage) {
                 Box(
                     Modifier

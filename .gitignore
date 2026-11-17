@@ -38,3 +38,4 @@ Thumbs.db
 
 # Marca de compilación pública (APK sin claves para GitHub)
 .public_build
+_opus_trash/

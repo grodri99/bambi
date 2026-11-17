@@ -8,6 +8,7 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import com.shieldstream.tv.domain.NextEpisode
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.ResolveState
 import com.shieldstream.tv.domain.ResolveStreamUseCase
@@ -152,6 +153,82 @@ class PlayerViewModelTest {
     }
 
     @Test
+    fun `changing speed with Dolby audio switches to PCM without recreating the player`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(players, flowOf(40), SubtitlePreference.OFF)
+        fixture.viewModel.start()
+        yield()
+        every { players.player(0).audioFormat } returns
+            Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).build()
+
+        fixture.viewModel.cyclePlaybackSpeed()
+        yield()
+
+        verify(exactly = 0) { players.player(0).release() }
+        verify { players.player(0).setPlaybackSpeed(1.25f) }
+        // La pista de audio se desactiva (y poco después se reactiva) para montar el decodificador PCM.
+        assertTrue(C.TRACK_TYPE_AUDIO in players.parameters[0].disabledTrackTypes)
+        fixture.viewModel.onStop()
+    }
+
+    @Test
+    fun `changing speed with plain audio only sets the speed`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(players, flowOf(40), SubtitlePreference.OFF)
+        fixture.viewModel.start()
+        yield()
+        every { players.player(0).audioFormat } returns
+            Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()
+
+        fixture.viewModel.cyclePlaybackSpeed()
+        yield()
+
+        verify { players.player(0).setPlaybackSpeed(1.25f) }
+        verify(exactly = 0) { players.player(0).release() }
+        fixture.viewModel.onStop()
+    }
+
+    @Test
+    fun `sleep timer cycles from off to end of episode and back`() = runBlocking {
+        val fixture = fixture(FakePlayers(Tracks.EMPTY), flowOf(40), SubtitlePreference.OFF)
+        val viewModel = fixture.viewModel
+
+        assertEquals(SleepTimer.Off, viewModel.sleepTimer.value)
+        listOf(15, 30, 45, 60, 90).forEach { minutes ->
+            viewModel.cycleSleepTimer()
+            assertEquals(SleepTimer.Minutes(minutes), viewModel.sleepTimer.value)
+        }
+        viewModel.cycleSleepTimer()
+        assertEquals(SleepTimer.EndOfEpisode, viewModel.sleepTimer.value)
+        viewModel.cycleSleepTimer()
+        assertEquals(SleepTimer.Off, viewModel.sleepTimer.value)
+
+        viewModel.onStop()
+    }
+
+    @Test
+    fun `end of episode sleep timer stops instead of playing the next episode`() = runBlocking {
+        val players = FakePlayers(Tracks.EMPTY)
+        val fixture = fixture(
+            players = players,
+            bufferSecondsFlow = flowOf(40),
+            subtitlePreference = SubtitlePreference.OFF,
+            next = NextEpisode("show", season = 1, episode = 2, label = "S1E2"),
+        )
+        fixture.viewModel.start()
+        yield()
+        repeat(6) { fixture.viewModel.cycleSleepTimer() }
+        assertEquals(SleepTimer.EndOfEpisode, fixture.viewModel.sleepTimer.value)
+
+        players.listener(0).onPlaybackStateChanged(Player.STATE_ENDED)
+
+        assertEquals(SleepTimer.Off, fixture.viewModel.sleepTimer.value)
+        verify(exactly = 1) { players.player(0).pause() }
+        assertNull(fixture.holder.consumeNextRequest())
+        fixture.viewModel.onStop()
+    }
+
+    @Test
     fun `subtitle appearance updates immediately and persists normalized values`() = runBlocking {
         val fixture = fixture(FakePlayers(Tracks.EMPTY), flowOf(40), SubtitlePreference.OFF)
         val requested = SubtitleAppearance(
@@ -171,10 +248,11 @@ class PlayerViewModelTest {
         players: FakePlayers,
         bufferSecondsFlow: Flow<Int>,
         subtitlePreference: SubtitlePreference,
+        next: NextEpisode? = null,
     ): Fixture {
         val policy = PlaybackPolicy.automatic(512L * 1024 * 1024)
         val media3Factory = mockk<Media3Factory>()
-        every { media3Factory.createPlayer(any()) } answers { players.create() }
+        every { media3Factory.createPlayer(any(), any()) } answers { players.create() }
         every { media3Factory.dataSourceFactory } returns mockk()
         val playbackPolicies = mockk<PlaybackPolicyProvider> {
             every { automatic() } returns policy
@@ -189,6 +267,8 @@ class PlayerViewModelTest {
             every { this@mockk.maxBufferSeconds } returns bufferSecondsFlow
             every { seekThumbnails } returns flowOf(false)
             every { autoNextEpisode } returns flowOf(true)
+            every { tracksPanelCard } returns flowOf(false)
+            every { autoSkipIntro } returns flowOf(false)
         }
         val profile = Profile(
             id = "test",
@@ -220,12 +300,15 @@ class PlayerViewModelTest {
                 label = "Movie",
                 progressKey = "movie:1",
                 media = PlaybackMedia(MediaType.MOVIE, "tt1", "Movie", "Movie", 2020),
+                next = next,
             )
         }
         val watchProgress = mockk<WatchProgressRepository>(relaxed = true)
         return Fixture(
             settings = settings,
             watchProgress = watchProgress,
+            holder = holder,
+            media3Factory = media3Factory,
             viewModel = PlayerViewModel(
                 media3Factory = media3Factory,
                 playbackPolicies = playbackPolicies,
@@ -237,6 +320,7 @@ class PlayerViewModelTest {
                 subtitles = mockk<SubtitleRepository>(relaxed = true),
                 trakt = mockk<TraktRepository>(relaxed = true),
                 skipSegmentsRepository = mockk<SkipSegmentsRepository>(relaxed = true),
+                trackMemory = mockk(relaxed = true),
                 texts = mockk<Texts>(relaxed = true),
             ),
         )
@@ -275,6 +359,8 @@ class PlayerViewModelTest {
         val viewModel: PlayerViewModel,
         val settings: SettingsRepository,
         val watchProgress: WatchProgressRepository,
+        val holder: SelectedContentHolder,
+        val media3Factory: Media3Factory,
     )
 
     private class FakePlayers(private val tracks: Tracks) {

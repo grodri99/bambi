@@ -222,7 +222,7 @@ private fun SetupHeader(step: SetupStep) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Image(painterResource(R.drawable.bambi_logo), contentDescription = null, modifier = Modifier.size(36.dp))
         Spacer(Modifier.width(10.dp))
-        Image(painterResource(R.drawable.bambi_wordmark), contentDescription = "Bambi", modifier = Modifier.height(13.dp))
+        Image(painterResource(R.drawable.bambi_wordmark), contentDescription = "Bambi", modifier = Modifier.height(20.dp))
         Spacer(Modifier.weight(1f))
         step.number?.let { n ->
             Text(localizedStringResource(SR.setup_step_counter, n), fontFamily = DisplayFont, fontSize = 22.sp, color = Muted)

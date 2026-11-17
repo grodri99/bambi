@@ -29,6 +29,7 @@ interface ResolveStreamTexts {
 class ResolveStreamUseCase(
     private val realDebrid: RealDebridRepository,
     private val allDebridTorrents: AllDebridRepository,
+    private val torBox: TorBoxRepository,
     private val torrentio: TorrentioLinkResolver,
     private val allDebrid: AllDebridAuthRepository,
     private val selectedDebrid: Flow<DebridService>,
@@ -43,11 +44,7 @@ class ResolveStreamUseCase(
         source.resolveUrl?.let { url ->
             val service = source.debrid ?: selectedDebrid.first().title
             emit(ResolveState.Progress(texts.requestingLink(service)))
-            val result = if (source.debrid == ITHIL_ALLDEBRID) {
-                allDebrid.unlock(url)
-            } else {
-                torrentio.resolve(url, service)
-            }
+            val result = torrentio.resolve(url, service)
             when (val link = result) {
                 is DebridLink.Ready -> emit(ResolveState.Ready(link.url))
                 is DebridLink.Problem -> emit(ResolveState.Failed(link.message, notCached = link.notCached))
@@ -56,10 +53,22 @@ class ResolveStreamUseCase(
         }
 
         val service = selectedDebrid.first()
-        val debrid = when (service) {
+        val debrid: MagnetDebridRepository = when (service) {
             DebridService.REAL_DEBRID -> realDebrid
             DebridService.ALLDEBRID -> allDebridTorrents
-            else -> error(texts.directMagnetUnsupported(service.title))
+            DebridService.TORBOX -> torBox
+            else -> {
+                // Sin resolución propia (Premiumize, Debrid-Link, Offcloud): el torrent se resuelve a través de
+                // Torrentio con la clave del servicio.
+                val url = torrentio.resolveUrlFor(service, source.infoHash, source.fileIdx, source.fileName)
+                    ?: error(texts.directMagnetUnsupported(service.title))
+                emit(ResolveState.Progress(texts.requestingLink(service.title)))
+                when (val link = torrentio.resolve(url, service.title)) {
+                    is DebridLink.Ready -> emit(ResolveState.Ready(link.url))
+                    is DebridLink.Problem -> emit(ResolveState.Failed(link.message, notCached = link.notCached))
+                }
+                return@flow
+            }
         }
 
         emit(ResolveState.Progress(texts.lookingInLibrary(service.title)))

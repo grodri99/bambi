@@ -66,6 +66,33 @@ interface SettingsRepository {
     val autoNextEpisode: Flow<Boolean>
     suspend fun setAutoNextEpisode(enabled: Boolean)
 
+    /**
+     * Si una fuente elegida a mano falla, saltar sola a la más parecida (true, por defecto) o avisar y volver a la
+     * lista de fuentes para elegir otra (false). "Reproducir" siempre salta sola: ahí la fuente la elige la app.
+     */
+    val switchFromPickedSource: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
+
+    /** Formato de imagen del reproductor (bandas negras, ampliar o estirar); se recuerda para lo siguiente. */
+    val videoFit: Flow<com.shieldstream.tv.model.VideoFit> get() = kotlinx.coroutines.flow.flowOf(com.shieldstream.tv.model.VideoFit.FIT)
+    suspend fun setVideoFit(fit: com.shieldstream.tv.model.VideoFit) {}
+    suspend fun setSwitchFromPickedSource(enabled: Boolean) {}
+
+    /** Salta la intro y el "Anteriormente en…" solos, sin tener que pulsar el botón. */
+    val autoSkipIntro: Flow<Boolean>
+    suspend fun setAutoSkipIntro(enabled: Boolean)
+
+    /** Muestra la fila de reparto y equipo en las fichas. */
+    val showCast: Flow<Boolean>
+    suspend fun setShowCast(enabled: Boolean)
+
+    /** Panel de audio/subtítulos del reproductor: false = transparente sobre el vídeo (como siempre); true = tarjeta. */
+    /** Tope de calidad al elegir fuente automáticamente (lo que lo pasa va detrás). */
+    val preferredQuality: Flow<com.shieldstream.tv.model.PreferredQuality>
+    suspend fun setPreferredQuality(quality: com.shieldstream.tv.model.PreferredQuality)
+
+    val tracksPanelCard: Flow<Boolean>
+    suspend fun setTracksPanelCard(enabled: Boolean)
+
     val searchQwerty: Flow<Boolean>
     suspend fun setSearchQwerty(enabled: Boolean)
 
@@ -80,6 +107,11 @@ interface SettingsRepository {
 
     val sourceExclusions: Flow<SourceExclusions>
     suspend fun setSourceExclusions(exclusions: SourceExclusions)
+
+    /** Fuentes que el usuario ha descartado por ir mal; no vuelven a ofrecerse hasta restaurarlas. */
+    val brokenSourceIds: Flow<Set<String>>
+    suspend fun markSourceBroken(id: String)
+    suspend fun clearBrokenSources()
 
     /** Servicio debrid en uso (Real-Debrid por defecto). */
     val debridService: Flow<DebridService>

@@ -63,6 +63,24 @@ val SubtitleColor.labelResource: Int
         SubtitleColor.RED -> R.string.subtitle_color_red
         SubtitleColor.BLACK -> R.string.subtitle_color_black
         SubtitleColor.TRANSPARENT -> R.string.subtitle_color_transparent
+        SubtitleColor.SHADE -> R.string.subtitle_color_shade
+    }
+
+@get:StringRes
+val com.shieldstream.tv.model.SubtitleFont.labelResource: Int
+    get() = when (this) {
+        com.shieldstream.tv.model.SubtitleFont.DEFAULT -> R.string.subtitle_font_default
+        com.shieldstream.tv.model.SubtitleFont.SERIF -> R.string.subtitle_font_serif
+        com.shieldstream.tv.model.SubtitleFont.MONOSPACE -> R.string.subtitle_font_mono
+        com.shieldstream.tv.model.SubtitleFont.CONDENSED -> R.string.subtitle_font_condensed
+        com.shieldstream.tv.model.SubtitleFont.BOLD -> R.string.subtitle_font_bold
+    }
+
+@get:StringRes
+val com.shieldstream.tv.model.SubtitleEdge.labelResource: Int
+    get() = when (this) {
+        com.shieldstream.tv.model.SubtitleEdge.OUTLINE -> R.string.subtitle_edge_outline
+        com.shieldstream.tv.model.SubtitleEdge.SHADOW -> R.string.subtitle_edge_shadow
     }
 
 @Composable

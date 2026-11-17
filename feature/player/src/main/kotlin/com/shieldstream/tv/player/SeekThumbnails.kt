@@ -170,13 +170,13 @@ internal class SeekThumbnails(context: Context, uri: Uri, pqHdr: Boolean) {
 }
 
 @UnstableApi
-private val HardwareWithoutDolbyVision = MediaCodecSelector { mimeType, secure, tunneling ->
+internal val HardwareWithoutDolbyVision = MediaCodecSelector { mimeType, secure, tunneling ->
     if (mimeType == MimeTypes.VIDEO_DOLBY_VISION) MediaCodecSelector.DEFAULT.getDecoderInfos(MimeTypes.VIDEO_H265, secure, tunneling)
     else MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling)
 }
 
 @OptIn(UnstableApi::class)
-private object PqToSdr {
+internal object PqToSdr {
     private const val SIZE = 33
     private const val M1 = 0.1593017578125
     private const val M2 = 78.84375

@@ -21,6 +21,9 @@ interface MyListRepository {
 
     fun add(type: MediaType, id: String)
 
+    /** Añade a la lista de otro perfil (p. ej. al aprobar una petición familiar). */
+    fun addFor(profileId: String, type: MediaType, id: String)
+
     fun remove(type: MediaType, id: String)
 
     val changes: SharedFlow<MyListChange>

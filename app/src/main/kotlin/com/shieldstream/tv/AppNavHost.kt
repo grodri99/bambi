@@ -6,10 +6,16 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -18,9 +24,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.shieldstream.tv.details.DetailsScreen
+import com.shieldstream.tv.details.PersonScreen
 import com.shieldstream.tv.domain.EpisodeTarget
 import com.shieldstream.tv.domain.SelectedContentHolder
 import com.shieldstream.tv.home.MainScreen
+import com.shieldstream.tv.intro.IntroReveal
 import com.shieldstream.tv.intro.IntroScreen
 import com.shieldstream.tv.intro.IntroViewModel
 import com.shieldstream.tv.intro.ProfileLoadingScreen
@@ -35,6 +43,7 @@ import com.shieldstream.tv.settings.profiles.ProfileEditViewModel
 import com.shieldstream.tv.settings.profiles.ProfilePickerScreen
 import com.shieldstream.tv.settings.profiles.ProfilesViewModel
 import com.shieldstream.tv.settings.profiles.TraktConnectScreen
+import com.shieldstream.tv.settings.requests.RequestsScreen
 import com.shieldstream.tv.settings.phoneconfig.PhoneConfigMode
 import com.shieldstream.tv.settings.phoneconfig.PhoneConfigScreen
 import com.shieldstream.tv.settings.update.UpdatePrompt
@@ -55,9 +64,40 @@ fun AppNavHost(
     val navController = rememberNavController()
     val gate: SetupGateViewModel = hiltViewModel()
     val watchNextNavigation: WatchNextNavigationViewModel = hiltViewModel()
-    // Al abrir en frío, la intro de Bambi (mientras se precarga el Inicio) y después "¿Quién está viendo?".
-    val start = remember { if (gate.needsSetup) "setup" else "intro" }
+    // Al abrir en frío, la intro de Bambi (mientras se precarga el Inicio) va ENCIMA de "¿Quién está viendo?", que ya
+    // está debajo: al terminar, la película avanza y el fotograma siguiente es esa pantalla (reveal 0→1, IntroReveal).
+    val start = remember { if (gate.needsSetup) "setup" else "profiles" }
+    var coldIntro by remember { mutableStateOf(!gate.needsSetup) }
+    var reveal by remember { mutableFloatStateOf(if (coldIntro) 0f else 1f) }
+    // Para que el gato vaya fluido, lo pesado (montar la navegación y "¿Quién está viendo?") se hace con la intro
+    // quieta en rojo: primero se pinta la intro, luego se monta lo de debajo y, ya montado, arranca la animación.
+    var hostAllowed by remember { mutableStateOf(!coldIntro) }
+    var hostComposed by remember { mutableStateOf(!coldIntro) }
+    // Hasta que arranca la animación, lo de debajo se pinta en su sitio (tapado por la intro, que es opaca): así la
+    // GPU ya lo tiene preparado y no da un tirón la primera vez que aparece en el fotograma de la película.
+    var introRunning by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!hostAllowed) {
+            withFrameNanos { }
+            withFrameNanos { }
+            hostAllowed = true
+        }
+    }
+    // La ventana arranca con el rojo de la intro (tema) para que no haya negro mientras abre la app; en cuanto la
+    // intro termina (o si no hay intro) vuelve a negro, que es lo que debe asomar en las transiciones.
+    val activity = LocalContext.current as? android.app.Activity
+    LaunchedEffect(coldIntro) {
+        if (!coldIntro) activity?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))
+    }
     val intro: IntroViewModel = hiltViewModel()
+    // Mientras se ve la intro, la precarga deja para después lo que no corre prisa (ver HomePreloader.setUiBusy).
+    LaunchedEffect(coldIntro) {
+        intro.setUiBusy(coldIntro)
+        if (!coldIntro) {
+            kotlinx.coroutines.delay(ICON_WARM_DELAY_MS)
+            intro.warmAllProfileIcons()
+        }
+    }
     val request by watchNextRequest.collectAsState()
     // Si se abre desde "Seguir viendo" de Android TV, la intro es más corta.
     val quickIntro = remember { watchNextRequest.value != null }
@@ -87,6 +127,19 @@ fun AppNavHost(
     }
 
     Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                // Durante la salida de la intro, esta pantalla es el fotograma siguiente de la tira de película.
+                if (coldIntro && !introRunning) return@graphicsLayer
+                val s = IntroReveal.scale(reveal)
+                scaleX = s
+                scaleY = s
+                translationY = size.height * IntroReveal.appOffset(reveal)
+            },
+    ) {
+    if (hostAllowed) {
     NavHost(navController = navController, startDestination = start) {
         composable("setup") {
             val toProfiles = {
@@ -98,20 +151,13 @@ fun AppNavHost(
                 onOpenPhone = { navController.navigate("phone_setup") },
             )
         }
-        composable("intro") {
-            IntroScreen(
-                onStartPreload = intro::start,
-                awaitReady = intro::awaitReady,
-                onFinished = { navController.navigate("profiles") { popUpTo("intro") { inclusive = true } } },
-                quick = quickIntro,
-            )
-        }
         composable("profile_loading") {
             val profiles: ProfilesViewModel = hiltViewModel()
             val active by profiles.active.collectAsState()
             ProfileLoadingScreen(
                 initial = active.initial,
                 avatar = active.avatar,
+                image = active.avatarImage,
                 awaitReady = intro::awaitReady,
                 onReady = toMainFresh,
             )
@@ -127,7 +173,8 @@ fun AppNavHost(
                 onEdit = { id -> if (entry.isVisible()) navController.navigate("profile_edit/$id") },
                 onAdd = { if (entry.isVisible()) navController.navigate("profile_edit/${ProfileEditViewModel.NEW}") },
             )
-            UpdatePrompt()
+            // El aviso de actualización es un diálogo (va por encima de todo): que espere a que acabe la intro.
+            if (!coldIntro) UpdatePrompt()
         }
         composable("profile_edit/{id}") { entry ->
             ProfileEditScreen(
@@ -150,8 +197,10 @@ fun AppNavHost(
             val active by profiles.active.collectAsState()
             MainScreen(
                 onExit = onExit,
+                onOpenDownloads = { if (entry.isVisible()) navController.navigate("downloads") },
                 profileInitial = active.initial,
                 profileAvatar = active.avatar,
+                profileImage = active.avatarImage,
                 onSwitchProfile = { if (entry.isVisible()) navController.navigate("profiles") },
                 onOpenItem = { item ->
                     if (entry.isVisible()) {
@@ -183,18 +232,53 @@ fun AppNavHost(
                         navController.navigate("details")
                     }
                 },
+                onPlaySomething = { item, target ->
+                    if (entry.isVisible()) {
+                        holder.selectItem(item, target, playImmediately = true)
+                        navController.navigate("details")
+                    }
+                },
                 onOpenSettings = { navController.navigate("settings") },
             )
             UpdatePrompt()
         }
         composable("details") { entry ->
+            val context = LocalContext.current
             DetailsScreen(
                 onBack = { if (entry.isVisible()) navController.popBackStack() },
                 onPlay = { if (entry.isVisible()) navController.navigate("player") },
+                onOpenPerson = { id -> if (entry.isVisible()) navController.navigate("person/$id") },
+                onOpenTrailer = { keys -> if (entry.isVisible()) com.shieldstream.tv.player.TrailerActivity.start(context, keys) },
+                onOpenItem = { item ->
+                    if (entry.isVisible()) {
+                        holder.selectItem(item)
+                        navController.navigate("details")
+                    }
+                },
+            )
+        }
+        composable("downloads") { entry ->
+            com.shieldstream.tv.home.DownloadsRoute(
+                onPlay = { if (entry.isVisible()) navController.navigate("player") },
+            )
+        }
+        composable("person/{id}") { entry ->
+            PersonScreen(
+                onOpenItem = { item ->
+                    if (entry.isVisible()) {
+                        holder.selectItem(item)
+                        navController.navigate("details")
+                    }
+                },
             )
         }
         composable("player") {
-            PlayerScreen(onBack = { navController.popBackStack() })
+            PlayerScreen(
+                onBack = { navController.popBackStack() },
+                onSleepTimerFinished = {
+                    if (!navController.popBackStack("main", inclusive = false)) toMainFresh()
+                },
+            )
         }
         composable("settings") {
             SettingsScreen(
@@ -202,10 +286,14 @@ fun AppNavHost(
                 onOpenSetup = { navController.navigate("setup_again") },
                 onOpenPhoneConfig = { navController.navigate("phone_config") },
                 onOpenAddons = { navController.navigate("addons") },
+                onOpenRequests = { navController.navigate("requests") },
             )
         }
         composable("addons") { entry ->
             AddonsScreen(onBack = { if (entry.isVisible()) navController.popBackStack() })
+        }
+        composable("requests") { entry ->
+            RequestsScreen(onBack = { if (entry.isVisible()) navController.popBackStack() })
         }
         composable("phone_config") { entry ->
             PhoneConfigScreen(onDone = { if (entry.isVisible()) navController.popBackStack() })
@@ -239,7 +327,27 @@ fun AppNavHost(
             )
         }
     }
-    ResumeIntroOverlay(resumeIntro, currentEntry?.destination?.route, intro, onResumeIntroDone)
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        withFrameNanos { }
+        hostComposed = true
+    }
+    }
+    }
+    if (coldIntro) {
+        IntroScreen(
+            onStartPreload = intro::start,
+            awaitReady = intro::awaitReady,
+            onFinished = { coldIntro = false },
+            quick = quickIntro,
+            onReveal = { reveal = it },
+            fadeFromBlack = false,
+            holdStart = !hostComposed,
+            onAnimationStart = { introRunning = true },
+        )
+    } else {
+        ResumeIntroOverlay(resumeIntro, currentEntry?.destination?.route, intro, onResumeIntroDone) { reveal = it }
+    }
     }
 }
 
@@ -249,6 +357,7 @@ private fun ResumeIntroOverlay(
     route: String?,
     intro: IntroViewModel,
     onDone: (ResumeIntro) -> Unit,
+    onReveal: (Float) -> Unit,
 ) {
     val pending by resumeIntro.collectAsState()
     val request = pending ?: return
@@ -258,13 +367,21 @@ private fun ResumeIntroOverlay(
         return
     }
     key(request.at) {
+        DisposableEffect(Unit) {
+            intro.setUiBusy(true)
+            onDispose { intro.setUiBusy(false) }
+        }
         IntroScreen(
             onStartPreload = { if (request.reload) intro.refresh() else intro.start() },
             awaitReady = intro::awaitReady,
             onFinished = { onDone(request) },
+            onReveal = onReveal,
         )
     }
 }
+
+/** Margen tras la intro antes de bajar los iconos de perfil que falten (que no coincida con la entrada al Inicio). */
+private const val ICON_WARM_DELAY_MS = 8_000L
 
 private val NO_RESUME_INTRO_ROUTES = setOf("intro", "player", "setup", "phone_setup", "profile_loading")
 

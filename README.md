@@ -75,14 +75,13 @@ Bambi que hizo Javier Molina (javiermolinar), manteniendo el aspecto de Bambi (b
 - **Subtítulos:** sincronización automática con el diálogo del propio vídeo y aspecto/idioma por perfil.
 - **Addons de Stremio:** gestor para añadir, cambiar, quitar y probar varios a la vez, con su nombre y logo.
 - **Trakt:** puntuar películas, series y episodios, y recomendaciones en Inicio.
-- **Reproducción:** ajuste de la frecuencia de la tele al vídeo, control completo desde el mando, exclusión de
-  fuentes por calidad/HDR/códec y etiquetas de formato (HDR, Dolby Vision, códecs, decodificación).
-- **Ithil:** fuente opcional con un índice de enlaces desbloqueados con AllDebrid (necesita compilar con su
-  configuración).
+- **Reproducción:** ajuste de la frecuencia de la tele al vídeo, temporizador de apagado (por minutos o al
+  terminar el episodio), velocidad 0,75x–2x (con audio directo pasa a PCM estéreo), memoria de audio/subtítulos por serie, control completo desde el
+  mando, exclusión de fuentes por calidad/HDR/códec y etiquetas de formato (HDR, Dolby Vision, códecs, decodificación).
 - **Seguridad:** las claves ya no se meten en el APK por defecto, ni en texto plano ni en las copias de seguridad
   de Android; URLs sensibles fuera de los logs.
 
-El historial detallado está en [CHANGELOG.md](CHANGELOG.md).
+El historial detallado está en [CHANGELOG.md](CHANGELOG.md) y lo que viene en [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -138,8 +137,14 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
   Policiacas…). En Ajustes eliges qué categorías se ven.
 - **Mi lista**: guarda películas y series desde su ficha; tiene su propia pestaña (con filtro Todo / Series /
   Películas) y una fila en el Inicio.
+- **Tema por perfil**: cada perfil elige el acento de la app (Bambi, Océano, Bosque, Oro, Violeta o Rosa);
+  se aplica al progreso, focos, reproductor y fichas.
+- **Peticiones familiares**: cada perfil puede pedir un título con el botón Pedir; el administrador (primer
+  perfil) las aprueba o descarta desde Ajustes y el título entra en Mi lista del solicitante.
 - Filas de **Tendencias**, **Top 10 de hoy** y muchas más.
 - **Seguir viendo** con barra de progreso y lo que te queda ("T1:E6 · 14 min"). Mantén OK para quitar un título.
+- **Reproduce algo**: elige al azar lo siguiente que toca (A continuación, estrenos, Seguir viendo o Mi lista)
+  sin tener que buscar. **Sorpréndeme** hace lo propio con un título del catálogo.
 - Desplazamiento suave y precompilado: la app se instala con un perfil de arranque para que vaya fluida desde el
   primer día.
 
@@ -156,6 +161,8 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
 - **Reanudar** donde lo dejaste o **Desde el principio**.
 - Series con **temporadas y episodios**, ticks de vistos y barra de progreso en cada episodio.
 - **Marcar como visto** una película o una temporada entera, o un episodio manteniendo OK sobre él.
+- **Tráiler** desde la ficha y fila de **saga** con el resto de películas de la colección (TMDB).
+- La fila de **Reparto y equipo** se puede ocultar desde Ajustes.
 - Botón **Mi lista** para guardarla.
 - Al volver de una ficha, el foco sigue en el título donde estabas.
 
@@ -182,6 +189,7 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
 - **"Reproducir" elige solo**: prueba las fuentes en orden hasta que una funciona. Se salta las que Real-Debrid
   bloquea o que no son vídeo, y frena si Real-Debrid pide calma.
 - **Packs de temporada**: si la fuente es la temporada completa, reproduce el episodio correcto de dentro del pack.
+- **Fuente rota**: mantén OK sobre una fuente para descartarla; no vuelve a salir. Se restauran en Ajustes → Fuentes rotas.
 - Resistente a los bloqueos de algunas operadoras (p. ej. las IP de Cloudflare durante el fútbol): si una IP no
   responde, prueba otra.
 

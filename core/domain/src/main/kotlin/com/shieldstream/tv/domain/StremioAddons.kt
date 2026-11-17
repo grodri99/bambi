@@ -18,7 +18,9 @@ data class StremioAddon(
 }
 
 object StremioAddons {
-    private val separator = Regex("[\\s,;]+")
+    // Espacios o saltos de línea; comas y punto y coma solo justo después de "manifest.json". Dentro de la URL son
+    // parte de la configuración del addon ("providers=mejortorrent,wolfmax4k|language=spanish"): cortar ahí la rompía.
+    private val separator = Regex("\\s+|(?<=manifest\\.json)[,;]+\\s*")
 
     fun parse(raw: String): List<StremioAddon> = raw.trim()
         .takeIf { it.isNotEmpty() }

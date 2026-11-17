@@ -28,6 +28,7 @@ dependencies {
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.common)
+    implementation(libs.media3.ffmpeg)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.hilt.android)

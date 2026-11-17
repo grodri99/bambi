@@ -39,7 +39,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,13 +88,20 @@ import coil.compose.AsyncImage
 import com.shieldstream.tv.domain.NewEpisodes
 import com.shieldstream.tv.model.CatalogDetails
 import com.shieldstream.tv.model.Episode
+import androidx.compose.ui.unit.sp
+import com.shieldstream.tv.ui.component.requestFocusWithRetry
+import com.shieldstream.tv.ui.component.downloadIndicatorState
+import com.shieldstream.tv.ui.component.busy
+import com.shieldstream.tv.ui.component.DownloadIndicator
+import com.shieldstream.tv.model.DownloadQuality
+import com.shieldstream.tv.model.DownloadStatus
+import com.shieldstream.tv.model.Download
 import com.shieldstream.tv.model.Lang
 import com.shieldstream.tv.strings.localizedCode
 import com.shieldstream.tv.strings.sectionResource
 import com.shieldstream.tv.model.HdrType
 import com.shieldstream.tv.model.StreamSource
 import com.shieldstream.tv.model.WatchProgress
-import com.shieldstream.tv.ui.component.ActionDockCard
 import com.shieldstream.tv.ui.component.ActionMenuDialog
 import com.shieldstream.tv.ui.component.ActionMenuItem
 import com.shieldstream.tv.ui.component.AppIcons
@@ -138,6 +148,9 @@ internal fun upcomingEpisodeDate(airDate: String?, today: String): String? =
 fun DetailsScreen(
     onBack: () -> Unit,
     onPlay: () -> Unit,
+    onOpenPerson: (Int) -> Unit = {},
+    onOpenItem: (com.shieldstream.tv.model.CatalogItem) -> Unit = {},
+    onOpenTrailer: (List<String>) -> Unit = {},
     viewModel: DetailsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -166,7 +179,7 @@ fun DetailsScreen(
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center),
             )
-            is DetailsUiState.Content -> DetailsContent(s, viewModel, onBack)
+            is DetailsUiState.Content -> DetailsContent(s, viewModel, onBack, onOpenPerson, onOpenItem, onOpenTrailer)
         }
     }
 }
@@ -176,8 +189,28 @@ private fun DetailsContent(
     state: DetailsUiState.Content,
     viewModel: DetailsViewModel,
     onBack: () -> Unit,
+    onOpenPerson: (Int) -> Unit,
+    onOpenItem: (com.shieldstream.tv.model.CatalogItem) -> Unit,
+    onOpenTrailer: (List<String>) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val downloadList by viewModel.downloadList.collectAsStateWithLifecycle()
+    val plannerProgress by viewModel.plannerProgress.collectAsStateWithLifecycle()
+    // El episodio sobre el que se estaba (enfocado), no solo el último abierto: "Más" actúa sobre ese.
+    var focusedEpisode by remember { mutableStateOf<Episode?>(null) }
+    val menuState = remember(state, focusedEpisode) {
+        val focused = focusedEpisode?.takeIf { f -> state.isSeries && f.season == state.selectedSeason }
+        if (focused != null) state.copy(selectedEpisode = focused) else state
+    }
     var panelOpen by remember { mutableStateOf(false) }
+    // La fuente elegida a mano falló (sin cambio automático): se vuelve con la lista abierta para elegir otra.
+    val reopenSources by viewModel.reopenSources.collectAsStateWithLifecycle()
+    LaunchedEffect(reopenSources) {
+        if (reopenSources) {
+            panelOpen = true
+            viewModel.sourcesReopened()
+        }
+    }
     var actionsOpen by remember { mutableStateOf(false) }
     var ratingTarget by remember { mutableStateOf<TraktRatingTarget?>(null) }
     var episodeMenu by remember { mutableStateOf<Episode?>(null) }
@@ -229,11 +262,13 @@ private fun DetailsContent(
             ),
         )
 
+        val pageScroll = rememberScrollState()
+        val pageScope = rememberCoroutineScope()
         ProvideMinimalScroll(margin = 72.dp) {
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(pageScroll)
                 .padding(top = 44.dp, bottom = 72.dp),
         ) {
             InfoBlock(
@@ -248,7 +283,11 @@ private fun DetailsContent(
                     panelOpen = true
                 },
                 onOpenActions = { actionsOpen = true },
-                modifier = Modifier.padding(start = 56.dp, end = 56.dp),
+                onTrailer = state.details.trailerKey?.let { first -> { onOpenTrailer(state.details.trailerKeys.ifEmpty { listOf(first) }) } },
+                // Al volver a los botones desde abajo, la página sube del todo: si no, la sinopsis quedaba cortada.
+                modifier = Modifier
+                    .padding(start = 56.dp, end = 56.dp)
+                    .onFocusChanged { if (it.hasFocus && pageScroll.value > 0) pageScope.launch { pageScroll.scrollToTopFirmly() } },
             )
 
             if (state.isSeries) {
@@ -259,9 +298,56 @@ private fun DetailsContent(
                     onSeason = { viewModel.selectSeason(it) },
                     onEpisode = { viewModel.playEpisode(it) },
                     onEpisodeLongPress = { episodeMenu = it },
+                    onEpisodeFocused = { focusedEpisode = it },
+                )
+            }
+
+            val interactive = !panelOpen && !actionsOpen && episodeMenu == null
+            state.collection?.let { saga ->
+                Spacer(Modifier.height(28.dp))
+                SectionTitle(localizedStringResource(StringsR.string.details_collection, saga.name))
+                PosterStrip(
+                    items = saga.parts,
+                    highlightId = item.id,
+                    onItem = { if (interactive && it.id != item.id) onOpenItem(it) },
+                )
+            }
+            val people = if (state.showCast) state.details.directors + state.details.cast else emptyList()
+            if (people.isNotEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                val shown = people.distinctBy { it.id }
+                Row(verticalAlignment = Alignment.Bottom) {
+                    SectionTitle(localizedStringResource(StringsR.string.details_cast))
+                    Text(
+                        text = shown.size.toString(),
+                        color = Grey,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 10.dp, bottom = 5.dp),
+                    )
+                }
+                PeopleRow(
+                    people = shown,
+                    enabled = interactive,
+                    onPerson = { onOpenPerson(it.id) },
+                    crewIds = state.details.directors.map { it.id }.toSet(),
+                    crewLabel = localizedStringResource(
+                        if (state.isSeries) StringsR.string.details_crew_creator else StringsR.string.details_crew_director,
+                    ),
                 )
             }
         }
+        }
+
+        val indicator = downloadIndicatorState(
+            downloadList,
+            preparing = plannerProgress?.let { "${it.done + 1}/${it.total}" },
+        )
+        if (indicator != null && indicator.busy && !panelOpen && !actionsOpen) {
+            DownloadIndicator(
+                state = indicator,
+                onClick = null,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = 32.dp).zIndex(1f),
+            )
         }
 
         AnimatedVisibility(
@@ -278,6 +364,10 @@ private fun DetailsContent(
                 },
                 isBlocked = viewModel::isBlocked,
                 onToggleSpanishOnly = viewModel::toggleSpanishOnly,
+                onMarkBroken = viewModel::markSourceBroken,
+                autoPick = remember(state.sources, state.selectedEpisode, state.sourceExclusions, state.brokenSources, state.spanishOnly) {
+                    viewModel.autoPlaySource()
+                },
             )
         }
         if (actionsOpen) {
@@ -292,7 +382,7 @@ private fun DetailsContent(
                     onDismiss = { ratingTarget = null },
                 )
                 else -> DetailsActions(
-                    state = state,
+                    state = menuState,
                     onToggleSeasonWatched = {
                         viewModel.toggleSeasonWatched()
                         actionsOpen = false
@@ -317,15 +407,40 @@ private fun DetailsContent(
                         ratingTarget = it
                         viewModel.loadRatings()
                     },
+                    onRandomEpisode = {
+                        actionsOpen = false
+                        viewModel.playRandomEpisode()
+                    },
+                    downloads = downloadList,
+                    onDownload = { episodes, quality ->
+                        actionsOpen = false
+                        viewModel.download(episodes, quality)
+                    },
+                    onDownloadAction = { d ->
+                        actionsOpen = false
+                        when {
+                            d.isDone -> viewModel.deleteDownload(d.id)
+                            d.isActive -> viewModel.pauseDownload(d.id)
+                            else -> viewModel.resumeDownload(d.id)
+                        }
+                    },
                     onDismiss = { actionsOpen = false },
                 )
             }
         }
 
         episodeMenu?.let { episode ->
+            val episodeDownload = downloadList.firstOrNull {
+                it.id == WatchProgress.episodeKey(state.details.item.id, episode.season, episode.number)
+            }
             EpisodeActions(
                 state = state,
                 episode = episode,
+                download = episodeDownload,
+                onDownload = {
+                    episodeMenu = null
+                    if (episodeDownload?.isDone == true) viewModel.deleteDownload(episodeDownload.id) else viewModel.download(listOf(episode))
+                },
                 onPlay = {
                     episodeMenu = null
                     viewModel.playEpisode(episode)
@@ -357,6 +472,7 @@ private fun InfoBlock(
     onPlayFromStart: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenActions: () -> Unit,
+    onTrailer: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val item = details.item
@@ -384,6 +500,19 @@ private fun InfoBlock(
         if (details.genres.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
             Text(details.genres.take(4).joinToString("  ·  "), color = Grey, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (details.directors.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = localizedStringResource(
+                    if (item.type == com.shieldstream.tv.model.MediaType.TV) StringsR.string.details_created_by else StringsR.string.details_directed_by,
+                    details.directors.take(2).joinToString(", ") { it.name },
+                ),
+                color = Grey,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         details.nextEpisode?.let { next ->
             val nextCode = next.localizedCode()
@@ -444,6 +573,14 @@ private fun InfoBlock(
                 onClick = onOpenSources,
                 enabled = interactive,
             )
+            if (onTrailer != null) {
+                TvButton(
+                    text = localizedStringResource(StringsR.string.details_trailer),
+                    icon = AppIcons.Movie,
+                    onClick = onTrailer,
+                    enabled = interactive,
+                )
+            }
             if (detailsMoreVisible(state.pendingPlay)) {
                 TvButton(
                     text = localizedStringResource(StringsR.string.details_more),
@@ -482,93 +619,365 @@ private fun DetailsActions(
     onToggleMyList: () -> Unit,
     onToggleFollowing: () -> Unit,
     onRate: (TraktRatingTarget) -> Unit,
+    onRandomEpisode: () -> Unit,
+    downloads: List<Download>,
+    onDownload: (List<Episode>, DownloadQuality) -> Unit,
+    onDownloadAction: (Download) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { requester.requestFocus() }
-    }
-    BottomActionDialog(
+    var downloadMenu by remember { mutableStateOf(false) }
+    MoreSidePanel(
         title = state.details.item.title,
-        onDismiss = onDismiss,
+        subtitle = state.selectedEpisode?.takeIf { state.isSeries }?.let { "${it.localizedCode()} · ${it.title}" },
+        onBack = { if (downloadMenu) downloadMenu = false else onDismiss() },
     ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val episodeAction = episodeWatchedAction(state)
-                val seasonLabel = if (state.isSeries) seasonWatchedLabel(state) else null
-                // Exactly one card owns the requester: a FocusRequester attached to two nodes throws.
-                val primary = Modifier.focusRequester(requester)
-                val watchedCardShown = !state.isSeries || episodeAction != null || seasonLabel != null
-                if (state.isSeries) {
-                    if (episodeAction != null) {
-                        DetailsActionCard(
-                            text = episodeWatchedLabel(episodeAction.episode, episodeAction.watched),
-                            icon = if (episodeAction.watched) AppIcons.Check else LineIcons.Eye,
-                            onClick = { onToggleEpisodeWatched(episodeAction.episode) },
-                            modifier = primary,
-                        )
-                    }
-                    if (seasonLabel != null) {
-                        DetailsActionCard(
-                            text = seasonLabel,
-                            icon = if (seasonAllWatched(state)) AppIcons.Check else LineIcons.Eye,
-                            onClick = onToggleSeasonWatched,
-                            modifier = if (episodeAction == null) primary else Modifier,
-                        )
-                    }
-                } else {
-                    val watched = state.mainProgress?.isWatched == true
-                    DetailsActionCard(
-                        text = localizedStringResource(if (watched) StringsR.string.details_watched else StringsR.string.details_mark_watched),
-                        icon = if (watched) AppIcons.Check else LineIcons.Eye,
-                        onClick = onToggleMovieWatched,
-                        modifier = primary,
-                    )
-                }
-                DetailsActionCard(
-                    text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
-                    icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
-                    onClick = onToggleMyList,
-                    modifier = if (watchedCardShown) Modifier else primary,
+        if (downloadMenu) {
+            DownloadOptions(state = state, downloads = downloads, onDownload = onDownload)
+            return@MoreSidePanel
+        }
+        val requester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { requester.requestFocusWithRetry() }
+        val item = state.details.item
+        val ratings = state.ratings as? TraktRatingsState.Ready
+        val episode = state.selectedEpisode?.takeIf { state.isSeries }
+        val key = if (episode != null) WatchProgress.episodeKey(item.id, episode.season, episode.number) else WatchProgress.movieKey(item.id)
+        val download = downloads.firstOrNull { it.id == key }
+        var firstAssigned = false
+        fun first(): Modifier = if (!firstAssigned) { firstAssigned = true; Modifier.focusRequester(requester) } else Modifier
+
+        if (state.isSeries) {
+            if (episode != null) {
+                MoreSectionHeader(localizedStringResource(StringsR.string.details_more_episode, episode.localizedCode()))
+                val watched = state.progressOf(episode)?.isWatched == true
+                MoreRow(
+                    text = episodeWatchedLabel(episode, watched),
+                    icon = if (watched) AppIcons.Check else LineIcons.Eye,
+                    highlighted = watched,
+                    onClick = { onToggleEpisodeWatched(episode) },
+                    modifier = first(),
                 )
-                if (state.isSeries) {
-                    DetailsActionCard(
-                        text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
-                        icon = if (state.following) AppIcons.Check else LineIcons.Bookmark,
-                        onClick = onToggleFollowing,
+                // La descarga de ESTE episodio siempre va aquí: descargarlo, o pausar/borrar si ya está. Varios episodios
+                // o la temporada van en la sección de la serie ("Descargar varios…").
+                if (download == null || download.status == DownloadStatus.FAILED) {
+                    MoreRow(
+                        text = localizedStringResource(StringsR.string.downloads_download_episode),
+                        icon = LineIcons.Download,
+                        detail = download?.error,
+                        onClick = { onDownload(listOf(episode), DownloadQuality.BEST) },
                     )
-                }
-                val item = state.details.item
-                val ratings = state.ratings as? TraktRatingsState.Ready
-                val overallTarget = if (state.isSeries) {
-                    TraktRatingTarget.Show(item.id)
                 } else {
-                    TraktRatingTarget.Movie(item.id)
+                    DownloadMoreRow(download, onOpenOptions = { downloadMenu = true }, onDownloadAction = onDownloadAction)
                 }
-                DetailsActionCard(
-                    text = ratingTargetLabel(state, overallTarget) + ratingSuffix(ratings?.overallRating),
+                val target = TraktRatingTarget.Episode(item.id, episode.season, episode.number)
+                MoreRow(
+                    text = ratingTargetLabel(state, target) + ratingSuffix(ratings?.episodeRating),
                     icon = LineIcons.Star,
-                    onClick = { onRate(overallTarget) },
+                    onClick = { onRate(target) },
                 )
-                state.selectedEpisode?.takeIf { state.isSeries }?.let { episode ->
-                    val target = TraktRatingTarget.Episode(item.id, episode.season, episode.number)
-                    DetailsActionCard(
-                        text = ratingTargetLabel(state, target) + ratingSuffix(ratings?.episodeRating),
-                        icon = LineIcons.Star,
-                        onClick = { onRate(target) },
-                    )
-                }
             }
+            MoreSectionHeader(localizedStringResource(StringsR.string.details_more_series))
+            seasonWatchedLabel(state)?.let { label ->
+                val all = seasonAllWatched(state)
+                MoreRow(label, if (all) AppIcons.Check else LineIcons.Eye, onToggleSeasonWatched, highlighted = all, modifier = first())
+            }
+            MoreRow(
+                text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
+                icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
+                highlighted = state.inMyList,
+                onClick = onToggleMyList,
+                modifier = first(),
+            )
+            MoreRow(
+                text = if (state.following) localizedStringResource(StringsR.string.details_following) else localizedStringResource(StringsR.string.details_follow),
+                icon = if (state.following) AppIcons.Check else LineIcons.Bookmark,
+                highlighted = state.following,
+                onClick = onToggleFollowing,
+            )
+            MoreRow(
+                text = localizedStringResource(StringsR.string.downloads_download_several),
+                icon = LineIcons.Download,
+                detail = localizedStringResource(StringsR.string.downloads_options_hint),
+                onClick = { downloadMenu = true },
+            )
+            val show = TraktRatingTarget.Show(item.id)
+            MoreRow(ratingTargetLabel(state, show) + ratingSuffix(ratings?.overallRating), LineIcons.Star, { onRate(show) })
+            if (state.details.seasons.isNotEmpty()) {
+                MoreRow(localizedStringResource(StringsR.string.details_random_episode), AppIcons.Bolt, onRandomEpisode)
+            }
+        } else {
+            val watched = state.mainProgress?.isWatched == true
+            MoreRow(
+                text = localizedStringResource(if (watched) StringsR.string.details_watched else StringsR.string.details_mark_watched),
+                icon = if (watched) AppIcons.Check else LineIcons.Eye,
+                highlighted = watched,
+                onClick = onToggleMovieWatched,
+                modifier = first(),
+            )
+            MoreRow(
+                text = if (state.inMyList) localizedStringResource(StringsR.string.details_in_my_list) else localizedStringResource(StringsR.string.details_my_list),
+                icon = if (state.inMyList) AppIcons.Check else AppIcons.Add,
+                highlighted = state.inMyList,
+                onClick = onToggleMyList,
+            )
+            DownloadMoreRow(download, onOpenOptions = { downloadMenu = true }, onDownloadAction = onDownloadAction)
+            val movie = TraktRatingTarget.Movie(item.id)
+            MoreRow(ratingTargetLabel(state, movie) + ratingSuffix(ratings?.overallRating), LineIcons.Star, { onRate(movie) })
+        }
+    }
+}
+
+/** Fila de descarga del episodio/película: según el estado, descargar (con opciones), pausar, reanudar o borrar. */
+@Composable
+private fun DownloadMoreRow(download: Download?, onOpenOptions: () -> Unit, onDownloadAction: (Download) -> Unit) {
+    when {
+        download == null || download.status == DownloadStatus.FAILED -> MoreRow(
+            text = localizedStringResource(StringsR.string.downloads_download_options),
+            icon = LineIcons.Download,
+            detail = download?.error,
+            onClick = onOpenOptions,
+        )
+        download.isDone -> MoreRow(
+            text = localizedStringResource(StringsR.string.downloads_delete),
+            icon = LineIcons.Delete,
+            detail = localizedStringResource(StringsR.string.downloads_downloaded),
+            onClick = { onDownloadAction(download) },
+        )
+        download.isActive -> MoreRow(
+            text = localizedStringResource(StringsR.string.downloads_pause),
+            icon = AppIcons.Pause,
+            detail = localizedStringResource(StringsR.string.downloads_downloading, (download.progress * 100).toInt()),
+            progress = download.progress,
+            onClick = { onDownloadAction(download) },
+        )
+        else -> MoreRow(
+            text = localizedStringResource(StringsR.string.downloads_resume),
+            icon = LineIcons.Download,
+            detail = localizedStringResource(StringsR.string.downloads_paused),
+            progress = download.progress,
+            onClick = { onDownloadAction(download) },
+        )
+    }
+}
+
+/**
+ * Opciones de descarga: este episodio, los siguientes, la temporada entera o solo lo que no has visto; y la calidad
+ * (lo mejor, o 1080p/720p para que ocupe menos).
+ */
+@Composable
+private fun DownloadOptions(
+    state: DetailsUiState.Content,
+    downloads: List<Download>,
+    onDownload: (List<Episode>, DownloadQuality) -> Unit,
+) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requester.requestFocusWithRetry() }
+    var quality by remember { mutableStateOf(DownloadQuality.BEST) }
+    val qualityLabel = localizedStringResource(
+        when (quality) {
+            DownloadQuality.BEST -> StringsR.string.downloads_quality_best
+            DownloadQuality.FHD -> StringsR.string.downloads_quality_1080
+            DownloadQuality.HD -> StringsR.string.downloads_quality_720
+        },
+    )
+    MoreSectionHeader(localizedStringResource(StringsR.string.downloads_download_options))
+    var assigned = false
+    fun first(): Modifier = if (!assigned) { assigned = true; Modifier.focusRequester(requester) } else Modifier
+    if (!state.isSeries) {
+        MoreRow(
+            text = localizedStringResource(StringsR.string.downloads_download_movie),
+            icon = LineIcons.Download,
+            onClick = { onDownload(emptyList(), quality) },
+            modifier = first(),
+        )
+    } else {
+        val today = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()) }
+        val season = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
+            .filter { it.airDate.isNullOrBlank() || it.airDate!! <= today }
+        val downloadedKeys = downloads.filter { it.status != DownloadStatus.FAILED }.map { it.id }.toSet()
+        fun key(e: Episode) = WatchProgress.episodeKey(state.details.item.id, e.season, e.number)
+        val pending = season.filter { key(it) !in downloadedKeys }
+        val current = state.selectedEpisode
+        if (current != null && key(current) !in downloadedKeys) {
+            MoreRow(
+                text = localizedStringResource(StringsR.string.downloads_option_episode, current.localizedCode()),
+                icon = LineIcons.Download,
+                detail = current.title,
+                onClick = { onDownload(listOf(current), quality) },
+                modifier = first(),
+            )
+        }
+        if (current != null) {
+            val next = season.dropWhile { it != current }.drop(1).filter { key(it) !in downloadedKeys }.take(NEXT_EPISODES)
+            if (next.size > 1) {
+                MoreRow(
+                    text = localizedStringResource(StringsR.string.downloads_option_next, next.size),
+                    icon = LineIcons.Download,
+                    detail = "${next.first().localizedCode()} – ${next.last().localizedCode()}",
+                    onClick = { onDownload(next, quality) },
+                    modifier = first(),
+                )
+            }
+        }
+        state.selectedSeason?.let { number ->
+            if (pending.isNotEmpty()) {
+                MoreRow(
+                    text = localizedStringResource(StringsR.string.downloads_option_season, number),
+                    icon = LineIcons.Download,
+                    detail = localizedStringResource(StringsR.string.downloads_option_count, pending.size),
+                    onClick = { onDownload(pending, quality) },
+                    modifier = first(),
+                )
+            }
+            if (pending.isEmpty()) {
+                Text(
+                    localizedStringResource(StringsR.string.downloads_season_all_done, number),
+                    color = Grey,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                )
+            }
+            val unwatched = pending.filter { state.progressOf(it)?.isWatched != true }
+            if (unwatched.isNotEmpty() && unwatched.size != pending.size) {
+                MoreRow(
+                    text = localizedStringResource(StringsR.string.downloads_option_unwatched, number),
+                    icon = LineIcons.Eye,
+                    detail = localizedStringResource(StringsR.string.downloads_option_count, unwatched.size),
+                    onClick = { onDownload(unwatched, quality) },
+                )
+            }
+        }
+    }
+    MoreSectionHeader(localizedStringResource(StringsR.string.downloads_quality))
+    MoreRow(
+        text = "‹  $qualityLabel  ›",
+        icon = AppIcons.Hdr,
+        detail = localizedStringResource(StringsR.string.downloads_quality_hint),
+        onClick = { quality = DownloadQuality.entries[(quality.ordinal + 1) % DownloadQuality.entries.size] },
+        onShift = { d -> quality = DownloadQuality.entries[((quality.ordinal + d) % 3 + 3) % 3] },
+        modifier = first(),
+    )
+}
+
+private const val NEXT_EPISODES = 5
+
+/** Panel lateral de la derecha (como el de fuentes), con el resto de la ficha atenuada detrás. */
+@Composable
+private fun MoreSidePanel(
+    title: String,
+    subtitle: String?,
+    onBack: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .onBackKey(enabled = true, onBack = onBack),
+    ) {
+        Column(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(480.dp)
+                .background(AppColors.BackgroundRaised.copy(alpha = 0.97f))
+                .verticalScroll(rememberScrollState())
+                .padding(top = 36.dp, start = 24.dp, end = 24.dp, bottom = 36.dp),
+        ) {
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+            subtitle?.let {
+                Text(it, color = Grey, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
     }
 }
 
 @Composable
-private fun DetailsActionCard(
+private fun MoreSectionHeader(text: String) {
+    Text(
+        text.uppercase(java.util.Locale.getDefault()),
+        color = Color.White.copy(alpha = 0.45f),
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+        modifier = Modifier.padding(start = 12.dp, top = 18.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun MoreRow(
     text: String,
     icon: ImageVector?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-) = ActionDockCard(text = text, icon = icon, onClick = onClick, modifier = modifier)
+    detail: String? = null,
+    highlighted: Boolean = false,
+    progress: Float? = null,
+    onShift: ((Int) -> Unit)? = null,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val fg = if (focused) Color.Black else Color.White
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .then(
+                if (onShift != null) {
+                    Modifier.onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionLeft -> { onShift(-1); true }
+                            Key.DirectionRight -> { onShift(1); true }
+                            else -> false
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .tvClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    when {
+                        focused -> Color.Black.copy(alpha = 0.08f)
+                        highlighted -> AppColors.Accent.copy(alpha = 0.25f)
+                        else -> Color.White.copy(alpha = 0.08f)
+                    },
+                ),
+        ) {
+            if (icon != null) Icon(icon, contentDescription = null, tint = if (highlighted && !focused) Color.White else fg, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(text, color = fg, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            detail?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = if (focused) Color.Black.copy(alpha = 0.6f) else Grey, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            progress?.let { p ->
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)).background(fg.copy(alpha = 0.2f))) {
+                    Box(Modifier.fillMaxWidth(p).height(3.dp).background(if (focused) Color.Black else AppColors.Accent))
+                }
+            }
+        }
+    }
+}
+
 
 /**
  * Long-press on an episode card opens this modal instead of silently toggling the watched flag: the
@@ -578,6 +987,8 @@ private fun DetailsActionCard(
 private fun EpisodeActions(
     state: DetailsUiState.Content,
     episode: Episode,
+    download: Download?,
+    onDownload: () -> Unit,
     onPlay: () -> Unit,
     onToggleWatched: () -> Unit,
     onDismiss: () -> Unit,
@@ -591,6 +1002,17 @@ private fun EpisodeActions(
         actions = listOf(
             ActionMenuItem(localizedStringResource(StringsR.string.details_cancel), LineIcons.Close, onDismiss),
             ActionMenuItem(localizedStringResource(StringsR.string.details_episode_play), AppIcons.Play, onPlay),
+            ActionMenuItem(
+                localizedStringResource(
+                    when {
+                        download?.isDone == true -> StringsR.string.downloads_delete
+                        download?.isActive == true -> StringsR.string.downloads_already_running
+                        else -> StringsR.string.downloads_download_episode
+                    },
+                ),
+                if (download?.isDone == true) LineIcons.Delete else LineIcons.Download,
+                onDownload,
+            ),
             ActionMenuItem(
                 text = localizedStringResource(
                     if (episodeMenuTogglesToWatched(state, episode)) {
@@ -922,6 +1344,7 @@ private fun SeasonsAndEpisodes(
     onSeason: (Int) -> Unit,
     onEpisode: (Episode) -> Unit,
     onEpisodeLongPress: (Episode) -> Unit,
+    onEpisodeFocused: (Episode) -> Unit = {},
 ) {
     val seasons = state.details.seasons
     val loadedEpisodes = (state.episodes as? EpisodesState.Ready)?.episodes.orEmpty()
@@ -947,14 +1370,6 @@ private fun SeasonsAndEpisodes(
                         }
                     }
                 }
-                if (loadedEpisodes.isNotEmpty()) {
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
-                        color = WatchedCountColor,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
             }
             Spacer(Modifier.height(10.dp))
         } else {
@@ -978,6 +1393,15 @@ private fun SeasonsAndEpisodes(
             }
         }
         if (loadedEpisodes.isNotEmpty()) {
+            // Con varias temporadas el recuento va aquí: al lado de las pestañas lo tapaban al desplazarlas.
+            if (seasons.size > 1) {
+                Text(
+                    text = localizedStringResource(StringsR.string.details_watched_count_short, watched, loadedEpisodes.size),
+                    color = WatchedCountColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 56.dp, bottom = 2.dp),
+                )
+            }
             Text(
                 text = localizedStringResource(StringsR.string.details_hold_ok_for_episode_options),
                 color = Color.White.copy(alpha = 0.38f),
@@ -1002,6 +1426,7 @@ private fun SeasonsAndEpisodes(
                             enabled = interactive,
                             onClick = { onEpisode(ep) },
                             onLongClick = { onEpisodeLongPress(ep) },
+                            onFocused = { onEpisodeFocused(ep) },
                         )
                     }
                 }
@@ -1046,8 +1471,10 @@ private fun EpisodeCard(
     enabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onFocused: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(focused) { if (focused) onFocused() }
     val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "episodeScale")
     val shape = RoundedCornerShape(6.dp)
     Column(
@@ -1146,27 +1573,28 @@ private fun SourcesPanel(
     onPick: (StreamSource) -> Unit,
     isBlocked: (StreamSource) -> Boolean,
     onToggleSpanishOnly: () -> Unit,
+    onMarkBroken: (StreamSource) -> Unit,
+    autoPick: StreamSource? = null,
 ) {
     val firstRequester = remember { FocusRequester() }
-    val allSources = (state.sources as? SourcesState.Ready)?.sources.orEmpty()
+    val allSources = (state.sources as? SourcesState.Ready)?.sources.orEmpty().filter { !it.isMarkedBroken(state.brokenSources) }
+    var brokenCandidate by remember { mutableStateOf<StreamSource?>(null) }
     var showAll by remember { mutableStateOf(false) }
     val sources = if (showAll) allSources else state.sourceExclusions.filter(allSources)
     val order = SourceProvider.entries.map { localizedStringResource(it.sectionResource) }.distinct()
     val pending = (state.sources as? SourcesState.Ready)?.pending.orEmpty()
-    val unavailable = (state.sources as? SourcesState.Ready)?.unavailable.orEmpty() +
-        pending.associateWith { localizedStringResource(StringsR.string.details_searching) }
+    // El buscador de castellano reparte sus fuentes en las secciones de cada sitio: no tiene cabecera propia.
+    val castellanoSection = localizedStringResource(SourceProvider.CASTELLANO.sectionResource)
+    val unavailable = ((state.sources as? SourcesState.Ready)?.unavailable.orEmpty() +
+        pending.associateWith { localizedStringResource(StringsR.string.details_searching) }) - castellanoSection
     val spanishFirst = state.spanishFirst
     val spanishOnly = state.spanishOnly
     val groups = remember(sources, unavailable, spanishFirst, spanishOnly) {
         val byProvider = sources.groupBy { it.provider }
         (byProvider.keys + unavailable.keys).distinct().sortedBy { order.indexOf(it) }.map { section ->
+            // Mismo orden que "Reproducir" (el que ya trae la lista): nada de reordenar aquí.
             section to byProvider[section].orEmpty()
                 .filter { !spanishOnly || it.advertisesSpanishAudio }
-                .sortedWith(
-                compareByDescending<StreamSource> { if (spanishFirst) it.spanishAudioScore else 0 }
-                    .thenByDescending { it.quality.rank }
-                    .thenByDescending { it.sizeBytes },
-            )
         }
     }
     var open by remember { mutableStateOf(emptySet<String>()) }
@@ -1204,6 +1632,12 @@ private fun SourcesPanel(
             }
             if (state.sources is SourcesState.Ready) {
                 Spacer(Modifier.height(8.dp))
+                Text(
+                    text = localizedStringResource(StringsR.string.details_hold_ok_to_mark_source_broken),
+                    color = Grey.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = localizedStringResource(
@@ -1240,6 +1674,27 @@ private fun SourcesPanel(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(bottom = 32.dp),
                     ) {
+                        val pick = autoPick?.takeIf { p -> sources.any { it.id == p.id } }
+                        if (pick != null) {
+                            item(key = "auto") {
+                                Column {
+                                    Text(
+                                        localizedStringResource(StringsR.string.details_plays_on_play),
+                                        color = AppColors.Accent,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+                                    )
+                                    SourceRow(
+                                        source = pick,
+                                        blocked = isBlocked(pick),
+                                        onClick = { onPick(pick) },
+                                        onLongClick = { brokenCandidate = pick },
+                                        modifier = Modifier.focusRequester(firstRequester),
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                }
+                            }
+                        }
                         groups.forEachIndexed { index, (name, list) ->
                             item(key = "h:$name") {
                                 ProviderHeader(
@@ -1250,17 +1705,44 @@ private fun SourcesPanel(
                                     note = unavailable[name].takeIf { list.isEmpty() }
                                         ?: localizedStringResource(StringsR.string.details_none_in_spanish).takeIf { list.isEmpty() && spanishOnly },
                                     onClick = { if (list.isNotEmpty()) open = if (name in open) open - name else open + name },
-                                    modifier = if (index == 0) Modifier.focusRequester(firstRequester) else Modifier,
+                                    modifier = if (index == 0 && pick == null) Modifier.focusRequester(firstRequester) else Modifier,
                                 )
                             }
                             if (name in open) {
-                                items(list, key = { it.id }) { source -> SourceRow(source = source, blocked = isBlocked(source), onClick = { onPick(source) }) }
+                                items(list, key = { it.id }) { source ->
+                                    SourceRow(
+                                        source = source,
+                                        blocked = isBlocked(source),
+                                        onClick = { onPick(source) },
+                                        onLongClick = { brokenCandidate = source },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+    brokenCandidate?.let { source ->
+        ActionMenuDialog(
+            title = source.title,
+            onDismiss = { brokenCandidate = null },
+            consumeOpeningKeyRelease = true,
+            actions = listOf(
+                ActionMenuItem(
+                    localizedStringResource(StringsR.string.details_cancel),
+                    LineIcons.Close,
+                ) { brokenCandidate = null },
+                ActionMenuItem(
+                    localizedStringResource(StringsR.string.details_mark_source_broken),
+                    LineIcons.Delete,
+                ) {
+                    onMarkBroken(source)
+                    brokenCandidate = null
+                },
+            ),
+        )
     }
 }
 
@@ -1343,7 +1825,13 @@ private fun ProviderHeader(name: String, count: Int, cached: Int, expanded: Bool
 }
 
 @Composable
-private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun SourceRow(
+    source: StreamSource,
+    blocked: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
@@ -1351,7 +1839,7 @@ private fun SourceRow(source: StreamSource, blocked: Boolean, onClick: () -> Uni
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(6.dp))
             .background(if (focused) Color.White else Color.White.copy(alpha = 0.06f))
-            .tvClickable(onClick = onClick)
+            .tvClickable(onLongClick = onLongClick, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1419,7 +1907,7 @@ private fun WatchBar(fraction: Float, modifier: Modifier = Modifier) {
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(Color(0xFFE50914)),
+                .background(AppColors.Accent),
         )
     }
 }
@@ -1437,4 +1925,22 @@ private fun formatRuntime(minutes: Int): String {
 private fun formatSize(bytes: Long): String {
     val gb = bytes / (1024.0 * 1024.0 * 1024.0)
     return if (gb >= 1) String.format(Locale.US, "%.1f GB", gb) else String.format(Locale.US, "%.0f MB", gb * 1024)
+}
+
+/**
+ * Sube la página del todo. Con prioridad alta: el desplazamiento que hace el foco al llegar al botón ("traer a la
+ * vista") tiene prioridad normal y, la segunda vez, cancelaba un animateScrollTo(0) normal a medio camino.
+ */
+private suspend fun androidx.compose.foundation.ScrollState.scrollToTopFirmly() {
+    scroll(androidx.compose.foundation.MutatePriority.PreventUserInput) {
+        var last = value.toFloat()
+        androidx.compose.animation.core.animate(
+            initialValue = last,
+            targetValue = 0f,
+            animationSpec = androidx.compose.animation.core.tween(durationMillis = 260),
+        ) { current, _ ->
+            scrollBy(current - last)
+            last = current
+        }
+    }
 }

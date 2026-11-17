@@ -112,3 +112,23 @@ fun Modifier.tvClickable(onLongClick: (() -> Unit)?, onClick: () -> Unit): Modif
     } else {
         combinedClickable(interactionSource = null, indication = null, onLongClick = onLongClick, onClick = onClick)
     }
+
+/**
+ * Con arriba/abajo mantenido, deja pasar como mucho una repetición cada [intervalMs] (la primera pulsación nunca se
+ * frena). Así el foco baja a un ritmo constante y el scroll lo sigue, en vez de acumular saltos y frenar al final.
+ * Es lo que hace el Inicio entre filas.
+ */
+@Composable
+fun Modifier.throttleVerticalRepeat(intervalMs: Long = VERTICAL_REPEAT_MS): Modifier {
+    var last by remember { mutableStateOf(0L) }
+    return onPreviewKeyEvent { e ->
+        val vertical = e.key == Key.DirectionDown || e.key == Key.DirectionUp
+        if (e.type != KeyEventType.KeyDown || !vertical || e.nativeKeyEvent.repeatCount == 0) return@onPreviewKeyEvent false
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - last < intervalMs) true else { last = now; false }
+    }
+}
+
+/** Ritmo de las filas al mantener arriba/abajo (Inicio, selector de iconos). */
+const val VERTICAL_REPEAT_MS = 130L
+

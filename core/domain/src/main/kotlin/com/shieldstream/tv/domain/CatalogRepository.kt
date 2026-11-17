@@ -26,9 +26,21 @@ interface CatalogRepository {
 
     suspend fun search(query: String): List<CatalogItem>
 
+    /**
+     * En un perfil infantil, lo que [search] deja fuera por no ser infantil: se enseña bloqueado para pedírselo a un
+     * adulto. En los demás perfiles, vacío.
+     */
+    suspend fun searchOutsideKids(query: String): List<CatalogItem> = emptyList()
+
     suspend fun getDetails(item: CatalogItem): CatalogDetails
 
     suspend fun getItem(type: MediaType, id: String): CatalogItem?
+
+    /** Películas de una saga (colección de TMDB) por orden de estreno. */
+    suspend fun getCollection(id: Int): com.shieldstream.tv.model.CollectionDetails
+
+    /** Ficha de un actor, director o creador con sus títulos más conocidos. */
+    suspend fun getPerson(id: Int): com.shieldstream.tv.model.PersonDetails
 
     suspend fun getShowAiring(id: String): ShowAiring?
 

@@ -59,6 +59,10 @@ internal class SubtitleCoordinator(
     private val notify: (String) -> Unit,
     private val referenceReader: EmbeddedReferenceReader,
     private val experimentalSyncEnabled: Boolean = true,
+    /** Pista de subtítulos recordada para este título (null = sin preferencia por serie). */
+    private val preferredSubtitle: () -> String? = { null },
+    /** El usuario apagó los subtítulos para este título. */
+    private val subtitlesOff: () -> Boolean = { false },
 ) {
     private val _externalSubs = MutableStateFlow<ExternalSubsState>(ExternalSubsState.Idle)
     val externalSubs: StateFlow<ExternalSubsState> = _externalSubs.asStateFlow()
@@ -374,24 +378,34 @@ internal class SubtitleCoordinator(
             subtitleDefaultHandled = true
             return
         }
+        if (subtitlesOff()) {
+            subtitleDefaultHandled = true
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            return
+        }
+        val remembered = preferredSubtitle()
+        if (remembered != null) {
+            val rememberedCandidate = bestSubtitleTrack(tracks) { language ->
+                language?.startsWith(remembered) == true
+            }
+            if (rememberedCandidate != null) {
+                subtitleDefaultHandled = true
+                val (group, index) = rememberedCandidate
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                    .build()
+                return
+            }
+        }
         if (subtitlePreference == SubtitlePreference.OFF) {
             subtitleDefaultHandled = true
             return
         }
-        val candidate = tracks.groups
-            .filter { it.type == C.TRACK_TYPE_TEXT }
-            .flatMap { group ->
-                (0 until group.length)
-                    .filter { group.isTrackSupported(it) }
-                    .map { group to it }
-            }
-            .filter { (group, index) -> subtitlePreference.matches(group.getTrackFormat(index).language) }
-            .minByOrNull { (group, index) ->
-                val format = group.getTrackFormat(index)
-                (if (isForced(format)) 2 else 0) +
-                    (if (format.sampleMimeType == androidx.media3.common.MimeTypes.APPLICATION_PGS) 1 else 0)
-            }
-
+        val candidate = bestSubtitleTrack(tracks) { language -> subtitlePreference.matches(language) }
         subtitleDefaultHandled = true
         if (candidate != null) {
             val (group, index) = candidate
@@ -408,7 +422,6 @@ internal class SubtitleCoordinator(
             )
             return
         }
-
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
@@ -422,6 +435,23 @@ internal class SubtitleCoordinator(
         )
         search(subtitlePreference.code ?: return, automatic = true)
     }
+
+    private fun bestSubtitleTrack(
+        tracks: Tracks,
+        matches: (String?) -> Boolean,
+    ): Pair<Tracks.Group, Int>? = tracks.groups
+        .filter { it.type == C.TRACK_TYPE_TEXT }
+        .flatMap { group ->
+            (0 until group.length)
+                .filter { group.isTrackSupported(it) }
+                .map { group to it }
+        }
+        .filter { (group, index) -> matches(group.getTrackFormat(index).language) }
+        .minByOrNull { (group, index) ->
+            val format = group.getTrackFormat(index)
+            (if (isForced(format)) 2 else 0) +
+                (if (format.sampleMimeType == androidx.media3.common.MimeTypes.APPLICATION_PGS) 1 else 0)
+        }
 
     private fun isForced(f: Format): Boolean {
         val label = f.label.orEmpty().lowercase()

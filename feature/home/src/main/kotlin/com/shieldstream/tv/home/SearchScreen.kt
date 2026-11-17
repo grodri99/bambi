@@ -64,6 +64,10 @@ import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.PosterCard
 import com.shieldstream.tv.ui.component.tvClickable
 import kotlinx.coroutines.delay
+import com.shieldstream.tv.ui.component.LineIcons
+import com.shieldstream.tv.ui.component.ActionMenuItem
+import com.shieldstream.tv.ui.component.ActionMenuDialog
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 
 private const val KEYS = "abcdefghijklmnopqrstuvwxyz1234567890"
 private const val KEY_COLUMNS = 6
@@ -77,6 +81,27 @@ fun SearchScreen(
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
+    var lockedPick by remember { mutableStateOf<CatalogItem?>(null) }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            delay(3_500)
+            viewModel.consumeNotice()
+        }
+    }
+    lockedPick?.let { item ->
+        ActionMenuDialog(
+            title = item.title,
+            onDismiss = { lockedPick = null },
+            actions = listOf(
+                ActionMenuItem(localizedStringResource(StringsR.string.home_cancel), LineIcons.Close) { lockedPick = null },
+                ActionMenuItem(localizedStringResource(StringsR.string.home_ask_an_adult_action), AppIcons.Lock) {
+                    viewModel.requestTitle(item)
+                    lockedPick = null
+                },
+            ),
+        )
+    }
     val qwerty by viewModel.qwerty.collectAsStateWithLifecycle()
 
     val firstKey = remember { FocusRequester() }
@@ -201,6 +226,21 @@ fun SearchScreen(
                 is SearchUiState.Results -> s.items
                 else -> emptyList()
             }
+            val results = state as? SearchUiState.Results
+            val locked = results?.locked.orEmpty()
+            val pending = results?.pending.orEmpty()
+            notice?.let { message ->
+                Text(
+                    text = message,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier
+                        .padding(start = 12.dp, bottom = 6.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                )
+            }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(118.dp),
                 contentPadding = PaddingValues(12.dp),
@@ -216,6 +256,33 @@ fun SearchScreen(
                         width = 118.dp,
                         modifier = if (item.key == lastCardKey) Modifier.focusRequester(cardRequester) else Modifier,
                     )
+                }
+                if (locked.isNotEmpty()) {
+                    item(key = "locked_header", span = { GridItemSpan(maxLineSpan) }) {
+                        Column(Modifier.padding(top = 12.dp)) {
+                            Text(
+                                localizedStringResource(StringsR.string.home_ask_an_adult),
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Text(
+                                localizedStringResource(StringsR.string.home_ask_an_adult_hint),
+                                color = Color.White.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    items(locked, key = { "locked_" + it.key }) { item ->
+                        val asked = item.key in pending
+                        PosterCard(
+                            item = item,
+                            onClick = { if (!asked) lockedPick = item },
+                            onFocused = { lastCardKey = "locked_" + item.key },
+                            width = 118.dp,
+                            modifier = if ("locked_" + item.key == lastCardKey) Modifier.focusRequester(cardRequester) else Modifier,
+                            overlay = { LockedOverlay(asked) },
+                        )
+                    }
                 }
             }
         }
@@ -303,5 +370,27 @@ private fun KeyButton(
         contentAlignment = Alignment.Center,
     ) {
         content(if (focused) Color.Black else Color.White)
+    }
+}
+
+/** Candado sobre la carátula: el título no es infantil; si ya se pidió, lo indica. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.LockedOverlay(asked: Boolean) {
+    Box(
+        Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(alpha = 0.55f)),
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.align(Alignment.Center).padding(8.dp),
+    ) {
+        Icon(if (asked) AppIcons.Check else AppIcons.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = localizedStringResource(if (asked) StringsR.string.home_requested else StringsR.string.home_locked),
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+        )
     }
 }

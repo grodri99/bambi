@@ -39,6 +39,29 @@ class NewEpisodesTest {
     }
 
     @Test
+    fun `a few seconds of a show do not make it a candidate`() {
+        val progress = mapOf(
+            WatchProgress.episodeKey("10", 1, 1) to progress(updatedAt = 300),
+            WatchProgress.episodeKey("40", 1, 1) to progress(updatedAt = 400).copy(positionMs = 5_000),
+            WatchProgress.episodeKey("50", 1, 1) to progress(updatedAt = 200).copy(positionMs = 5_800, durationMs = 6_000),
+        )
+
+        // "40" solo tiene unos segundos (un vídeo de error, una prueba); "50" acabó aunque fuera corto.
+        assertEquals(listOf("10", "50"), NewEpisodes.candidateIds(progress, emptyList(), HomeFilter.ALL))
+    }
+
+    @Test
+    fun `hidden shows never appear even if watched followed or listed`() {
+        val progress = mapOf(WatchProgress.episodeKey("10", 1, 1) to progress(updatedAt = 300))
+        val listed = listOf(MyListEntry(MediaType.TV, "30", addedAt = 400))
+
+        assertEquals(
+            listOf("20"),
+            NewEpisodes.candidateIds(progress, listed, HomeFilter.ALL, followedShowIds = setOf("20", "40"), hiddenShowIds = setOf("10", "30", "40")),
+        )
+    }
+
+    @Test
     fun `recent unaired and watched episodes are distinguished`() {
         val latest = episode(airDate = "2026-06-15")
 

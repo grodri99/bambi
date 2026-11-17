@@ -74,6 +74,7 @@ import com.shieldstream.tv.ui.component.ProvidePivotScroll
 import com.shieldstream.tv.ui.component.loopingItems
 import com.shieldstream.tv.ui.component.rememberLoopingRowState
 import com.shieldstream.tv.ui.component.tvClickable
+import com.shieldstream.tv.ui.theme.AppColors
 import com.shieldstream.tv.ui.theme.DisplayFont
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -280,7 +281,7 @@ private fun BadgeChip(badge: FeaturedBadge, modifier: Modifier = Modifier) {
 }
 
 private fun badgeIcon(badge: FeaturedBadge): Pair<ImageVector, Color> = when (badge) {
-    FeaturedBadge.NEW -> AppIcons.Bolt to NetflixRed
+    FeaturedBadge.NEW -> AppIcons.Bolt to AppColors.Accent
     FeaturedBadge.POPULAR -> AppIcons.Trending to Color(0xFFFF8A00)
     FeaturedBadge.RISING -> AppIcons.Trending to Color(0xFFFF8A00)
     FeaturedBadge.SERIES_NOW -> AppIcons.Tv to Color(0xFF4FA3FF)
@@ -301,23 +302,46 @@ internal fun CategoryChips(
     onFocused: () -> Unit,
     onDown: () -> Unit,
     modifier: Modifier = Modifier,
+    onSurprise: (() -> Unit)? = null,
+    onPlaySomething: (() -> Unit)? = null,
 ) {
-    if (categories.isEmpty()) return
+    val playLabel = if (onPlaySomething != null) localizedStringResource(StringsR.string.home_play_something) else ""
+    val surpriseLabel = if (onSurprise != null) localizedStringResource(StringsR.string.home_surprise_me) else ""
+    val entries = buildList {
+        if (onPlaySomething != null) {
+            add(HomeChip("play_something", playLabel, AppIcons.Play, onPlaySomething))
+        }
+        if (onSurprise != null) {
+            add(HomeChip("surprise_me", surpriseLabel, AppIcons.Bolt, onSurprise))
+        }
+        categories.forEach { category ->
+            add(HomeChip("category_${category.name}", category.localizedTitle(), null) { onOpen(category) })
+        }
+    }
+    if (entries.isEmpty()) return
     // Si cambian las categorías (Ajustes → Categorías del Inicio), la fila empieza de cero con la lista nueva.
-    key(categories) { CategoryChipsRow(categories, onOpen, requester, upRequester, onFocused, onDown, modifier) }
+    key(entries.map { it.key }) {
+        CategoryChipsRow(entries, requester, upRequester, onFocused, onDown, modifier)
+    }
 }
+
+private data class HomeChip(
+    val key: String,
+    val label: String,
+    val icon: ImageVector?,
+    val onClick: () -> Unit,
+)
 
 @Composable
 private fun CategoryChipsRow(
-    categories: List<Category>,
-    onOpen: (Category) -> Unit,
+    chips: List<HomeChip>,
     requester: FocusRequester,
     upRequester: FocusRequester,
     onFocused: () -> Unit,
     onDown: () -> Unit,
     modifier: Modifier,
 ) {
-    val state = rememberLoopingRowState(categories.size)
+    val state = rememberLoopingRowState(chips.size)
     var focusedVirtual by rememberSaveable { mutableIntStateOf(state.firstVisibleItemIndex) }
     ProvidePivotScroll(leading = 28.dp) {
         LazyRow(
@@ -335,10 +359,11 @@ private fun CategoryChipsRow(
                     }
                 },
         ) {
-            loopingItems(categories) { virtual, _, category ->
+            loopingItems(chips) { virtual, _, chip ->
                 CategoryChip(
-                    category = category,
-                    onClick = { onOpen(category) },
+                    label = chip.label,
+                    icon = chip.icon,
+                    onClick = chip.onClick,
                     onFocused = {
                         focusedVirtual = virtual
                         onFocused()
@@ -353,7 +378,8 @@ private fun CategoryChipsRow(
 
 @Composable
 private fun CategoryChip(
-    category: Category,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
     onClick: () -> Unit,
     onFocused: () -> Unit,
     modifier: Modifier = Modifier,
@@ -387,13 +413,19 @@ private fun CategoryChip(
             .tvClickable(onClick = onClick)
             .padding(horizontal = 22.dp),
     ) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+        if (icon != null) {
+            androidx.compose.material3.Icon(icon, null, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(22.dp))
+            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        }
         Text(
-            text = category.localizedTitle().uppercase(UiLocale),
+            text = label.uppercase(UiLocale),
             fontFamily = DisplayFont,
             fontSize = 25.sp,
             letterSpacing = 0.6.sp,
             color = if (focused) Color.Black else Color.White,
             maxLines = 1,
         )
+        }
     }
 }

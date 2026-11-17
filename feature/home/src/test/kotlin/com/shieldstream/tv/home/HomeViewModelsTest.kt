@@ -694,6 +694,7 @@ class HomeViewModelsTest {
     private fun tracking() = mockk<EpisodeTrackingRepository> {
         every { followedShowIds } returns MutableStateFlow(emptySet())
         every { dismissedEpisodeKeys } returns MutableStateFlow(emptySet())
+        every { hiddenShowIds } returns MutableStateFlow(emptySet())
         every { dismissEpisodes(any()) } returns Unit
     }
 

@@ -26,9 +26,20 @@ data class PlaybackRequest(
     val media: PlaybackMedia? = null,
     val next: NextEpisode? = null,
     val requestedAtNs: Long = System.nanoTime(),
+    /** Fuente elegida a mano sin cambio automático: si falla, el reproductor no prueba otra y vuelve a la lista. */
+    val manualPick: Boolean = false,
 )
 
 class SelectedContentHolder {
+    @Volatile private var pickedSourceFailure: String? = null
+
+    /** El reproductor avisa de que la fuente elegida a mano no funcionó (con el motivo) antes de cerrarse. */
+    fun reportPickedSourceFailed(message: String) {
+        pickedSourceFailure = message
+    }
+
+    fun consumePickedSourceFailure(): String? = pickedSourceFailure.also { pickedSourceFailure = null }
+
     private val _details = MutableStateFlow<DetailsRequest?>(null)
     val details: StateFlow<DetailsRequest?> = _details.asStateFlow()
 
@@ -64,7 +75,8 @@ class SelectedContentHolder {
         media: PlaybackMedia? = null,
         next: NextEpisode? = null,
         requestedAtNs: Long = System.nanoTime(),
+        manualPick: Boolean = false,
     ) {
-        _playback.value = PlaybackRequest(sources, label, progressKey, fromStart, media, next, requestedAtNs)
+        _playback.value = PlaybackRequest(sources, label, progressKey, fromStart, media, next, requestedAtNs, manualPick)
     }
 }

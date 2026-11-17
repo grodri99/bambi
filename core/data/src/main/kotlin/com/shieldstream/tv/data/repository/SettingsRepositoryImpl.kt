@@ -136,6 +136,60 @@ class SettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_AUTO_NEXT, enabled).apply()
         autoNextFlow.value = enabled
     }
+
+    private val videoFitFlow = MutableStateFlow(
+        prefs.getString(KEY_VIDEO_FIT, null)?.let { name -> com.shieldstream.tv.model.VideoFit.entries.firstOrNull { it.name == name } }
+            ?: com.shieldstream.tv.model.VideoFit.FIT,
+    )
+    override val videoFit: Flow<com.shieldstream.tv.model.VideoFit> = videoFitFlow
+
+    override suspend fun setVideoFit(fit: com.shieldstream.tv.model.VideoFit) {
+        prefs.edit().putString(KEY_VIDEO_FIT, fit.name).apply()
+        videoFitFlow.value = fit
+    }
+
+    private val switchPickedFlow = MutableStateFlow(prefs.getBoolean(KEY_SWITCH_PICKED_SOURCE, true))
+    override val switchFromPickedSource: Flow<Boolean> = switchPickedFlow
+
+    override suspend fun setSwitchFromPickedSource(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SWITCH_PICKED_SOURCE, enabled).apply()
+        switchPickedFlow.value = enabled
+    }
+
+    private val autoSkipIntroFlow = MutableStateFlow(prefs.getBoolean(KEY_AUTO_SKIP_INTRO, false))
+    override val autoSkipIntro: Flow<Boolean> = autoSkipIntroFlow
+
+    override suspend fun setAutoSkipIntro(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_SKIP_INTRO, enabled).apply()
+        autoSkipIntroFlow.value = enabled
+    }
+
+    private val showCastFlow = MutableStateFlow(prefs.getBoolean(KEY_SHOW_CAST, true))
+    override val showCast: Flow<Boolean> = showCastFlow
+
+    override suspend fun setShowCast(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_CAST, enabled).apply()
+        showCastFlow.value = enabled
+    }
+
+    private val preferredQualityFlow = MutableStateFlow(
+        runCatching { com.shieldstream.tv.model.PreferredQuality.valueOf(prefs.getString(KEY_PREFERRED_QUALITY, null) ?: "") }
+            .getOrDefault(com.shieldstream.tv.model.PreferredQuality.DV_4K),
+    )
+    override val preferredQuality: Flow<com.shieldstream.tv.model.PreferredQuality> = preferredQualityFlow
+
+    override suspend fun setPreferredQuality(quality: com.shieldstream.tv.model.PreferredQuality) {
+        prefs.edit().putString(KEY_PREFERRED_QUALITY, quality.name).apply()
+        preferredQualityFlow.value = quality
+    }
+
+    private val tracksPanelCardFlow = MutableStateFlow(prefs.getBoolean(KEY_TRACKS_PANEL_CARD, false))
+    override val tracksPanelCard: Flow<Boolean> = tracksPanelCardFlow
+
+    override suspend fun setTracksPanelCard(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_TRACKS_PANEL_CARD, enabled).apply()
+        tracksPanelCardFlow.value = enabled
+    }
     private val searchQwertyFlow = MutableStateFlow(prefs.getBoolean(KEY_SEARCH_QWERTY, false))
     override val searchQwerty: Flow<Boolean> = searchQwertyFlow
 
@@ -199,6 +253,37 @@ class SettingsRepositoryImpl @Inject constructor(
     )
     override val sourceExclusions: Flow<SourceExclusions> = sourceExclusionsFlow
 
+    // Se guarda "clave|fecha": un enlace caído puede volver (o el debrid cachearlo), así que la marca caduca.
+    // Las entradas antiguas sin fecha cuentan desde ahora.
+    private val brokenStamps: MutableMap<String, Long> = loadBrokenStamps()
+    private val brokenSourcesFlow = MutableStateFlow(brokenStamps.keys.toSet())
+    override val brokenSourceIds: Flow<Set<String>> = brokenSourcesFlow
+
+    private fun loadBrokenStamps(): MutableMap<String, Long> {
+        val now = System.currentTimeMillis()
+        val stored = prefs.getStringSet(KEY_BROKEN_SOURCES, null).orEmpty()
+        val live = stored.associate { entry ->
+            val cut = entry.lastIndexOf('|')
+            val stamp = if (cut > 0) entry.substring(cut + 1).toLongOrNull() else null
+            (if (stamp != null) entry.substring(0, cut) else entry) to (stamp ?: now)
+        }.filterValues { now - it < BROKEN_SOURCE_TTL_MS }.toMutableMap()
+        val encoded = live.map { (k, t) -> "$k|$t" }.toSet()
+        if (encoded != stored) prefs.edit().putStringSet(KEY_BROKEN_SOURCES, encoded).apply()
+        return live
+    }
+
+    override suspend fun markSourceBroken(id: String) {
+        brokenStamps[id] = System.currentTimeMillis()
+        prefs.edit().putStringSet(KEY_BROKEN_SOURCES, brokenStamps.map { (k, t) -> "$k|$t" }.toSet()).apply()
+        brokenSourcesFlow.value = brokenStamps.keys.toSet()
+    }
+
+    override suspend fun clearBrokenSources() {
+        brokenStamps.clear()
+        prefs.edit().remove(KEY_BROKEN_SOURCES).apply()
+        brokenSourcesFlow.value = emptySet()
+    }
+
     override suspend fun setSourceExclusions(exclusions: SourceExclusions) {
         prefs.edit()
             .putStringSet(KEY_EXCLUDED_QUALITIES, exclusions.qualities.map { it.name }.toSet())
@@ -261,12 +346,20 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_HIGH_RES_BACKDROPS = "high_res_backdrops"
         const val KEY_SEARCH_QWERTY = "search_qwerty"
         const val KEY_AUTO_NEXT = "auto_next_episode"
+        const val KEY_SWITCH_PICKED_SOURCE = "switch_from_picked_source"
+        const val KEY_VIDEO_FIT = "video_fit"
+        const val KEY_AUTO_SKIP_INTRO = "auto_skip_intro"
+        const val KEY_SHOW_CAST = "show_cast"
+        const val KEY_TRACKS_PANEL_CARD = "tracks_panel_card"
+        const val KEY_PREFERRED_QUALITY = "preferred_quality"
         const val KEY_HOME_ROW_ITEM_LIMIT = "home_row_item_limit"
         const val KEY_DEBRID = "debrid_service"
         const val KEY_PROVIDERS_OFF = "source_providers_off"
         const val KEY_EXCLUDED_QUALITIES = "source_excluded_qualities"
         const val KEY_EXCLUDED_HDR_TYPES = "source_excluded_hdr_types"
         const val KEY_EXCLUDED_AUDIO_CODECS = "source_excluded_audio_codecs"
+        const val KEY_BROKEN_SOURCES = "source_broken_ids"
+        const val BROKEN_SOURCE_TTL_MS = 60L * 24 * 60 * 60 * 1000
         const val MIN_BUFFER = 20
         const val MAX_BUFFER = 100
     }

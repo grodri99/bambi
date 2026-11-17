@@ -199,9 +199,9 @@ class HomeViewModel @Inject constructor(
                 homeRowQuery,
                 watchProgress.progress,
                 myList.entries,
-                tracking.followedShowIds,
+                tracking.followedShowIds.combine(tracking.hiddenShowIds) { followed, hidden -> followed to hidden },
                 tracking.dismissedEpisodeKeys,
-            ) { rowQuery, progress, list, followed, dismissed ->
+            ) { rowQuery, progress, list, (followed, hidden), dismissed ->
                 NewEpisodeQuery(
                     showIds = NewEpisodes.candidateIds(
                         progress,
@@ -209,6 +209,7 @@ class HomeViewModel @Inject constructor(
                         rowQuery.filter,
                         followed,
                         maxItems = rowQuery.maxItems,
+                        hiddenShowIds = hidden,
                     ),
                     watchedKeys = progress.filterValues { it.isWatched }.keys,
                     dismissedKeys = dismissed,

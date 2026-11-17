@@ -56,6 +56,15 @@ class HomePreloader @Inject constructor(
     private var jobKey: String? = null
     @Volatile private var pendingRefresh = false
     private val _refreshed = MutableStateFlow(0)
+    private val uiBusy = MutableStateFlow(false)
+
+    /**
+     * Mientras haya una animación delicada en pantalla (la intro), lo que no corre prisa (el resto de carátulas y las
+     * otras pestañas) espera: decodificar muchas imágenes a la vez le quita CPU al dibujo y la animación da tirones.
+     */
+    fun setUiBusy(busy: Boolean) {
+        uiBusy.value = busy
+    }
 
     /** Sube cada vez que una recarga ([refresh]) deja el Inicio renovado: el Inicio abierto se actualiza. */
     val refreshed: StateFlow<Int> = _refreshed
@@ -109,7 +118,9 @@ class HomePreloader @Inject constructor(
             val (featured, rows) = load(HomeFilter.ALL, limit)
             // Lo que se ve al entrar: los primeros destacados y las primeras filas.
             val essential = firstScreen(featured, rows, sizes)
-            withTimeoutOrNull(ESSENTIAL_TIMEOUT_MS) { fetchAll(essential, memory = true) }
+            // Pocas a la vez: esto coincide con la intro y decodificar muchas imágenes grandes en paralelo le quita
+            // CPU al dibujo (el gato daría tirones).
+            withTimeoutOrNull(ESSENTIAL_TIMEOUT_MS) { fetchAll(essential, memory = true, parallel = INTRO_PARALLEL_DOWNLOADS) }
             readyFor.value = key
             if (pendingRefresh) {
                 pendingRefresh = false
@@ -117,7 +128,9 @@ class HomePreloader @Inject constructor(
             }
             Log.d(TAG, "Inicio listo en ${System.currentTimeMillis() - startedAt} ms (${essential.size} imágenes)")
 
-            // Resto, sin prisa y solo a disco (para no echar de la memoria lo que se va a ver primero).
+            // Resto, sin prisa y solo a disco (para no echar de la memoria lo que se va a ver primero), y cuando la
+            // intro haya terminado.
+            uiBusy.first { !it }
             fetchAll(rows.flatMap { row -> row.items.mapNotNull { it.posterUrl } }.map { sizes.poster(it) }, memory = false)
             for (other in listOf(HomeFilter.TV, HomeFilter.MOVIES)) {
                 val (f, r) = load(other, limit)
@@ -149,8 +162,8 @@ class HomePreloader @Inject constructor(
         }
     }
 
-    private suspend fun fetchAll(requests: List<ImageRequest>, memory: Boolean) = coroutineScope {
-        val gate = Semaphore(PARALLEL_DOWNLOADS)
+    private suspend fun fetchAll(requests: List<ImageRequest>, memory: Boolean, parallel: Int = PARALLEL_DOWNLOADS) = coroutineScope {
+        val gate = Semaphore(parallel)
         requests.distinctBy { it.data }.map { base ->
             async {
                 gate.withPermit {
@@ -169,14 +182,16 @@ class HomePreloader @Inject constructor(
         private val screenW = metrics.widthPixels
         private val screenH = metrics.heightPixels
 
-        fun poster(url: String): ImageRequest = ImageRequest.Builder(context).data(url).size(posterW, posterH).build()
+        // Sin bitmaps "hardware": crearlos ocupa el hilo de dibujo (RenderThread) y la intro, que se está viendo
+        // mientras tanto, daría tirones. El Inicio los usa igual (se suben a la GPU al pintarse).
+        fun poster(url: String): ImageRequest = ImageRequest.Builder(context).data(url).size(posterW, posterH).allowHardware(false).build()
 
         fun backdrop(url: String?): ImageRequest? = BackdropUrls.fullScreen(url, lightweight, highRes)?.let {
-            ImageRequest.Builder(context).data(it).size(screenW, screenH).build()
+            ImageRequest.Builder(context).data(it).size(screenW, screenH).allowHardware(false).build()
         }
 
         fun logo(url: String): ImageRequest =
-            ImageRequest.Builder(context).data(url).size((screenW * 0.4f).roundToInt(), (screenH * 0.2f).roundToInt()).build()
+            ImageRequest.Builder(context).data(url).size((screenW * 0.4f).roundToInt(), (screenH * 0.2f).roundToInt()).allowHardware(false).build()
     }
 
     private companion object {
@@ -186,5 +201,6 @@ class HomePreloader @Inject constructor(
         const val FIRST_ROWS = 4
         const val FIRST_POSTERS = 9
         const val PARALLEL_DOWNLOADS = 6
+        const val INTRO_PARALLEL_DOWNLOADS = 3
     }
 }

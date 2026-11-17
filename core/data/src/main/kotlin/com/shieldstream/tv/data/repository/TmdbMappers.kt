@@ -14,6 +14,7 @@ internal object TmdbImages {
     fun poster(path: String) = "$ROOT/w342$path"
     fun backdrop(path: String) = "$ROOT/w1280$path"
     fun still(path: String) = "$ROOT/w300$path"
+    fun profile(path: String) = "$ROOT/w185$path"
 
     fun logo(images: TmdbImagesDto?, languageCode: String): String? {
         val best = images?.logos.orEmpty()

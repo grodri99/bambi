@@ -3,6 +3,7 @@ package com.shieldstream.tv.data.repository
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.shieldstream.tv.model.Profile
+import com.shieldstream.tv.model.ProfileTheme
 import com.shieldstream.tv.model.SubtitleAppearance
 import com.shieldstream.tv.model.SubtitleColor
 import com.shieldstream.tv.strings.Texts
@@ -77,6 +78,21 @@ class ProfileRepositoryImplTest {
         val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
 
         assertEquals(appearance, reloaded.active.value.subtitleAppearance)
+    }
+
+    @Test
+    fun `profile theme persists across repository reloads`() {
+        val cleanup = mockk<ProfileDataCleaner>(relaxed = true)
+        val texts = mockk<Texts>(relaxed = true)
+        val repository = ProfileRepositoryImpl(context, cleanup, texts)
+        val profile = Profile(id = "theme", name = "Theme", avatar = 0, theme = ProfileTheme.VIOLET)
+        repository.save(profile)
+        repository.select(profile.id)
+
+        val reloaded = ProfileRepositoryImpl(context, cleanup, texts)
+
+        assertEquals(ProfileTheme.VIOLET, reloaded.active.value.theme)
+        assertEquals(ProfileTheme.BAMBI, Profile(id = "default", name = "Default", avatar = 0).theme)
     }
 
     @Test

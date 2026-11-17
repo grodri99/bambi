@@ -1,6 +1,14 @@
 package com.shieldstream.tv.ui.component
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
+import com.shieldstream.tv.ui.theme.LocalLightweightUi
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,8 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.shieldstream.tv.ui.theme.AppShapes
-import java.util.Locale
 
 @Composable
 fun BottomActionDialog(
@@ -52,7 +58,14 @@ fun BottomActionDialog(
     Box(
         modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = scrimAlpha))
+            // Se oscurece más hacia abajo, donde va el menú; arriba se sigue intuyendo la pantalla de detrás.
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = scrimAlpha * 0.75f),
+                    0.55f to Color.Black.copy(alpha = scrimAlpha),
+                    1f to Color.Black.copy(alpha = (scrimAlpha + 0.14f).coerceAtMost(1f)),
+                ),
+            )
             .then(if (consumeOpeningKeyRelease) Modifier.consumeInitialConfirmationKeyUp() else Modifier)
             .onBackKey(enabled = true, onBack = onDismiss),
         contentAlignment = Alignment.BottomCenter,
@@ -60,15 +73,16 @@ fun BottomActionDialog(
         Column(
             Modifier.padding(bottom = bottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text(
-                text = remember(title) { title.uppercase(Locale.getDefault()) },
-                color = Color.White.copy(alpha = 0.65f),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 2.sp),
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 640.dp),
             )
             content()
         }
@@ -103,7 +117,10 @@ fun ActionMenuDialog(
         scrimAlpha = scrimAlpha,
         consumeOpeningKeyRelease = consumeOpeningKeyRelease,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 8.dp),
+        ) {
             actions.forEachIndexed { index, action ->
                 ActionDockCard(
                     text = action.text,
@@ -116,6 +133,10 @@ fun ActionMenuDialog(
     }
 }
 
+/**
+ * Tarjeta de acción estilo Bambi: ancha para que el texto quepa entero en dos líneas ("Marcar como visto",
+ * "Reproducir episodio"), y al enfocarla pasa a blanco con el contenido en negro y crece un poco.
+ */
 @Composable
 fun ActionDockCard(
     text: String,
@@ -124,30 +145,41 @@ fun ActionDockCard(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val scale = if (LocalLightweightUi.current) {
+        if (focused) 1.06f else 1f
+    } else {
+        animateFloatAsState(if (focused) 1.06f else 1f, label = "actionCardScale").value
+    }
+    val content = if (focused) Color.Black else Color.White
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .width(108.dp)
-            .height(84.dp)
+            .width(156.dp)
+            .height(104.dp)
             .onFocusChanged { focused = it.isFocused }
-            .clip(AppShapes.Control)
-            .background(if (focused) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f))
-            .border(1.5.dp, if (focused) Color.White else Color.Transparent, AppShapes.Control)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(ActionCardShape)
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.10f))
+            .border(1.dp, if (focused) Color.Transparent else Color.White.copy(alpha = 0.14f), ActionCardShape)
             .tvClickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(8.dp))
         }
         Text(
             text = text,
-            color = Color.White,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = content,
+            fontSize = 14.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+private val ActionCardShape = RoundedCornerShape(14.dp)

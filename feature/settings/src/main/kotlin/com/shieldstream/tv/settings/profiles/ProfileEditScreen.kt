@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,8 +58,10 @@ import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shieldstream.tv.model.Category
 import com.shieldstream.tv.model.ProfileAvatars
+import com.shieldstream.tv.model.ProfileTheme
 import com.shieldstream.tv.model.SubtitlePreference
 import com.shieldstream.tv.settings.HomeCategoriesDialog
+import com.shieldstream.tv.ui.component.AppIcons
 import com.shieldstream.tv.ui.component.ProfileAvatar
 import com.shieldstream.tv.ui.component.TvButton
 import com.shieldstream.tv.ui.component.tvClickable
@@ -89,6 +93,7 @@ fun ProfileEditScreen(
     var firstPin by remember { mutableStateOf<String?>(null) }
     var pinError by remember { mutableStateOf<String?>(null) }
     var choosingCategories by remember { mutableStateOf(false) }
+    var choosingIcon by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(ProfileBackground)) {
         Column(
@@ -105,7 +110,13 @@ fun ProfileEditScreen(
             )
             Spacer(Modifier.height(18.dp))
             Row {
-                ProfileAvatar(initial = profile.initial, avatar = profile.avatar, size = 150.dp)
+                // OK sobre el avatar: elegir un icono.
+                AvatarButton(
+                    initial = profile.initial,
+                    avatar = profile.avatar,
+                    image = profile.avatarImage,
+                    onClick = { choosingIcon = true },
+                )
                 Spacer(Modifier.width(36.dp))
                 Column(Modifier.weight(1f)) {
                     NameField(
@@ -123,6 +134,18 @@ fun ProfileEditScreen(
                                 avatar = index,
                                 selected = index == ProfileAvatars.safe(profile.avatar),
                                 onClick = { viewModel.setAvatar(index) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Text(localizedStringResource(StringsR.string.settings_app_theme), color = ProfileMuted, fontSize = 16.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ProfileTheme.entries.forEach { theme ->
+                            ThemeChoice(
+                                theme = theme,
+                                selected = profile.theme == theme,
+                                onClick = { viewModel.setTheme(theme) },
                             )
                         }
                     }
@@ -237,6 +260,19 @@ fun ProfileEditScreen(
                 TvButton(text = localizedStringResource(StringsR.string.settings_cancel), onClick = onDone)
             }
         }
+        if (choosingIcon) {
+            ProfileIconPicker(
+                profileId = profile.id,
+                initial = profile.initial,
+                avatar = profile.avatar,
+                current = profile.avatarImage,
+                onPick = { url ->
+                    viewModel.setAvatarImage(url)
+                    choosingIcon = false
+                },
+                onDismiss = { choosingIcon = false },
+            )
+        }
     }
 
     if (creatingPin) {
@@ -347,6 +383,70 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
             }
         },
     )
+}
+
+@Composable
+private fun ThemeChoice(theme: ProfileTheme, selected: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(
+                when {
+                    focused -> Color.White
+                    selected -> Color.White.copy(alpha = 0.2f)
+                    else -> Color.White.copy(alpha = 0.08f)
+                },
+                RoundedCornerShape(50),
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Box(Modifier.size(14.dp).background(Color(theme.accent), CircleShape))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            themeLabel(theme),
+            color = if (focused) Color.Black else Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun themeLabel(theme: ProfileTheme): String = when (theme) {
+    ProfileTheme.BAMBI -> localizedStringResource(StringsR.string.settings_theme_bambi)
+    ProfileTheme.OCEAN -> localizedStringResource(StringsR.string.settings_theme_ocean)
+    ProfileTheme.FOREST -> localizedStringResource(StringsR.string.settings_theme_forest)
+    ProfileTheme.GOLD -> localizedStringResource(StringsR.string.settings_theme_gold)
+    ProfileTheme.VIOLET -> localizedStringResource(StringsR.string.settings_theme_violet)
+    ProfileTheme.ROSE -> localizedStringResource(StringsR.string.settings_theme_rose)
+}
+
+@Composable
+private fun AvatarButton(initial: String, avatar: Int, image: String?, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        Modifier
+            .border(3.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(26.dp))
+            .padding(5.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick = onClick),
+    ) {
+        ProfileAvatar(initial = initial, avatar = avatar, size = 150.dp, image = image)
+        Icon(
+            AppIcons.Edit,
+            contentDescription = localizedStringResource(StringsR.string.settings_profile_icon),
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                .padding(6.dp)
+                .size(20.dp),
+        )
+    }
 }
 
 @Composable

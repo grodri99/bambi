@@ -83,4 +83,22 @@
     <string name="player_evaluating_candidates">Testing %1$d candidates · %2$d reference cues</string>
     <string name="player_track_number">Track %1$d</string>
     <string name="player_subtitle_number">Subtitle %1$d</string>
+    <string name="player_playback">Playback</string>
+    <string name="player_speed">Speed</string>
+    <string name="player_speed_passthrough_note">Dolby/DTS audio switches to stereo</string>
+    <string name="player_sleep_timer">Sleep timer</string>
+    <string name="player_sleep_timer_off">Off</string>
+    <string name="player_sleep_timer_end_of_episode">At the end of the episode</string>
+    <string name="player_sleep_timer_minutes">Pauses in %1$d min</string>
+    <string name="player_sleep_timer_paused">Sleep timer: playback paused</string>
+    <string name="player_intro_skipped">Intro skipped</string>
+    <string name="player_recap_skipped">Recap skipped</string>
+    <string name="player_speed_stereo_notice">Stereo audio while speed is not 1x</string>
+    <string name="player_switched_source">The previous source failed: now playing another %1$s</string>
+    <string name="player_castellano">Spanish</string>
+    <string name="trailer_loading">Loading the trailer…</string>
+    <string name="player_video_fit">Picture format</string>
+    <string name="player_video_fit_original">Original (with black bars)</string>
+    <string name="player_video_fit_zoom">Zoom · no bars, crops the sides</string>
+    <string name="player_video_fit_stretch">Stretch · no bars, distorts the picture</string>
 </resources>

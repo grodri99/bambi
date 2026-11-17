@@ -1,8 +1,12 @@
 package com.shieldstream.tv.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.shieldstream.tv.model.ProfileTheme
 
 /**
  * Colores compartidos con el estilo de Bambi: fondo casi negro, el foco invierte a blanco y el rojo de
@@ -27,17 +31,24 @@ object AppColors {
     /** Image and skeleton placeholders. */
     val Placeholder = Color(0xFF232327)
 
-    /** Rojo de Bambi: progreso, selección e indicadores activos. */
-    val Accent = Color(0xFFE50914)
+    /** Acento del perfil activo: progreso, selección e indicadores activos. */
+    var Accent by mutableStateOf(Color(0xFFE50914))
+        private set
+
+    /** Variante oscura del acento (degradados y estados secundarios). */
+    var AccentDark by mutableStateOf(Color(0xFF8C0610))
+        private set
 
     /** Content drawn on [Accent]. */
-    val OnAccent = Color.White
+    var OnAccent by mutableStateOf(Color.White)
+        private set
 
     /**
      * The single accent: "new" dots and counts, progress bars, the active rail marker and small
      * section labels. Keep it to small details; large accent areas compete with the artwork.
      */
-    val Highlight = Color(0xFFE50914)
+    var Highlight by mutableStateOf(Color(0xFFE50914))
+        private set
 
     /** Restricted age ratings only. */
     val Alert = Color(0xFFE50914)
@@ -48,6 +59,14 @@ object AppColors {
     val Success = Color(0xFF46D369)
     val Warning = Color(0xFFF5B83D)
     val Error = Color(0xFFFF5A5F)
+
+    /** Aplica el acento del perfil. Las pantallas leen estos valores como estado de Compose. */
+    fun applyTheme(theme: ProfileTheme) {
+        Accent = Color(theme.accent)
+        AccentDark = Color(theme.accentDark)
+        OnAccent = Color(theme.onAccent)
+        Highlight = Color(theme.accent)
+    }
 }
 
 /** Shared corner radii. Use these instead of ad-hoc `RoundedCornerShape` values. */

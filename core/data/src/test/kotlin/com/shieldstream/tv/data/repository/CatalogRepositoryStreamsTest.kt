@@ -3,8 +3,6 @@ package com.shieldstream.tv.data.repository
 import com.shieldstream.tv.data.security.TokenStore
 import com.shieldstream.tv.domain.ApiService
 import com.shieldstream.tv.domain.DebridService
-import com.shieldstream.tv.domain.IthilAccessRepository
-import com.shieldstream.tv.domain.IthilLibraryRepository
 import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.SettingsRepository
 import com.shieldstream.tv.domain.SourceProvider
@@ -57,8 +55,6 @@ class CatalogRepositoryStreamsTest {
         settings = settings,
         profiles = profiles,
         texts = texts,
-        ithil = mockk<IthilLibraryRepository>(),
-        ithilAccess = mockk<IthilAccessRepository>(),
     )
 
     @Test

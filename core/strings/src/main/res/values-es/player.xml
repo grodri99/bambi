@@ -83,4 +83,22 @@
     <string name="player_evaluating_candidates">Probando %1$d candidatos · %2$d frases de referencia</string>
     <string name="player_track_number">Pista %1$d</string>
     <string name="player_subtitle_number">Subtítulo %1$d</string>
+    <string name="player_playback">Reproducción</string>
+    <string name="player_speed">Velocidad</string>
+    <string name="player_speed_passthrough_note">con Dolby/DTS el audio pasa a estéreo</string>
+    <string name="player_sleep_timer">Temporizador de apagado</string>
+    <string name="player_sleep_timer_off">Desactivado</string>
+    <string name="player_sleep_timer_end_of_episode">Al terminar el episodio</string>
+    <string name="player_sleep_timer_minutes">Pausa en %1$d min</string>
+    <string name="player_sleep_timer_paused">Temporizador de apagado: reproducción en pausa</string>
+    <string name="player_intro_skipped">Intro saltada</string>
+    <string name="player_recap_skipped">Resumen saltado</string>
+    <string name="player_speed_stereo_notice">Audio en estéreo mientras la velocidad no sea 1x</string>
+    <string name="player_switched_source">La fuente anterior falló: ahora con otra %1$s</string>
+    <string name="player_castellano">castellano</string>
+    <string name="trailer_loading">Cargando el tráiler…</string>
+    <string name="player_video_fit">Formato de imagen</string>
+    <string name="player_video_fit_original">Original (con bandas negras)</string>
+    <string name="player_video_fit_zoom">Ampliar · sin bandas, recorta los lados</string>
+    <string name="player_video_fit_stretch">Estirar · sin bandas, deforma la imagen</string>
 </resources>
