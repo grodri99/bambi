@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.8] - Bambi
+
+- **Multidebrid en todas las fuentes:** The Pirate Bay, Knaben, Nyaa, el buscador de castellano y Comet funcionan con
+  el servicio activo (TorBox nativo; Premiumize, Debrid-Link y Offcloud a través de Torrentio).
+- **No cambiar de fuente si la elegida falla** (Ajustes → Reproducción).
+- **Iconos de perfil:** grupo propio de Bambi incluido en la app, iconos de Netflix y foto propia subida con el móvil
+  por QR.
+- **Formato de imagen** en el reproductor: original, ampliar o estirar, también con bandas negras grabadas en el vídeo.
+- **Episodios:** punto rojo en vez del número; mantener OK sobre una serie permite quitarla; unos segundos vistos ya
+  no la meten en la lista.
+- El detalle completo está en la sección de la 1.0.7, que reúne todo lo hecho hasta hoy.
+
 ## [1.0.7] - Bambi
 
 Bambi 1.0.7 incorpora todas las funciones de [Franklix](https://github.com/javiermolinar/franklix) (fork de Bambi
