@@ -34,12 +34,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -86,12 +88,6 @@ private val UiLocale: Locale get() = Lang.locale
 private val NetflixRed = Color(0xFFE50914)
 private val CardShape = RoundedCornerShape(18.dp)
 
-/** Lo que tarda el tráiler en arrancar con la portada enfocada (como Netflix). */
-private const val TrailerStartDelayMs = 2_500L
-
-/** Tope de reproducción: si no se mueve el foco, la portada vuelve a rotar. */
-private const val TrailerMaxMs = 45_000L
-
 /**
  * Portada grande del Inicio: los destacados de la semana. ◀ ▶ cambia de destacado (en bucle) y además
  * avanza solo cada 10 s. OK abre la ficha. Con la portada enfocada se reproduce el tráiler mudo.
@@ -114,26 +110,24 @@ internal fun FeaturedCarousel(
     val resumed = inForeground.isAtLeast(Lifecycle.State.RESUMED)
 
     // Clave del tráiler en curso. Se limpia al cambiar de destacado, al perder el foco o al salir de la app.
-    var trailerKey by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(index, focused, trailersEnabled, lightweightUi, resumed, current.trailerKey) {
-        trailerKey = null
-        val key = current.trailerKey?.takeIf { trailersEnabled && !lightweightUi && focused && resumed }
-        if (key != null) {
-            delay(TrailerStartDelayMs)
-            trailerKey = key
-        }
+    val trailerState = remember { mutableStateOf<String?>(null) }
+    val trailerKey = trailerState.value
+    val scope = rememberCoroutineScope()
+    val trailerSession = remember(scope) {
+        BillboardTrailerSession(scope) { trailerState.value = it }
     }
-    // El tráiler manda: mientras suena, la portada no rota. Pasado el tope, vuelve la rotación.
-    LaunchedEffect(trailerKey) {
-        if (trailerKey != null) {
-            delay(TrailerMaxMs)
-            trailerKey = null
-        }
+    LaunchedEffect(index, focused, trailersEnabled, lightweightUi, resumed, current.trailerKey) {
+        trailerSession.request(
+            trailerToPlay(current.trailerKey, trailersEnabled, lightweightUi, focused, resumed),
+        )
+    }
+    DisposableEffect(trailerSession) {
+        onDispose { trailerSession.dispose() }
     }
 
     LaunchedEffect(index, items.size, lightweightUi, trailerKey) {
-        if (!lightweightUi && items.size > 1 && trailerKey == null) {
-            delay(10_000)
+        if (shouldRotateCarousel(lightweightUi, items.size, trailerKey != null)) {
+            delay(BillboardTrailerTiming.ROTATION_MS)
             index = (index + 1) % items.size
         }
     }

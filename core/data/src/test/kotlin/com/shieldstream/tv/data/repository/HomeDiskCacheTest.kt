@@ -70,10 +70,56 @@ class HomeDiskCacheTest {
         assertEquals(listOf("tt1"), cache.readRows("home_ALL_p2")?.value?.single()?.items?.map { it.id })
     }
 
+    @Test
+    fun `mixed featured entries keep each trailer key`() {
+        cache.writeFeatured("featured_ALL", listOf(featured("with-trailer"), featured(null)))
+
+        assertEquals(
+            listOf("with-trailer", null),
+            cache.readFeatured("featured_ALL")?.value?.map { it.trailerKey },
+        )
+    }
+
+    @Test
+    fun `malformed featured cache is ignored instead of crashing`() {
+        rawFile("featured_ALL", "{not json")
+
+        assertNull(cache.readFeatured("featured_ALL"))
+    }
+
+    @Test
+    fun `featured cache from another version is ignored`() {
+        rawFile("featured_ALL", """{"v":999,"savedAt":1,"featuredTrailers":true,"featured":[]}""")
+
+        assertNull(cache.readFeatured("featured_ALL"))
+    }
+
+    @Test
+    fun `legacy featured cache is replaced by a fresh write`() {
+        legacyFeaturedFile("featured_ALL")
+        assertNull(cache.readFeatured("featured_ALL"))
+
+        cache.writeFeatured("featured_ALL", listOf(featured(trailerKey = "fresh-trailer")))
+
+        assertEquals(listOf("fresh-trailer"), cache.readFeatured("featured_ALL")?.value?.map { it.trailerKey })
+    }
+
+    @Test
+    fun `repeated writes keep the last trailer key`() {
+        cache.writeFeatured("featured_ALL", listOf(featured(trailerKey = "old-trailer")))
+        cache.writeFeatured("featured_ALL", listOf(featured(trailerKey = "new-trailer")))
+
+        assertEquals(listOf("new-trailer"), cache.readFeatured("featured_ALL")?.value?.map { it.trailerKey })
+    }
+
     /** Caché tal y como la escribía la versión anterior: sin la marca `featuredTrailers`. */
     private fun legacyFeaturedFile(key: String) {
+        rawFile(key, """{"v":1,"savedAt":123,"featured":[]}""")
+    }
+
+    private fun rawFile(key: String, content: String) {
         val dir = File(context.filesDir, "home_cache").apply { mkdirs() }
-        File(dir, "$key.json").writeText("""{"v":1,"savedAt":123,"featured":[]}""")
+        File(dir, "$key.json").writeText(content)
     }
 
     private fun item(id: String) = CatalogItem(

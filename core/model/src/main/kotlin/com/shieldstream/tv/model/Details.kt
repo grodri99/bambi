@@ -1,5 +1,7 @@
 package com.shieldstream.tv.model
 
+import java.util.Locale
+
 data class CatalogDetails(
     val item: CatalogItem,
     val originalTitle: String? = null,
@@ -59,11 +61,14 @@ data class VideoInfo(
 )
 
 object Trailers {
-    private val TYPE_ORDER = listOf("Trailer", "Teaser")
+    private val TYPE_ORDER = listOf("trailer", "teaser")
+
+    /** Comparación sin distinguir mayúsculas ni variantes regionales (`es-ES` → `es`). */
+    private fun String?.normalized(): String? = this?.lowercase(Locale.ROOT)?.substringBefore('-')
 
     /**
-     * Elige el tráiler a enseñar: solo YouTube; primero tráileres y luego teasers; dentro de eso, primero en el
-     * idioma de la interfaz, luego en inglés; y los oficiales antes que los demás.
+     * Elige el tráiler a enseñar: solo YouTube; primero en el idioma de la interfaz, luego en inglés; dentro de eso,
+     * tráileres antes que teasers y los oficiales antes que los demás.
      */
     fun pick(videos: List<VideoInfo>, language: String): String? = rank(videos, language).firstOrNull()
 
@@ -71,15 +76,26 @@ object Trailers {
      * Todos los candidatos en ese orden: algunos tráileres no dejan verse incrustados (lo decide quien los sube) y
      * entonces se prueba el siguiente.
      */
-    fun rank(videos: List<VideoInfo>, language: String): List<String> = videos
-        .filter { it.site.equals("YouTube", ignoreCase = true) && it.key.isNotBlank() && it.type in TYPE_ORDER }
-        .sortedWith(
-            compareBy<VideoInfo> { when (it.language) { language -> 0; "en" -> 1; else -> 2 } }
-                .thenBy { TYPE_ORDER.indexOf(it.type) }
-                .thenBy { if (it.official) 0 else 1 },
-        )
-        .map { it.key }
-        .distinct()
+    fun rank(videos: List<VideoInfo>, language: String): List<String> {
+        val appLanguage = language.normalized()
+        return videos
+            .mapNotNull { video ->
+                val type = video.type.normalized()?.let { TYPE_ORDER.indexOf(it) }?.takeIf { it >= 0 } ?: return@mapNotNull null
+                if (!video.site.equals("YouTube", ignoreCase = true) || video.key.isBlank()) return@mapNotNull null
+                val videoLanguage = video.language.normalized()
+                val languageRank = when {
+                    videoLanguage == appLanguage -> 0
+                    videoLanguage == "en" -> 1
+                    else -> 2
+                }
+                Ranked(video.key, languageRank, type, if (video.official) 0 else 1)
+            }
+            .sortedWith(compareBy<Ranked> { it.language }.thenBy { it.type }.thenBy { it.official })
+            .map { it.key }
+            .distinct()
+    }
+
+    private data class Ranked(val key: String, val language: Int, val type: Int, val official: Int)
 }
 
 data class Season(

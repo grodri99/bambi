@@ -13,8 +13,12 @@ import com.shieldstream.tv.model.Quality
 import com.shieldstream.tv.model.SourceExclusions
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class SettingsRepositoryImplTest {
@@ -141,6 +146,33 @@ class SettingsRepositoryImplTest {
 
         assertEquals(false, repository().billboardTrailers.first())
         assertEquals(false, repository().billboardTrailersEnabled)
+    }
+
+    @Test
+    fun `billboard trailers can be turned back on`() = runTest {
+        val settings = repository()
+        settings.setBillboardTrailers(false)
+
+        settings.setBillboardTrailers(true)
+
+        assertEquals(true, settings.billboardTrailers.first())
+        assertEquals(true, repository().billboardTrailers.first())
+    }
+
+    @Test
+    fun `billboard trailers flow notifies every change`() = runTest {
+        val settings = repository()
+        val values = mutableListOf<Boolean>()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            settings.billboardTrailers.collect { values += it }
+        }
+
+        settings.setBillboardTrailers(false)
+        settings.setBillboardTrailers(true)
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(listOf(true, false, true), values)
     }
 
     private fun repository(): SettingsRepositoryImpl {

@@ -50,6 +50,55 @@ class TrailerPreviewTest {
         assertCovers(800.dp, 900.dp)
     }
 
+    @Test
+    fun `square billboard grows in width and keeps 16 by 9`() {
+        val (width, height) = coverSize(1000.dp, 1000.dp)
+
+        assertEquals(1000f * ratio, width.value, 0.01f)
+        assertEquals(1000f, height.value, 0.01f)
+        assertCovers(1000.dp, 1000.dp)
+    }
+
+    @Test
+    fun `exact 16 by 9 box is not changed`() {
+        val (width, height) = coverSize(1920.dp, 1080.dp)
+
+        assertEquals(1920f, width.value, 0.01f)
+        assertEquals(1080f, height.value, 0.01f)
+    }
+
+    @Test
+    fun `key is sanitised before going into the embed URL`() {
+        val url = embedUrl("ab&c?d/e f#g")
+
+        // Solo letras, números, `-` y `_`: un `&` en la clave no puede añadir parámetros.
+        assertEquals(
+            "https://www.youtube-nocookie.com/embed/abcdefg?autoplay=1&mute=1&controls=0&modestbranding=1" +
+                "&rel=0&iv_load_policy=3&playsinline=1&loop=1&playlist=abcdefg&disablekb=1&fs=0&cc_load_policy=0",
+            url,
+        )
+        assertFalse(url.contains("&c?"))
+    }
+
+    @Test
+    fun `safe YouTube key characters are kept`() {
+        val url = embedUrl("ab-c_D123")
+
+        assertTrue(url.contains("/embed/ab-c_D123?"))
+        assertTrue(url.contains("playlist=ab-c_D123&"))
+    }
+
+    @Test
+    fun `playback probe mutes and reports whether the video is running`() {
+        assertTrue(PlaybackProbe.contains("v.muted=true"))
+        assertTrue(PlaybackProbe.contains("v.volume=0"))
+        assertTrue(PlaybackProbe.contains("v.play()"))
+        assertTrue(PlaybackProbe.contains("'yes'"))
+        assertTrue(PlaybackProbe.contains("'no'"))
+        assertEquals(20, ProbeAttempts)
+        assertEquals(400L, ProbeIntervalMs)
+    }
+
     /** El vídeo tiene que cubrir el hueco entero y mantener 16:9 exacto (nunca dejar bandas). */
     private fun assertCovers(width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp) {
         val (coverWidth, coverHeight) = coverSize(width, height)

@@ -35,14 +35,14 @@ private const val YouTubeAspectRatio = 16f / 9f
 private const val TrailerFadeMs = 700
 
 /** Sondeo del <video> del reproductor: silencio forzado y aviso cuando ya corre. */
-private val PlaybackProbe =
+internal val PlaybackProbe =
     "(function(){var v=document.querySelector('video');if(!v)return 'no';" +
         "v.muted=true;v.volume=0;if(v.paused){v.play();}" +
         "return (v.paused||v.ended)?'no':'yes';})()"
 
 /** 20 intentos × 400 ms ≈ 8 s para que YouTube cree el <video> y arranque. */
-private const val ProbeAttempts = 20
-private const val ProbeIntervalMs = 400L
+internal const val ProbeAttempts = 20
+internal const val ProbeIntervalMs = 400L
 
 /**
  * Tráiler mudo de YouTube encima del arte de la portada, recortado como `ContentScale.Crop`.
@@ -102,7 +102,7 @@ internal fun coverSize(width: Dp, height: Dp): Pair<Dp, Dp> =
  * destruir el reproductor en un solo sitio.
  */
 @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
-private fun createTrailerView(
+internal fun createTrailerView(
     context: Context,
     videoKey: String,
     onPlaying: () -> Unit,
@@ -145,7 +145,7 @@ private fun createTrailerView(
     return container
 }
 
-private fun releaseTrailer(view: View) {
+internal fun releaseTrailer(view: View) {
     // El cliente se guarda en el contenedor: `WebView.webViewClient` solo existe desde API 26.
     val container = view as? TrailerContainer ?: return
     container.client.released = true
@@ -160,7 +160,7 @@ private fun releaseTrailer(view: View) {
 }
 
 /** Contenedor que recorta a sus hijos y guarda el cliente para poder parar el sondeo al destruirlo. */
-private class TrailerContainer(context: Context, val client: TrailerClient) : FrameLayout(context) {
+internal class TrailerContainer(context: Context, val client: TrailerClient) : FrameLayout(context) {
     init {
         clipChildren = true
     }
@@ -170,7 +170,7 @@ private class TrailerContainer(context: Context, val client: TrailerClient) : Fr
  * Cuando la página termina de cargar, fuerza silencio (`mute=1` ya viene en la URL, pero un `volume=0`
  * por JS no cuesta nada) y avisa a Compose solo cuando el vídeo está corriendo de verdad.
  */
-private class TrailerClient(
+internal class TrailerClient(
     private val onPlaying: () -> Unit,
     private val onGone: () -> Unit,
 ) : WebViewClient() {
@@ -204,18 +204,22 @@ private class TrailerClient(
     }
 }
 
-/** `autoplay` + `mute` para que Chrome deje arrancar sin gesto; sin controles ni tarjetas. */
+/**
+ * `autoplay` + `mute` para que Chrome deje arrancar sin gesto; sin controles ni tarjetas.
+ * La clave se limpia igual que en el reproductor de tráileres del creador: solo letras, números, `-` y `_`.
+ */
 internal fun embedUrl(videoKey: String) = buildString {
+    val safeKey = videoKey.filter { it.isLetterOrDigit() || it == '-' || it == '_' }
     append("https://www.youtube-nocookie.com/embed/")
-    append(videoKey)
+    append(safeKey)
     append("?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3")
     append("&playsinline=1&loop=1&playlist=")
-    append(videoKey)
+    append(safeKey)
     append("&disablekb=1&fs=0&cc_load_policy=0")
 }
 
 /** Algunos TV boxes vienen sin WebView: sin él la portada se queda con el arte estático. */
-private fun isWebViewAvailable(): Boolean {
+internal fun isWebViewAvailable(): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
     return runCatching { WebView.getCurrentWebViewPackage() }.getOrNull() != null
 }
