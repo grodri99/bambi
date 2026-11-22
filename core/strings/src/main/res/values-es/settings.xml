@@ -143,6 +143,8 @@
     <string name="settings_soft_backdrops_summary">Difumina la imagen de fondo detrás de las filas de Inicio para que destaquen los títulos.</string>
     <string name="settings_high_res_backdrops">Fondos en alta resolución</string>
     <string name="settings_high_res_backdrops_summary">Imágenes de fondo más nítidas en Inicio. Usa más datos y memoria de imágenes; se ignora con la interfaz ligera.</string>
+    <string name="settings_billboard_trailers">Tráilers en la portada</string>
+    <string name="settings_billboard_trailers_summary">Reproduce el avance sin sonido a los 2,5 s con el destacado enfocado y lo para al moverte. Se ignora con la interfaz ligera.</string>
     <string name="settings_smaller_backdrops_no_automatic_rotation_or_focus">Fondos más pequeños, sin rotación automática ni animaciones de foco. Para TV boxes de baja potencia.</string>
     <string name="settings_on">Sí</string>
     <string name="settings_off_9847b4">No</string>

@@ -679,6 +679,8 @@ class HomeViewModelsTest {
     ) = mockk<SettingsRepository> {
         every { hiddenCategories } returns MutableStateFlow(emptySet())
         every { homeRowItemLimit } returns rowItemLimit
+        every { billboardTrailers } returns MutableStateFlow(true)
+        every { billboardTrailersEnabled } returns true
     }
 
     private fun catalog(base: CatalogItem, vararg hydrated: CatalogItem): CatalogRepository {

@@ -62,6 +62,7 @@ import coil.compose.AsyncImage
 internal fun Billboard(
     featured: List<FeaturedItem>,
     categories: List<Category>,
+    trailersEnabled: Boolean,
     initialFocus: TopFocus,
     onFocusChange: (TopFocus) -> Unit,
     onItemClick: (CatalogItem) -> Unit,
@@ -100,6 +101,7 @@ internal fun Billboard(
             FeaturedCarousel(
                 items = featured,
                 onOpen = onItemClick,
+                trailersEnabled = trailersEnabled,
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(heroRequester)
