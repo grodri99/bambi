@@ -131,7 +131,7 @@ class ApiKeysRepositoryImpl @Inject constructor(
     private suspend fun checkViaTorrentio(service: ApiService, key: String): KeyCheck {
         val debrid = DebridService.of(service) ?: return KeyCheck.Invalid(texts.get(StringsR.string.data_unknown_service))
         val streams = torrentioApi.streamsWithConfig(torrentioConfig(debrid, key), "movie", "tt0137523").streams
-        streams.firstOrNull { it.isDebridError() }?.let { return KeyCheck.Invalid(debridErrorMessage(it.title, debrid.title, texts)) }
+        streams.firstOrNull { it.isDebridError() }?.let { return KeyCheck.Invalid(debridErrorMessage(it.title, debrid.title, AndroidStreamTexts(texts))) }
         if (streams.none { it.url?.contains("/resolve/") == true }) {
             return KeyCheck.Invalid(texts.get(StringsR.string.data_torrentio_no_links, debrid.title))
         }

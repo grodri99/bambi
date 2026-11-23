@@ -17,30 +17,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal fun torrentioConfig(debrid: DebridService, key: String): String = "${debrid.torrentioKey}=${Uri.encode(key)}"
-
-internal fun TorrentioStreamDto.isDebridError(): Boolean =
-    url?.contains("/videos/") == true && name.contains("error", ignoreCase = true)
-
-internal fun debridErrorMessage(title: String, service: String, texts: Texts): String = when {
-    title.contains("expired", ignoreCase = true) -> texts.get(StringsR.string.data_subscription_expired, service)
-    title.contains("invalid", ignoreCase = true) -> texts.get(StringsR.string.data_invalid_service_key, service)
-    title.contains("blocked", ignoreCase = true) -> texts.get(StringsR.string.data_service_blocked, service)
-    else -> texts.get(StringsR.string.data_service_unavailable_torrentio, service)
-}
-
-private val HASH = Regex("^[0-9a-fA-F]{40}$")
-
-internal fun parseResolveUrl(url: String): Pair<String, Int?>? {
-    val segments = Uri.parse(url).pathSegments
-    val start = segments.indexOf("resolve").takeIf { it >= 0 } ?: return null
-    val hash = segments.getOrNull(start + 3)?.takeIf { HASH.matches(it) }
-        ?: segments.drop(start + 3).firstOrNull { HASH.matches(it) }
-        ?: return null
-    val fileIdx = segments.getOrNull(start + 5)?.toIntOrNull()
-    return hash.lowercase() to fileIdx
-}
-
 @Singleton
 class TorrentioLinkResolverImpl @Inject constructor(
     base: OkHttpClient,
@@ -130,8 +106,3 @@ class TorrentioLinkResolverImpl @Inject constructor(
         const val TORRENTIO_BASE = "https://torrentio.strem.fun"
     }
 }
-
-internal fun aioStreamBases(raw: String): List<String> =
-    StremioAddons.parse(raw).mapNotNull { it.baseUrl }
-
-internal fun aioStreamBase(manifestUrl: String): String? = StremioAddons.baseUrl(manifestUrl)

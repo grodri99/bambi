@@ -1,6 +1,7 @@
 package com.shieldstream.tv.network.di
 
-import com.shieldstream.tv.model.Lang
+import com.shieldstream.tv.network.ApiConfig
+import com.shieldstream.tv.network.ApiFactory
 import com.shieldstream.tv.network.api.AllDebridApi
 import com.shieldstream.tv.network.api.RealDebridApi
 import com.shieldstream.tv.network.api.TmdbApi
@@ -14,19 +15,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
-
-object ApiConfig {
-    const val ALLDEBRID_BASE_URL = "https://api.alldebrid.com/"
-    const val REAL_DEBRID_BASE_URL = "https://api.real-debrid.com/"
-    const val TORRENTIO_BASE_URL = "https://torrentio.strem.fun/"
-    const val TMDB_BASE_URL = "https://api.themoviedb.org/"
-}
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -34,16 +26,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideJson(): Json = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
-    }
+    fun provideJson(): Json = ApiFactory.json()
 
     @Provides
     @Singleton
     fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
-        .dns(com.shieldstream.tv.network.CloudflareFallbackDns)
+        .dns(com.shieldstream.tv.network.CloudflareFallbackDns.also { dns -> dns.logger = { android.util.Log.w("CfDns", it) } })
         .eventListener(com.shieldstream.tv.network.CloudflareFallbackDns.failureListener)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -76,20 +65,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideTmdbApi(client: OkHttpClient, json: Json): TmdbApi {
-        val tmdbClient = client.newBuilder()
-            .addInterceptor { chain ->
-                val request = chain.request()
-                val url = request.url.newBuilder().addQueryParameter("language", Lang.current.tmdb).build()
-                chain.proceed(request.newBuilder().url(url).build())
-            }
-            .build()
+        val tmdbClient = ApiFactory.tmdbClient(client)
         return buildRetrofit(ApiConfig.TMDB_BASE_URL, tmdbClient, json).create(TmdbApi::class.java)
     }
 
     private fun buildRetrofit(baseUrl: String, client: OkHttpClient, json: Json): Retrofit =
-        Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(client)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-            .build()
+        ApiFactory.retrofit(baseUrl, client, json)
 }

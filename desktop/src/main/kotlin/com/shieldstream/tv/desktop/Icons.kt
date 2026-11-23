@@ -1,0 +1,167 @@
+// Los mismos iconos que la app de la tele (core/ui AppIcons), copiados tal cual.
+package com.shieldstream.tv.desktop
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.dp
+
+object AppIcons {
+    val Search = icon(
+        "search",
+        "M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16" +
+            "c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5" +
+            "S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z",
+    )
+    val Home = icon("home", "M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z")
+    val Movie = icon(
+        "movie",
+        "M18,4l2,4h-3l-2,-4h-2l2,4h-3l-2,-4H8l2,4H7L5,4H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16" +
+            "c1.1,0 2,-0.9 2,-2V4h-4z",
+    )
+    val Tv = icon(
+        "tv",
+        "M21,3H3c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h5v2h8v-2h5c1.1,0 1.99,-0.9 1.99,-2L23,5c0,-1.1 -0.9,-2 -2,-2z" +
+            "M21,17H3V5h18v12z",
+    )
+    val Settings = icon(
+        "settings",
+        "M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 " +
+            "0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94" +
+            "L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35" +
+            "C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 " +
+            "2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 " +
+            "-0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54" +
+            "c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 " +
+            "1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94z" +
+            "M12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z",
+    )
+    val Play = icon("play", "M8,5v14l11,-7z")
+    val Pause = icon("pause", "M6,19h4V5H6v14zM14,5v14h4V5h-4z")
+    val List = icon(
+        "list",
+        "M3,13h2v-2H3v2zM3,17h2v-2H3v2zM3,9h2V7H3v2zM7,13h14v-2H7v2zM7,17h14v-2H7v2zM7,7v2h14V7H7z",
+    )
+    val Bolt = icon("bolt", "M7,2v11h3v9l7,-12h-4l4,-8z")
+    val Backspace = icon(
+        "backspace",
+        "M22,3H7c-0.69,0 -1.23,0.35 -1.59,0.88L0,12l5.41,8.11c0.36,0.53 0.9,0.89 1.59,0.89h15c1.1,0 2,-0.9 2,-2V5" +
+            "c0,-1.1 -0.9,-2 -2,-2zM19,15.59L17.59,17 14,13.41 10.41,17 9,15.59 12.59,12 9,8.41 10.41,7 14,10.59 " +
+            "17.59,7 19,8.41 15.41,12 19,15.59z",
+    )
+
+    val Trending = icon("trending", "M16,6l2.29,2.29 -4.88,4.88 -4,-4L2,16.59 3.41,18l6,-6 4,4 6.3,-6.29L22,12V6z")
+    val Star = icon(
+        "star",
+        "M12,17.27L18.18,21l-1.64,-7.03L22,9.24l-7.19,-0.61L12,2 9.19,8.63 2,9.24l5.46,4.73L5.82,21z",
+    )
+
+    val Edit = icon(
+        "edit",
+        "M3,17.25V21h3.75L17.81,9.94l-3.75,-3.75L3,17.25zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34" +
+            "c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75 1.83,-1.83z",
+    )
+    val Add = icon("add", "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z")
+    val Check = icon("check", "M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z")
+    val Lock = icon("lock", "M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10c0,-1.1 -0.9,-2 -2,-2zM12,17c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM15.1,8H8.9V6c0,-1.71 1.39,-3.1 3.1,-3.1 1.71,0 3.1,1.39 3.1,3.1v2z")
+    val Hdr = icon(
+        "hdr",
+        "M19,4H5C3.89,4 3,4.9 3,6v12c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V6C21,4.9 20.1,4 19,4zM11,15H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11V15zM18,14c0,0.55 -0.45,1 -1,1h-4V9h4c0.55,0 1,0.45 1,1V14zM16.5,10.5h-2v3h2V10.5z",
+    )
+    val Memory = icon(
+        "memory",
+        "M15,9H9v6h6V9zM19,11h2v2h-2v2h-2v2h-2v2h-2v-2h-2v2H9v-2H7v-2H5v-2h2v-2H5v-2h2V9H5V7h2V5h2V3h2v2h2V3h2v2h2v2h2v2h-2v2zM17,7H7v10h10V7z",
+    )
+    val Key = icon("key", "M12.65,10C11.83,7.67 9.61,6 7,6c-3.31,0 -6,2.69 -6,6s2.69,6 6,6c2.61,0 4.83,-1.67 5.65,-4H17v4h4v-4h2v-4H12.65zM7,14c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2z")
+    val Extension = icon(
+        "extension",
+        "M20.5,11H19V7c0,-1.1 -0.9,-2 -2,-2h-4V3.5C13,2.12 11.88,1 10.5,1S8,2.12 8,3.5V5H4c-1.1,0 -1.99,0.9 -1.99,2v3.8H3.5c1.49,0 2.7,1.21 2.7,2.7s-1.21,2.7 -2.7,2.7H2V20c0,1.1 0.9,2 2,2h3.8v-1.5c0,-1.49 1.21,-2.7 2.7,-2.7 1.49,0 2.7,1.21 2.7,2.7V22H17c1.1,0 2,-0.9 2,-2v-4h1.5c1.38,0 2.5,-1.12 2.5,-2.5S21.88,11 20.5,11z",
+    )
+    val Info = icon("info", "M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2V7h2v2z")
+    val Subtitles = icon(
+        "subtitles",
+        "M20,4H4c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V6c0,-1.1 -0.9,-2 -2,-2zM4,12h4v2H4v-2zM14,18H4v-2h10v2zM20,18h-4v-2h4v2zM20,14H10v-2h10v2z",
+    )
+    val Mail = icon("mail", "M20,4H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V6c0,-1.1 -0.9,-2 -2,-2zM20,8l-8,5 -8,-5V6l8,5 8,-5v2z")
+    val Translate = icon(
+        "translate",
+        "M12.87,15.07l-2.54,-2.51 0.03,-0.03c1.74,-1.94 2.98,-4.17 3.71,-6.53L17,6L17,4h-7L10,2L8,2v2L1,4v1.99h11.17C11.5,7.92 10.44,9.75 9,11.35 8.07,10.32 7.3,9.19 6.69,8h-2c0.73,1.63 1.73,3.17 2.98,4.56l-5.09,5.02L4,19l5,-5 3.11,3.11 0.76,-2.04zM18.5,10h-2L12,22h2l1.12,-3h4.75L21,22h2l-4.5,-12zM15.88,17l1.62,-4.33L19.12,17h-3.24z",
+    )
+    val ExpandMore = icon("expand_more", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z")
+    val Close = icon("close", "M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z")
+    val SkipNext = icon("skip_next", "M6,18l8.5,-6L6,6v12zM16,6v12h2V6h-2z")
+    val FastForward = icon("fast_forward", "M4,18l8.5,-6L4,6v12zM13,6v12l8.5,-6L13,6z")
+
+    private fun icon(name: String, path: String): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(
+            pathData = addPathNodes(path),
+            fill = SolidColor(Color.White),
+        ).build()
+}
+
+/**
+ * Outline icons for the navigation rail. Drawn as strokes on a 24-unit grid so they read as thin
+ * lines next to the filled icons used inside screens.
+ */
+object LineIcons {
+    val Search = line("line_search", "M17,11A6,6 0,1 1,5,11A6,6 0,1 1,17,11Z M15.5,15.5L20,20")
+    val Home = line("line_home", "M4,10.5L12,4L20,10.5V19a1,1 0,0 1,-1,1H15V14H9v6H5a1,1 0,0 1,-1,-1Z")
+    val Movie = line(
+        "line_movie",
+        "M5,4H19a1,1 0,0 1,1,1V19a1,1 0,0 1,-1,1H5a1,1 0,0 1,-1,-1V5a1,1 0,0 1,1,-1Z " +
+            "M8,4V20 M16,4V20 M4,9H8 M4,15H8 M16,9H20 M16,15H20",
+    )
+    val Tv = line(
+        "line_tv",
+        "M4,5H20a1,1 0,0 1,1,1V16a1,1 0,0 1,-1,1H4a1,1 0,0 1,-1,-1V6a1,1 0,0 1,1,-1Z M8,20H16 M12,17V20",
+    )
+    val Episodes = line(
+        "line_episodes",
+        "M9,4H19a1,1 0,0 1,1,1V14a1,1 0,0 1,-1,1H9a1,1 0,0 1,-1,-1V5a1,1 0,0 1,1,-1Z " +
+            "M4,8V19a1,1 0,0 0,1,1H16 M12.25,6.75L16.5,9.5L12.25,12.25Z",
+    )
+    val Eye = line(
+        "line_eye",
+        "M2,12C4.2,7.5 7.7,5 12,5C16.3,5 19.8,7.5 22,12C19.8,16.5 16.3,19 12,19C7.7,19 4.2,16.5 2,12Z " +
+            "M15,12A3,3 0,1 1,9 12A3,3 0,0 1,15 12Z",
+    )
+    val Star = line(
+        "line_star",
+        "M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.63L12,2L9.19,8.63L2,9.24L7.46,13.97L5.82,21Z",
+    )
+    val Close = line("line_close", "M6,6L18,18M18,6L6,18")
+    val Delete = line("line_delete", "M4,7H20M9,7V4H15V7M6,7L7,21H17L18,7M10,11V17M14,11V17")
+    val Download = line("line_download", "M12,4V15M7,10L12,15L17,10M5,20H19")
+    val Exit = line("line_exit", "M10,5H5V19H10M14,8L18,12L14,16M18,12H9")
+    val Bookmark = line("line_bookmark", "M7,4H17a1,1 0,0 1,1,1V20L12,16L6,20V5a1,1 0,0 1,1,-1Z")
+    val Settings = line(
+        "line_settings",
+        "M4,7H12 M16,7H20 M16,7A2,2 0,1 1,12,7A2,2 0,1 1,16,7Z " +
+            "M4,17H7 M11,17H20 M11,17A2,2 0,1 1,7,17A2,2 0,1 1,11,17Z",
+    )
+
+    private fun line(name: String, path: String): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(
+            pathData = addPathNodes(path),
+            fill = null,
+            stroke = SolidColor(Color.White),
+            strokeLineWidth = 1.6f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+        ).build()
+}

@@ -1,5 +1,7 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.network.tmdb.TmdbImages
+import com.shieldstream.tv.network.tmdb.toCatalogItem
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.Texts
 import com.shieldstream.tv.model.Lang

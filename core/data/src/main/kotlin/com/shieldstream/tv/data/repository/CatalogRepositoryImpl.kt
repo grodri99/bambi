@@ -1,5 +1,8 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.network.tmdb.TmdbImages
+import com.shieldstream.tv.network.tmdb.toCatalogItem
+import com.shieldstream.tv.network.tmdb.toCatalogItemOrNull
 import com.shieldstream.tv.strings.R as StringsR
 import com.shieldstream.tv.strings.Texts
 import kotlinx.coroutines.CancellationException
@@ -166,7 +169,10 @@ class CatalogRepositoryImpl @Inject constructor(
 
     private val key: String get() = store.tmdbKey.orEmpty()
 
-    private val streamSearch = StreamSearch(tmdb, torrentio, store, settings, texts) { key }
+    private val streamSearch = run {
+        installAndroidStreamLog()
+        StreamSearch(tmdb, torrentio, TokenStoreSecrets(store), RepositoryStreamSettings(settings), AndroidStreamTexts(texts)) { key }
+    }
 
     private class RowSpec(
         val id: String,

@@ -1,0 +1,16 @@
+Bambi para Windows
+==================
+
+Instalar:   abre Bambi-Windows-Setup-<version>.exe y sigue el asistente. Se instala para tu usuario (no pide permisos
+            de administrador), crea accesos en el menu Inicio y en el escritorio y aparece en Configuracion > Aplicaciones.
+Quitar:     Configuracion de Windows > Aplicaciones > Bambi > Desinstalar. Tus perfiles y ajustes se conservan en
+            %APPDATA%\Bambi.
+
+La primera vez, una guia te pide la clave de TMDB (gratis) y la de tu servicio debrid. Las claves se guardan
+cifradas con tu usuario de Windows. Bambi lleva dentro su Java y su reproductor (mpv): no hay que instalar nada mas.
+
+Teclado: flechas para moverte, Intro para elegir, Escape para volver, F11 pantalla completa.
+Reproductor (como Netflix): espacio pausa, flechas -10/+10 s, arriba/abajo volumen, M silencio, F pantalla completa,
+C audio y subtitulos, E editar subtitulos, S omitir intro, N siguiente episodio, T temporizador. Con el raton, los
+controles salen al moverlo; clic pausa y doble clic pantalla completa.
+Mando de Xbox (o compatible): cruceta para moverte, A para elegir, B para volver, Start para pausar.

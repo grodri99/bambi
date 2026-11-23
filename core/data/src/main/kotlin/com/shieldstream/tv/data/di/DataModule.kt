@@ -28,7 +28,6 @@ import com.shieldstream.tv.domain.ProfileRepository
 import com.shieldstream.tv.domain.TraktRepository
 import com.shieldstream.tv.data.update.UpdateRepositoryImpl
 import com.shieldstream.tv.domain.UpdateRepository
-import com.shieldstream.tv.data.skip.IntroDbRepository
 import com.shieldstream.tv.domain.SkipSegmentsRepository
 import com.shieldstream.tv.data.repository.MyListRepositoryImpl
 import com.shieldstream.tv.domain.MyListRepository
@@ -110,9 +109,6 @@ abstract class DataModule {
     @Singleton
     abstract fun bindUpdateRepository(impl: UpdateRepositoryImpl): UpdateRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindSkipSegmentsRepository(impl: IntroDbRepository): SkipSegmentsRepository
 
     @Binds
     @Singleton

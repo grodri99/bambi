@@ -28,6 +28,8 @@ dependencies {
     implementation(project(":core:strings"))
     implementation(project(":core:domain"))
     implementation(project(":core:network"))
+    implementation(project(":core:streams"))
+    api(project(":core:trakt"))
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)

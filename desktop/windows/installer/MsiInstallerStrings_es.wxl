@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Instalador en español: las pantallas estándar las traduce WiX (cultura es-es). Aquí solo van los textos que
+     jpackage no trae (los suyos no se pueden repetir: WiX da error). -->
+<WixLocalization Culture="es-es" xmlns="http://schemas.microsoft.com/wix/2006/localization" Codepage="1252">
+    <String Id="DisallowSameVersionUpgradeErrorMessage">Esta versión de [ProductName] ya está instalada. El instalador se cerrará.</String>
+    <String Id="ContextMenuCommandLabel">Abrir con [ProductName]</String>
+</WixLocalization>

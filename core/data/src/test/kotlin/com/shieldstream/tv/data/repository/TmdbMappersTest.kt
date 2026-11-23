@@ -1,5 +1,8 @@
 package com.shieldstream.tv.data.repository
 
+import com.shieldstream.tv.network.tmdb.TmdbImages
+import com.shieldstream.tv.network.tmdb.toCatalogItem
+import com.shieldstream.tv.network.tmdb.toCatalogItemOrNull
 import com.shieldstream.tv.model.MediaType
 import com.shieldstream.tv.network.dto.TmdbImageDto
 import com.shieldstream.tv.network.dto.TmdbImagesDto

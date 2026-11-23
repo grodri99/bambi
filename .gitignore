@@ -22,6 +22,7 @@ _archivo/
 .build_*
 .adb_*
 .av1_*
+.desktop_*
 .git_request
 .git_running
 .git_log.txt
@@ -39,3 +40,4 @@ Thumbs.db
 # Marca de compilación pública (APK sin claves para GitHub)
 .public_build
 _opus_trash/
+_windows/
