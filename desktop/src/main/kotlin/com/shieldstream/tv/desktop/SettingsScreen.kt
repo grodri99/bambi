@@ -47,6 +47,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -258,6 +263,8 @@ fun SettingsScreen(
                     SettingsGroup("Al elegir fuente") {
                         SwitchRow(AppIcons.Star, BambiColors.Gold, "Castellano primero", "Las fuentes en castellano van delante y «Reproducir» las prueba antes.", draft.spanishFirst) { update(draft.copy(spanishFirst = it)) }
                         RowDivider()
+                        SwitchRow(AppIcons.Star, Color(0xFFE50914), "Solo fuentes en español", "Lo mismo que «Solo en español» del panel de fuentes: «Reproducir» y el siguiente episodio solo prueban fuentes con audio en español.", draft.spanishOnly) { update(draft.copy(spanishOnly = it)) }
+                        RowDivider()
                         SwitchRow(AppIcons.Lock, Color(0xFF4FA3FF), "No cambiar de fuente si la elegida falla", "Al elegir una a mano, solo se prueba esa.", draft.keepChosenSource) { update(draft.copy(keepChosenSource = it)) }
                         RowDivider()
                         SwitchRow(
@@ -276,7 +283,10 @@ fun SettingsScreen(
                 }
                 SettingsTab.ADDONS -> SettingsCard(null, null) { AddonsSection(draft.addons, repository) { update(draft.copy(addons = it)) } }
                 SettingsTab.TRAKT -> SettingsCard(null, null) { TraktSection(draft, onChange = { update(it) }, profile = profile, trakt = trakt) }
-                SettingsTab.HOME -> if (profile != null && profiles != null) SettingsCard(null, null) { CategoriesSection(profile, profiles) }
+                SettingsTab.HOME -> if (profile != null && profiles != null) {
+                    HomeLayoutSection(profile, profiles)
+                    SettingsCard(null, null) { CategoriesSection(profile, profiles) }
+                }
                 SettingsTab.FAMILY -> if (requests != null && profiles != null) SettingsCard(null, null) { RequestsSection(requests, profiles) }
                 SettingsTab.ABOUT -> {
                     SettingsCard(null, null) {
@@ -295,7 +305,7 @@ enum class SettingsTab(val label: String, val hint: String) {
     SOURCES("Fuentes", "Qué fuentes salen, en qué orden y cuáles no quieres ver nunca."),
     ADDONS("Addons", "Más fuentes con tus addons de Stremio."),
     TRAKT("Trakt", "Sincroniza lo que ves con la tele y con otros PC."),
-    HOME("Inicio", "Las categorías que salen en el Inicio de este perfil."),
+    HOME("Inicio", "Qué sale en el Inicio de este perfil: la portada, las filas y su orden, y las categorías."),
     FAMILY("Peticiones", "Lo que han pedido los perfiles infantiles."),
     ABOUT("Bambi", "Instalación, actualizaciones y dónde se guarda todo."),
     ;
@@ -469,7 +479,13 @@ private fun <T> Pills(options: List<Pair<String, T>>, selected: T, modifier: Mod
 }
 
 @Composable
-private fun BambiTextField(value: String, label: String, password: Boolean = false, onChange: (String) -> Unit) {
+private fun BambiTextField(
+    value: String,
+    label: String,
+    password: Boolean = false,
+    onEnter: (() -> Unit)? = null,
+    onChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -486,13 +502,22 @@ private fun BambiTextField(value: String, label: String, password: Boolean = fal
             focusedTextColor = Color.White,
             unfocusedTextColor = Color.White,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
+            if (onEnter != null && event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                onEnter(); true
+            } else {
+                false
+            }
+        },
     )
 }
 
 /**
  * Una clave: guardada se ve tapada («•••• a3f9») con su estado (correcta / no vale) y «Cambiar»; al cambiarla o si
- * está vacía, el campo para pegarla.
+ * está vacía, el campo para pegarla (o el botón «Pegar», que la coge del portapapeles).
+ *
+ * El campo se queda abierto hasta pulsar «Listo» o Intro. Antes se cerraba solo en cuanto tenía una letra (porque «ya
+ * había clave»): al escribir o pegar a medias desaparecía y había que darle a «Cambiar» para seguir.
  */
 @Composable
 private fun KeyRow(
@@ -506,8 +531,11 @@ private fun KeyRow(
     link: String,
     onChange: (String) -> Unit,
 ) {
-    var editing by remember(title) { mutableStateOf(false) }
-    val showField = editing || value.isBlank()
+    var editing by remember(title) { mutableStateOf(value.isBlank()) }
+    // Si la clave se borra (o se cambia de servicio y no hay), el campo se abre solo.
+    LaunchedEffect(title, value.isBlank()) { if (value.isBlank()) editing = true }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    fun done() { if (value.isNotBlank()) editing = false }
     Column {
         SettingRow(icon, tint, title, if (status != null && !status.ok) status.message else hint) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -516,20 +544,25 @@ private fun KeyRow(
                     checking && status == null -> CircularProgressIndicator(Modifier.size(16.dp), color = BambiColors.Muted, strokeWidth = 2.dp)
                     status != null -> StatusPill(if (status.ok) "Correcta" else "No vale", ok = status.ok)
                 }
-                if (!showField) {
+                if (!editing) {
                     Text("•••• " + value.takeLast(4), color = BambiColors.Muted, fontSize = 14.sp)
                     GhostButton("Cambiar") { editing = true }
                 }
             }
         }
-        if (showField) {
+        if (editing) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 70.dp, end = 20.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(Modifier.weight(1f)) { BambiTextField(value, "Pega aquí la clave", password = true, onChange = onChange) }
-                if (editing && value.isNotBlank()) GhostButton("Listo") { editing = false }
+                Box(Modifier.weight(1f)) {
+                    BambiTextField(value, "Pega aquí la clave (Ctrl+V)", password = true, onEnter = ::done) { onChange(it.trim()) }
+                }
+                GhostButton("Pegar") {
+                    clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { onChange(it) }
+                }
+                if (value.isNotBlank()) GhostButton("Listo", primary = true) { done() }
             }
         }
         Row(Modifier.padding(start = 62.dp, bottom = 8.dp)) { LinkButton("Dónde sacar la clave", link) }
@@ -630,6 +663,62 @@ internal fun StatusLine(status: KeyStatus) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Spacer(Modifier.size(9.dp).background(if (status.ok) BambiColors.Cached else BambiColors.Accent, CircleShape))
         Text(status.message, color = BambiColors.Text, fontSize = 14.sp)
+    }
+}
+
+/**
+ * El Inicio a gusto de cada perfil (sugerencia del foro): qué va en la portada y qué filas salen, en qué orden. Se
+ * puede dejar casi vacío (sin portada y con solo «Seguir viendo», por ejemplo).
+ */
+@Composable
+private fun HomeLayoutSection(profile: DesktopProfile, profiles: ProfileStore) {
+    val layout = profile.homeLayout
+    val library = profiles.library(profile)
+    fun save(next: HomeLayout) {
+        profiles.save(profile.copy(homeLayout = next))
+        HomeCache.clear()
+    }
+    SettingsGroup("Portada", footer = "La imagen grande de arriba, con «Reproducir» y «Más información».") {
+        Box(Modifier.padding(20.dp)) {
+            Pills(
+                listOf(
+                    "Automática (tendencias)" to HomeLayout.AUTO,
+                    "Top 10 de hoy" to HomeLayout.TOP10,
+                    "De Mi lista" to HomeLayout.MYLIST,
+                    "Sin portada" to HomeLayout.NONE,
+                ),
+                layout.billboard,
+            ) { save(layout.copy(billboard = it)) }
+        }
+    }
+    val available = HomeLayout.available(HomeLayout.CATALOG_ROWS_ALL, library.lists)
+    val all = layout.all(available)
+    SettingsGroup("Filas del Inicio", footer = "Enciende o apaga cada fila y súbela o bájala. Las listas nuevas (y las de Trakt) se añaden al final.") {
+        all.forEachIndexed { index, id ->
+            if (index > 0) RowDivider()
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val on = id !in layout.hidden
+                Text(
+                    HomeLayout.label(id, library.lists),
+                    color = if (on) Color.White else BambiColors.Muted,
+                    fontSize = 15.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                GhostButton("↑", enabled = index > 0) { save(layout.move(id, -1, available)) }
+                GhostButton("↓", enabled = index < all.lastIndex) { save(layout.move(id, 1, available)) }
+                BambiSwitch(on) { save(layout.toggle(id)) }
+            }
+        }
+        RowDivider()
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.End) {
+            GhostButton("Como al principio", enabled = layout != HomeLayout()) { save(HomeLayout()) }
+        }
     }
 }
 

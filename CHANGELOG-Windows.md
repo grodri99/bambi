@@ -1,6 +1,57 @@
 # Changelog — Bambi para Windows
 
-## [Sin publicar]
+## [1.0.9] — 2026-11-24
+
+### Lo que pidieron en el foro
+- Arreglado: al crear un perfil y volver a abrir Bambi desaparecían las claves de TMDB, del debrid y los addons
+  (Trakt guardaba su copia antigua de secrets.dat encima). Ahora cada escritura relee el archivo y lo cambia entero
+  de golpe.
+- Arreglado: el campo de una clave se cerraba con la primera letra (había que escribir una, darle a «Cambiar» y
+  pegar). Ahora se queda abierto hasta «Listo» o Intro, y tiene botón «Pegar».
+- Al empezar un vídeo salen arriba a la izquierda el título y las etiquetas de la fuente (4K, Dolby Vision, HDR10,
+  Dolby Atmos, 5.1…), como en la tele; también con los controles a la vista.
+- Clic en alguien del reparto: su ficha con foto, datos, biografía y toda su filmografía (Todo · Películas · Series).
+- Estrenos: el número de la pestaña y la lista bajan al momento al marcar capítulos como vistos (antes se quedaba
+  el total hasta 6 horas); botón «Marcar visto» en cada capítulo.
+- Los tráileres se ven dentro de Bambi, en el mismo reproductor (yt-dlp va junto a mpv y se pone al día solo cada
+  dos semanas); si YouTube no deja, se abren en el navegador.
+- Fecha entera de estreno en la ficha (día, mes y año), el año en cada pestaña de temporada y, debajo, cuándo
+  empezó y cuántos episodios tiene; los episodios con fecha legible.
+- Nota de IMDb junto a la de TMDB (de Cinemeta, sin clave).
+- «Seguir viendo»: menú en cada tarjeta (botón ⋮, clic derecho o mantener pulsado): seguir viendo (en ese mismo
+  episodio), ver la ficha, marcar como visto o quitar.
+- Listas: además de Mi lista, listas propias («Listas» en la ficha → añadir, quitar o «Nueva lista…»; en Mi lista,
+  pestañas para cada una, renombrar y borrar) y listas públicas de Trakt de otra gente (buscar por nombre, las más
+  populares o pegar el enlace; necesita el Client ID de Trakt, no conectar la cuenta).
+- Inicio a medida (Ajustes → Inicio, por perfil): portada automática, Top 10, de Mi lista o sin portada; cada fila
+  (Seguir viendo, Mi lista, tus listas, Top 10, recomendadas, cada fila del catálogo, categorías) se enciende,
+  apaga, sube o baja.
+- Pantalla completa hecha de nuevo (como Chrome o VLC: sin marco y con el tamaño exacto del monitor, en píxeles de
+  verdad). Se acaban las franjas blancas abajo y a la derecha (con la pantalla escalada, al abrir Bambi a pantalla
+  completa o al pulsar F11 con la ventana sin maximizar), F11 siempre sale a la primera, al salir del vídeo a
+  pantalla completa con «Volver» se vuelve a la ventana, y si estaba maximizada vuelve maximizada.
+- Abrir una ficha ya no congela la app unos segundos: las fuentes (cientos, de varios buscadores) y el color del logo
+  se procesan fuera de la interfaz (ahora responde en menos de 60 ms mientras carga).
+- «Solo en español» se guarda: ya no se quita al cambiar de episodio o de temporada, y «Reproducir», el siguiente
+  episodio y las fuentes de reserva solo prueban fuentes en español (si no hay, lo dice y abre el panel). También en
+  Ajustes → Fuentes.
+- Sin destello blanco al dar a Reproducir (ni al salir del vídeo): la primera vez, cargar JNA, arrancar mpv y
+  guardar el progreso se hacía en el hilo que pinta la ventana, que se quedaba en blanco un cuarto de segundo. Ahora
+  se hace aparte y se deja cargado al abrir Bambi; además el vídeo va en un panel negro propio y se enseña cuando mpv
+  ya tiene el primer fotograma. Medido con la tarjeta gráfica, fotograma a fotograma: ninguno en blanco.
+- «Cargando» como en Netflix: en vez del texto, un aro del color del perfil que gira con la cola difuminada (con el %
+  de carga en el centro si se sabe), al abrir el vídeo y cuando se queda cargando o al saltar. Sale a los 0,3 s, para
+  que en las cargas rápidas no parpadee.
+- Avisos de actualización arreglados: se busca la versión de Windows más nueva entre todas las releases (también las
+  beta), no solo «la última» de GitHub, y se entienden etiquetas como `windows-1.0.9-beta`.
+- Arreglado: desde «Seguir viendo», al salir del vídeo con Escape a veces volvía a arrancar solo el mismo episodio
+  (la ficha seguía marcada para reproducir al volver a pintarse). Ahora «Reproducir» vale una vez por ficha abierta.
+- Panel de fuentes rediseñado: resumen (cuántas, cuántas al instante y hasta qué calidad), filtros (solo en español,
+  al instante, 4K / 1080p / 720p), la recomendada destacada con su botón «Reproducir», cada buscador como tarjeta con
+  su color, y cada fuente con sus etiquetas (Dolby Vision, HDR10, Atmos, 5.1, castellano, tamaño, seeds).
+
+
+## [1.0.8 beta] — 2026-11-23 (primera versión para Windows)
 
 ### Rediseño
 - Interfaz más premium: nueva paleta, letra de Windows 11, barra con pestañas de texto, pósteres con sombra, botones

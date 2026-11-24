@@ -58,6 +58,10 @@ object ReleaseCenter {
         return split(episodes, library, today)
     }
 
+    /** Los que siguen sin ver ahora mismo (lo visto desde que se cargaron ya no cuenta). */
+    fun pending(episodes: List<ReleaseEpisode>, library: LibraryStore): List<ReleaseEpisode> =
+        episodes.filter { library.progressFor(it.show, it.season, it.number)?.finished != true }
+
     fun split(episodes: List<ReleaseEpisode>, library: LibraryStore, today: LocalDate): Releases {
         val from = today.minusDays(WINDOW_DAYS)
         val to = today.plusDays(WINDOW_DAYS)
@@ -111,8 +115,10 @@ object Notifier {
 }
 
 @Composable
-fun ReleasesScreen(library: LibraryStore, repository: DesktopRepository, onOpen: (CatalogItem) -> Unit) {
-    val releases by produceState<Releases?>(null, library) { value = ReleaseCenter.load(library, repository) }
+fun ReleasesScreen(library: LibraryStore, repository: DesktopRepository, onOpen: (CatalogItem) -> Unit, trakt: TraktManager? = null) {
+    val loaded by produceState<Releases?>(null, library) { value = ReleaseCenter.load(library, repository) }
+    // Lo que se marca como visto (aquí o en la ficha) desaparece al momento y el número baja con ello.
+    val releases = loaded?.let { it.copy(recent = ReleaseCenter.pending(it.recent, library)) }
     Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 48.dp, top = 88.dp)) {
         Text("Estrenos", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Text("Capítulos de las series que sigues: los de los últimos 30 días que no has visto y los que llegan.", color = BambiColors.Muted, fontSize = 14.sp)
@@ -128,7 +134,11 @@ fun ReleasesScreen(library: LibraryStore, repository: DesktopRepository, onOpen:
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (r.recent.isNotEmpty()) item { Header("Nuevos para ti · ${r.recent.size}") }
-            items(r.recent, key = { "r" + it.key }) { EpisodeLine(it, new = true) { onOpen(it.show) } }
+            items(r.recent, key = { "r" + it.key }) { e ->
+                EpisodeLine(e, new = true, onMarkWatched = {
+                    setWatched(library, trakt, e.show, listOf(e.season to e.number), true)
+                }) { onOpen(e.show) }
+            }
             if (r.upcoming.isNotEmpty()) item { Header("Próximamente") }
             items(r.upcoming, key = { "u" + it.key }) { EpisodeLine(it, new = false) { onOpen(it.show) } }
         }
@@ -139,7 +149,7 @@ fun ReleasesScreen(library: LibraryStore, repository: DesktopRepository, onOpen:
 private fun Header(text: String) = Text(text, color = BambiColors.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
 
 @Composable
-private fun EpisodeLine(e: ReleaseEpisode, new: Boolean, onClick: () -> Unit) {
+private fun EpisodeLine(e: ReleaseEpisode, new: Boolean, onMarkWatched: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(BambiColors.Surface, BambiShapes.Control).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -150,7 +160,8 @@ private fun EpisodeLine(e: ReleaseEpisode, new: Boolean, onClick: () -> Unit) {
             Text(e.show.title, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("T${e.season}:E${e.number} · ${e.title}", color = BambiColors.Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(e.airDate.format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.forLanguageTag("es"))), color = BambiColors.Muted, fontSize = 13.sp)
+        Text(formatDate(e.airDate.toString()), color = BambiColors.Muted, fontSize = 13.sp)
+        onMarkWatched?.let { mark -> androidx.compose.material3.TextButton(onClick = mark) { Text("Marcar visto", color = BambiColors.Muted) } }
         androidx.compose.material3.TextButton(onClick = onClick) { Text("Ver ficha", color = BambiColors.Accent) }
     }
 }

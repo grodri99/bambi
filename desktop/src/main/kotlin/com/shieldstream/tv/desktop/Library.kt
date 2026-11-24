@@ -77,6 +77,8 @@ data class DesktopProfile(
     val traktUser: String? = null,
     /** Categorías del Inicio ocultas en este perfil (como en la tele; por defecto, las mismas). */
     val hiddenCategories: Set<String> = com.shieldstream.tv.model.Category.DEFAULT_HIDDEN,
+    /** Qué sale en el Inicio de este perfil, en qué orden, y qué va en la portada. */
+    val homeLayout: HomeLayout = HomeLayout(),
 ) {
     val initial: String get() = name.trim().take(1).uppercase().ifBlank { "?" }
     val locked: Boolean get() = pinHash != null
@@ -100,7 +102,28 @@ data class LibraryFile(
     val progress: List<SavedProgress> = emptyList(),
     /** Audio y subtítulos elegidos por serie (clave: "TV:id"), como «memoria de pistas» en la tele. */
     val tracks: Map<String, TrackPreference> = emptyMap(),
+    /** Listas propias del perfil («Para ver en familia», «Pendientes de terror»…) y listas de Trakt añadidas. */
+    val lists: List<CustomList> = emptyList(),
 )
+
+/**
+ * Una lista más, aparte de Mi lista. Las propias se llenan desde las fichas («Añadir a una lista»). Las de Trakt
+ * ([traktPath], p. ej. «/users/juan/lists/terror») son de otra persona: se leen de Trakt y se guardan aquí para
+ * enseñarlas al momento; no se pueden editar desde Bambi.
+ */
+@Serializable
+data class CustomList(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val items: List<SavedItem> = emptyList(),
+    val traktPath: String? = null,
+    /** Dueño de la lista de Trakt (para enseñarlo: «de juan»). */
+    val traktUser: String? = null,
+    val updatedAt: Long = 0,
+) {
+    val isTrakt: Boolean get() = traktPath != null
+    fun contains(item: CatalogItem) = items.any { it.id == item.id && it.type == item.type.name }
+}
 
 @Serializable
 data class TrackPreference(val audioLang: String? = null, val subLang: String? = null)
@@ -206,6 +229,49 @@ class LibraryStore(private val file: File) {
         val list = if (!added) data.myList.filterNot { it.id == item.id && it.type == item.type.name } else listOf(saved) + data.myList
         write(data.copy(myList = list))
         myListChanges.tryEmit(saved to added)
+    }
+
+    // --------------------------------------------------------------- otras listas
+
+    val lists: List<CustomList> get() = data.lists
+
+    fun list(id: String): CustomList? = data.lists.firstOrNull { it.id == id }
+
+    fun createList(name: String, first: CatalogItem? = null): CustomList {
+        val list = CustomList(
+            name = name.trim().ifBlank { "Lista nueva" },
+            items = listOfNotNull(first?.let { SavedItem.of(it).copy(addedAt = System.currentTimeMillis()) }),
+            updatedAt = System.currentTimeMillis(),
+        )
+        write(data.copy(lists = data.lists + list))
+        return list
+    }
+
+    fun renameList(id: String, name: String) = updateList(id) { it.copy(name = name.trim().ifBlank { it.name }) }
+
+    fun deleteList(id: String) = write(data.copy(lists = data.lists.filterNot { it.id == id }))
+
+    /** Pone o quita un título de una lista propia (las de Trakt no se tocan). */
+    fun toggleInList(id: String, item: CatalogItem) = updateList(id) { list ->
+        if (list.isTrakt) return@updateList list
+        val items = if (list.contains(item)) list.items.filterNot { it.id == item.id && it.type == item.type.name }
+        else listOf(SavedItem.of(item).copy(addedAt = System.currentTimeMillis())) + list.items
+        list.copy(items = items, updatedAt = System.currentTimeMillis())
+    }
+
+    /** Añade (o pone al día, si ya estaba) una lista de Trakt con lo que tiene ahora. */
+    fun saveTraktList(path: String, name: String, user: String?, items: List<CatalogItem>): CustomList {
+        val saved = items.map { SavedItem.of(it) }
+        val existing = data.lists.firstOrNull { it.traktPath == path }
+        val list = (existing ?: CustomList(name = name, traktPath = path, traktUser = user))
+            .copy(name = name.ifBlank { existing?.name ?: "Lista de Trakt" }, items = saved, updatedAt = System.currentTimeMillis())
+        write(data.copy(lists = if (existing != null) data.lists.map { if (it.id == existing.id) list else it } else data.lists + list))
+        return list
+    }
+
+    private fun updateList(id: String, change: (CustomList) -> CustomList) {
+        if (data.lists.none { it.id == id }) return
+        write(data.copy(lists = data.lists.map { if (it.id == id) change(it) else it }))
     }
 
     fun progressFor(item: CatalogItem, season: Int? = null, episode: Int? = null): SavedProgress? =

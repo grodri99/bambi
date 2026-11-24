@@ -31,7 +31,33 @@ data class PlayRequest(
     val matchRefresh: Boolean = false,
     /** Ya se reintentó tras un corte a mitad. */
     val retried: Boolean = false,
+    /** Tráiler de YouTube (con yt-dlp): ni progreso, ni Trakt, ni siguiente episodio. */
+    val trailer: Boolean = false,
 )
+
+/**
+ * Las etiquetas que enseña el reproductor arriba a la izquierda al empezar (como en la tele): calidad, HDR / Dolby
+ * Vision, audio y canales, leídos del nombre de la fuente con los mismos detectores que la lista de fuentes.
+ */
+fun sourceBadges(source: DesktopSource): List<String> {
+    val name = source.title + " " + source.detail
+    val lower = name.lowercase()
+    return buildList {
+        source.quality.takeIf { it != com.shieldstream.tv.model.Quality.UNKNOWN }?.let { add(it.label) }
+        // Más estricto que el detector de la lista (allí «Dolby Digital» cuenta como Dolby Vision).
+        val dv = Regex("(?<![a-z0-9])(dv|dovi|dolby[ ._-]?vision)(?![a-z0-9])|profile[ ._-]?[578]").containsMatchIn(lower)
+        val hdr10Plus = Regex("hdr10(\\+|plus)").containsMatchIn(lower)
+        val hdr = Regex("(?<![a-z0-9])hdr").containsMatchIn(lower)
+        if (dv) add("Dolby Vision")
+        when {
+            hdr10Plus -> add("HDR10+")
+            hdr -> add("HDR10")
+            Regex("(?<![a-z0-9])hlg(?![a-z0-9])").containsMatchIn(lower) -> add("HLG")
+        }
+        com.shieldstream.tv.model.AudioCodec.parse(name).minByOrNull { it.ordinal }?.let { add(it.label) }
+        Regex("(?<![0-9])([57])[ ._]1(?![0-9])").find(lower)?.let { add(it.groupValues[1] + ".1") }
+    }.distinct()
+}
 
 /** Cómo acabó: por dónde ibas, cuánto dura, si llegaste al final o si no se pudo abrir. */
 data class PlaybackResult(
@@ -216,14 +242,20 @@ object MpvPlayer {
                     request.autoNext,
                     slateCheck = request.source.sizeBytes >= 150_000_000L && request.alternatives.isNotEmpty(),
                     accent = "%06X".format(BambiColors.Accent.toArgb() and 0xFFFFFF),
-                    autoSubs = PlayerPrefs.autoSubtitles,
+                    autoSubs = PlayerPrefs.autoSubtitles && !request.trailer,
                     subStyle = PlayerPrefs.subtitleStyle.encode(),
+                    badges = if (request.trailer) emptyList() else sourceBadges(request.source),
                 ).joinToString(","),
             )
+            if (request.trailer) {
+                // YouTube con el yt-dlp que va junto a mpv (si no, el del PATH). Hasta 1080p: arranca rápido.
+                ytDlp(mpvPath)?.let { add("--script-opts-append=ytdl_hook-ytdl_path=$it") }
+                add("--ytdl-format=bestvideo[height<=?1080]+bestaudio/best")
+            }
             add("--osd-font=Segoe UI")
             add("--input-ipc-server=$pipe")
             if (System.getProperty("bambi.tour") != null) add("--mute=yes")
-            add("--save-position-on-quit")
+            if (!request.trailer) add("--save-position-on-quit")
             add("--watch-later-dir=${dir.absolutePath}")
             add("--log-file=${log.absolutePath}")
             add("--term-playing-msg=bambi-duration=\${=duration}")
@@ -295,6 +327,24 @@ object MpvPlayer {
             System.getenv("USERPROFILE")?.let { File(it, "scoop/apps/mpv/current/mpv.exe") },
         ) + wingetPackages(local)
         return (bundled + installed).firstOrNull { it.isFile }?.absolutePath ?: name
+    }
+
+    /**
+     * yt-dlp para los tráileres: el que va con Bambi junto a mpv.exe; si no, null (mpv busca el del PATH).
+     */
+    fun ytDlp(mpvPath: String): String? {
+        val mpv = File(executable(mpvPath)).takeIf { it.isFile } ?: return null
+        return File(mpv.parentFile, "yt-dlp.exe").takeIf { it.isFile }?.absolutePath
+    }
+
+    /** Al abrir Bambi (no a la vez que un tráiler): yt-dlp se actualiza solo si tiene más de dos semanas. */
+    fun refreshYtDlp(mpvPath: String) {
+        val exe = ytDlp(mpvPath)?.let(::File) ?: return
+        if (System.currentTimeMillis() - exe.lastModified() < 14L * 24 * 3600 * 1000) return
+        runCatching {
+            val p = ProcessBuilder(exe.absolutePath, "-U").redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start()
+            if (p.waitFor(90, java.util.concurrent.TimeUnit.SECONDS)) exe.setLastModified(System.currentTimeMillis()) else p.destroy()
+        }
     }
 
     /** winget deja los paquetes portables en WinGet\Packages\<id>_…\, a veces dentro de otra carpeta. */

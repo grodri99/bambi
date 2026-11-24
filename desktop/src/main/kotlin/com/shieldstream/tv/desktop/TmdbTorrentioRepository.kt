@@ -21,6 +21,7 @@ import com.shieldstream.tv.domain.DebridService
 import com.shieldstream.tv.model.HdrType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -198,6 +199,7 @@ class TmdbTorrentioRepository(
                     }.getOrNull()
                 }
             }
+            val imdb = (d.imdb_id ?: item.imdbId)?.let { async { imdbRating("movie", it) } }
             TitleDetails(
                 // Lo que llega solo con el id (de Trakt) se completa aquí: título, póster, año y nota.
                 item = item.copy(
@@ -217,9 +219,12 @@ class TmdbTorrentioRepository(
                 cast = cast(d.credits),
                 trailerKey = trailer(d.videos),
                 saga = saga?.await(),
+                releaseDate = d.release_date?.takeIf { it.isNotBlank() },
+                imdbRating = imdb?.await(),
             )
         } else {
             val d = tmdb.tvDetails(id, key(), append = "images,external_ids,translations,content_ratings,aggregate_credits,videos")
+            val imdb = (d.external_ids?.imdb_id ?: item.imdbId)?.let { async { imdbRating("series", it) } }
             TitleDetails(
                 item = item.copy(
                     title = item.title.ifBlank { d.name },
@@ -235,12 +240,14 @@ class TmdbTorrentioRepository(
                 runtimeMinutes = d.episode_run_time.firstOrNull(),
                 genres = d.genres.map { TvGenres.localized(it.name) },
                 seasons = d.seasons.filter { it.season_number > 0 && it.episode_count > 0 }
-                    .map { SeasonInfo(it.season_number, it.name, it.episode_count) },
+                    .map { SeasonInfo(it.season_number, it.name, it.episode_count, it.air_date?.takeIf { d -> d.isNotBlank() }) },
                 ageRating = d.content_ratings?.results?.let { list ->
                     (list.firstOrNull { it.iso_3166_1 == "ES" } ?: list.firstOrNull { it.iso_3166_1 == "US" })?.rating?.takeIf { it.isNotBlank() }
                 },
                 cast = cast(d.aggregate_credits ?: d.credits),
                 trailerKey = trailer(d.videos),
+                releaseDate = d.first_air_date?.takeIf { it.isNotBlank() },
+                imdbRating = imdb?.await(),
             )
         }
     }
@@ -257,8 +264,74 @@ class TmdbTorrentioRepository(
 
     private fun cast(credits: com.shieldstream.tv.network.dto.TmdbCreditsDto?): List<CastMember> =
         credits?.cast.orEmpty().sortedBy { it.order }.take(20).map { c ->
-            CastMember(c.name, c.character?.takeIf { it.isNotBlank() } ?: c.roles.firstOrNull()?.character, c.profile_path?.let(TmdbImages::profile))
+            CastMember(
+                c.name,
+                c.character?.takeIf { it.isNotBlank() } ?: c.roles.firstOrNull()?.character,
+                c.profile_path?.let(TmdbImages::profile),
+                c.id.takeIf { it > 0 },
+            )
         }
+
+    /**
+     * Nota de IMDb desde Cinemeta (el catálogo de Stremio, sin clave). Si tarda o falla, la ficha sale sin ella: no
+     * se espera más de unos segundos.
+     */
+    private suspend fun imdbRating(type: String, imdbId: String): String? = runCatching {
+        kotlinx.coroutines.withTimeout(4_000) {
+            val body = torrentio.raw("https://v3-cinemeta.strem.io/meta/$type/$imdbId.json").use { it.string() }
+            val meta = (kotlinx.serialization.json.Json.parseToJsonElement(body) as? kotlinx.serialization.json.JsonObject)
+                ?.get("meta") as? kotlinx.serialization.json.JsonObject
+            (meta?.get("imdbRating") as? kotlinx.serialization.json.JsonPrimitive)?.content
+        }
+    }.getOrNull()?.trim()?.takeIf { it.toDoubleOrNull()?.let { r -> r > 0 } == true }
+
+    override suspend fun person(id: Int): PersonDetails {
+        val p = tmdb.person(id, key())
+        val credits = p.combined_credits
+        // Lo que ha hecho como actor y, para directores y guionistas, lo que ha dirigido o escrito.
+        val talk = setOf(10763, 10767) // noticias y programas de entrevistas: sale de invitado, no es su filmografía
+        val acted = credits?.cast.orEmpty().filter { r -> r.genre_ids.none { it in talk } }.mapNotNull { r -> r.toCatalogItemOrNull()?.let { it to (r.vote_count to r.popularity) } }
+        val made = credits?.crew.orEmpty()
+            .filter { it.job in setOf("Director", "Creator", "Screenplay", "Writer", "Novel") && it.genre_ids.none { g -> g in talk } }
+            .mapNotNull { c ->
+                val type = when (c.media_type) { "movie" -> MediaType.MOVIE; "tv" -> MediaType.TV; else -> return@mapNotNull null }
+                CatalogItem(
+                    id = c.id.toString(),
+                    imdbId = null,
+                    type = type,
+                    title = c.title ?: c.name ?: return@mapNotNull null,
+                    overview = c.overview,
+                    posterUrl = c.poster_path?.let(TmdbImages::poster),
+                    backdropUrl = c.backdrop_path?.let(TmdbImages::backdrop),
+                    year = (c.release_date ?: c.first_air_date)?.take(4)?.toIntOrNull(),
+                    rating = c.vote_average.takeIf { it > 0 }?.toFloat(),
+                ) to (c.vote_count to c.popularity)
+            }
+        val directing = p.known_for_department == "Directing" || p.known_for_department == "Writing"
+        val all = (if (directing) made + acted else acted + made)
+            .filter { it.first.posterUrl != null }
+            // Lo más conocido primero (votos), y no los programas de entrevistas donde sale de invitado.
+            .sortedByDescending { (_, score) -> score.first * 10.0 + score.second }
+            .map { it.first }
+            .distinctBy { it.key }
+        return PersonDetails(
+            id = p.id,
+            name = p.name,
+            photoUrl = p.profile_path?.let(TmdbImages::profile),
+            biography = p.biography.trim(),
+            knownFor = when (p.known_for_department) {
+                "Acting" -> "Interpretación"
+                "Directing" -> "Dirección"
+                "Writing" -> "Guion"
+                "Production" -> "Producción"
+                null, "" -> null
+                else -> p.known_for_department
+            },
+            birthday = p.birthday?.takeIf { it.isNotBlank() },
+            placeOfBirth = p.place_of_birth?.takeIf { it.isNotBlank() },
+            credits = all,
+        )
+    }
 
     /** Tráiler de YouTube: oficial y en el idioma de la app primero, como en la tele. */
     private fun trailer(videos: com.shieldstream.tv.network.dto.TmdbVideosDto?): String? {
@@ -419,7 +492,9 @@ class TmdbTorrentioRepository(
                         results.sources.any { it.id.startsWith("CASTELLANO:") })
                 },
             )
-        }
+        // Leer, ordenar y clasificar cientos de fuentes (idioma, calidad, HDR…) fuera del hilo de la interfaz: antes
+        // se hacía en él y la ficha se quedaba congelada unos segundos al abrirla (lo contaron en el foro).
+        }.flowOn(kotlinx.coroutines.Dispatchers.Default)
     }
 
     /** Enlace /resolve/ de Torrentio para un torrent: el servicio debrid lo convierte en el vídeo al abrirlo. */

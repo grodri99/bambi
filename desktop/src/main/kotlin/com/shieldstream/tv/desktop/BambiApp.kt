@@ -62,8 +62,11 @@ sealed interface Screen {
 
     /** Guía del primer arranque (sin clave de TMDB). */
     data object Setup : Screen
-    data class Details(val item: CatalogItem, val autoPlay: Boolean = false, val season: Int? = null) : Screen
+    data class Details(val item: CatalogItem, val autoPlay: Boolean = false, val season: Int? = null, val episode: Int? = null) : Screen
     data class Player(val request: PlayRequest) : Screen
+
+    /** Una persona del reparto y su filmografía. */
+    data class Person(val cast: CastMember) : Screen
 }
 
 /** Lo que se cierra con Escape o «Atrás» antes de cambiar de pantalla (el panel de fuentes de una ficha). */
@@ -81,6 +84,14 @@ class Navigator(start: Screen) {
     val focus = FocusRestore()
 
     fun listState(key: String) = listStates.getOrPut(key) { androidx.compose.foundation.lazy.LazyListState() }
+
+    /**
+     * «Reproducir» al abrir una ficha vale una sola vez por ficha abierta. Al volver del vídeo (Escape) la ficha se
+     * vuelve a pintar y, como seguía marcada para reproducir, a veces arrancaba otra vez sola el mismo episodio.
+     */
+    private val autoPlayed = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Screen, Boolean>())
+
+    fun takeAutoPlay(screen: Screen.Details): Boolean = screen.autoPlay && autoPlayed.add(screen)
     val current: Screen get() = stack.last()
     val canGoBack: Boolean get() = stack.size > 1
     fun open(screen: Screen) {
@@ -169,15 +180,21 @@ fun BambiApp(
             } else {
                 val library = remember(profile.id) { profiles.library(profile) }
                 val retryScope = androidx.compose.runtime.rememberCoroutineScope()
-                // Al entrar en un perfil, Trakt trae lo visto en la tele o en otro PC.
-                LaunchedEffect(profile.id) { trakt?.syncNow(force = true) }
+                // Al entrar en un perfil, Trakt trae lo visto en la tele o en otro PC (y pone al día sus listas añadidas).
+                LaunchedEffect(profile.id) {
+                    trakt?.syncNow(force = true)
+                    trakt?.refreshTraktLists(library)
+                }
                 // Estrenos de las series que sigue (contador arriba y aviso de Windows) y actualizaciones, cada 6 horas.
-                var newEpisodes by remember(profile.id) { mutableStateOf(0) }
+                // Se guardan los capítulos y el número se cuenta al pintar: al marcar algo como visto (aquí, en la ficha
+                // o desde Trakt) baja al momento, no a las 6 horas.
+                var recentEpisodes by remember(profile.id) { mutableStateOf<List<ReleaseEpisode>>(emptyList()) }
+                val newEpisodes = ReleaseCenter.pending(recentEpisodes, library).size
                 LaunchedEffect(profile.id) {
                     while (true) {
                         runCatching {
                             val recent = ReleaseCenter.load(library, repository).recent
-                            newEpisodes = recent.size
+                            recentEpisodes = recent
                             val seen = SeenReleases()
                             val fresh = recent.filter { it.key in seen.unseen(recent.map { r -> r.key }) }
                             fresh.take(3).forEach { Notifier.notify("Nuevo capítulo de ${it.show.title}", "T${it.season}:E${it.number} · ${it.title}") }
@@ -194,10 +211,10 @@ fun BambiApp(
                 Box(Modifier.fillMaxSize()) {
                     androidx.compose.runtime.CompositionLocalProvider(LocalFocusRestore provides navigator.focus) {
                     when (val screen = navigator.current) {
-                        Screen.Home -> HomeScreen(repository, Catalog.ALL, library, openDetails, listState = navigator.listState("home-ALL-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onSettings = { navigator.section(Screen.Settings) })
-                        Screen.Shows -> HomeScreen(repository, Catalog.SHOWS, library, openDetails, listState = navigator.listState("home-SHOWS-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onSettings = { navigator.section(Screen.Settings) })
-                        Screen.Movies -> HomeScreen(repository, Catalog.MOVIES, library, openDetails, listState = navigator.listState("home-MOVIES-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onSettings = { navigator.section(Screen.Settings) })
-                        Screen.MyList -> MyListScreen(library, openDetails, initialFilter = Catalog.ALL)
+                        Screen.Home -> HomeScreen(repository, Catalog.ALL, library, openDetails, listState = navigator.listState("home-ALL-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onResume = { navigator.open(Screen.Details(it.item.toItem(), autoPlay = true, season = it.season, episode = it.episode)) }, layout = profile.homeLayout, onSettings = { navigator.section(Screen.Settings) })
+                        Screen.Shows -> HomeScreen(repository, Catalog.SHOWS, library, openDetails, listState = navigator.listState("home-SHOWS-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onResume = { navigator.open(Screen.Details(it.item.toItem(), autoPlay = true, season = it.season, episode = it.episode)) }, layout = profile.homeLayout, onSettings = { navigator.section(Screen.Settings) })
+                        Screen.Movies -> HomeScreen(repository, Catalog.MOVIES, library, openDetails, listState = navigator.listState("home-MOVIES-${profile.id}"), kids = profile.kids, trakt = trakt, profileId = profile.id, hiddenCategories = profile.hiddenCategories, onPlay = { navigator.open(Screen.Details(it, autoPlay = true)) }, onResume = { navigator.open(Screen.Details(it.item.toItem(), autoPlay = true, season = it.season, episode = it.episode)) }, layout = profile.homeLayout, onSettings = { navigator.section(Screen.Settings) })
+                        Screen.MyList -> MyListScreen(library, openDetails, trakt = trakt, initialFilter = Catalog.ALL)
                         Screen.Search -> SearchScreen(
                             repository,
                             openDetails,
@@ -205,7 +222,7 @@ fun BambiApp(
                             onRequest = { requests.request(profile, it); notice.text = "Pedido. Un adulto lo verá en Ajustes → Peticiones." },
                             isRequested = { requests.isRequested(profile.id, it) },
                         )
-                        Screen.Releases -> ReleasesScreen(library, repository, openDetails)
+                        Screen.Releases -> ReleasesScreen(library, repository, openDetails, trakt)
                         Screen.Setup -> SetupScreen(config, repository, onDone = { navigator.section(Screen.Home) })
                         Screen.Settings -> SettingsScreen(config, repository, onDone = { navigator.section(Screen.Home) }, profile = profile, trakt = trakt, requests = requests, profiles = profiles, update = updates.available)
                         is Screen.Details -> DetailsScreen(
@@ -214,16 +231,21 @@ fun BambiApp(
                             library = library,
                             onPlay = { request -> navigator.open(Screen.Player(request)) },
                             trakt = trakt,
-                            autoPlayOnOpen = screen.autoPlay,
+                            autoPlayOnOpen = remember(screen) { navigator.takeAutoPlay(screen) },
                             showCast = config.current.showCast,
                             onOpen = openDetails,
                             onNotice = { notice.text = it },
                             service = config.current.debridService.title,
                             keepChosenSource = config.current.keepChosenSource,
                             startSeason = screen.season,
+                            startEpisode = screen.episode,
                             autoNext = config.current.autoNext,
                             matchRefresh = config.current.matchRefresh,
+                            onPerson = { navigator.open(Screen.Person(it)) },
+                            spanishOnly = config.current.spanishOnly,
+                            onSpanishOnly = { on -> runCatching { config.save(config.current.copy(spanishOnly = on)) } },
                         )
+                        is Screen.Person -> PersonScreen(repository, screen.cast, openDetails)
                         is Screen.Player -> {
                             PlayerPrefs.autoSubtitles = config.current.autoSubtitles
                             PlayerPrefs.subtitleScale = config.current.subtitleScale
@@ -231,6 +253,7 @@ fun BambiApp(
                             PlayerPrefs.onStyleChanged = { style -> runCatching { config.save(config.current.copy(subtitleStyle = style)) } }
                             LaunchedEffect(screen) {
                                 val r = screen.request
+                                if (r.trailer) return@LaunchedEffect
                                 trakt?.playbackStarted(r, library.progressFor(r.item, r.episode?.season, r.episode?.number)?.durationSec)
                             }
                             PlayerScreen(
@@ -242,6 +265,16 @@ fun BambiApp(
                                     if (navigator.current == screen) navigator.back()
                                 },
                                 onExit = { result ->
+                                    // Tráiler: no cuenta como visto ni va a Trakt. Si YouTube no lo dejó ver, al navegador.
+                                    if (screen.request.trailer) {
+                                        if (result.failed && (result.positionSec ?: 0.0) < 1.0) {
+                                            notice.text = "No se pudo abrir el tráiler aquí; se abre en el navegador."
+                                            openInBrowser(screen.request.source.url)
+                                        }
+                                        onFullscreen(false)
+                                        if (navigator.current == screen) navigator.back()
+                                        return@PlayerScreen
+                                    }
                                     // Como en la tele: si no arranca, se prueba la siguiente fuente.
                                     if (screen.request.alternatives.isNotEmpty() && (result.report.slate || (result.failed && (result.positionSec ?: 0.0) < 1.0))) {
                                         retryScope.launch {
@@ -320,6 +353,8 @@ fun BambiApp(
                     }
                 }
             }
+            // Ventanas encima de todo (nombre de una lista, listas de Trakt…).
+            OverlayHost()
             notice.text?.let { text ->
                 LaunchedEffect(text) {
                     delay(if (text.contains("mpv")) 15_000 else 5_000)

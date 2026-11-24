@@ -19,6 +19,7 @@ object BambiScript {
         accent: String = "E50914",
         autoSubs: Boolean = false,
         subStyle: String = "",
+        badges: List<String> = emptyList(),
     ): List<String> {
         fun range(r: com.shieldstream.tv.domain.TimeRange?) =
             r?.let { "%.1f-%.1f".format(Locale.US, it.startMs / 1000.0, if (it.endMs == Long.MAX_VALUE) -1.0 else it.endMs / 1000.0) }.orEmpty()
@@ -32,6 +33,8 @@ object BambiScript {
             "bambi-autosubs=${if (autoSubs) "yes" else "no"}",
             "bambi-substyle=$subStyle",
             "bambi-lang=${if (com.shieldstream.tv.model.Lang.isEnglish) "en" else "es"}",
+            // Las opciones de script van separadas por comas: las etiquetas, con «|».
+            "bambi-badges=" + badges.joinToString("|") { it.replace(",", " ").replace("=", " ").replace("|", " ") },
         )
     }
 
@@ -63,7 +66,7 @@ object BambiScript {
     private val LUA = """
 local mp = require 'mp'
 local options = require 'mp.options'
-local o = { intro = "", recap = "", outro = "", next = "no", slate = "no", accent = "E50914", lang = "es", autosubs = "no", substyle = "" }
+local o = { intro = "", recap = "", outro = "", next = "no", slate = "no", accent = "E50914", lang = "es", autosubs = "no", substyle = "", badges = "" }
 options.read_options(o, "bambi")
 
 -- Controles de Bambi encima del vídeo, como los de Netflix en el PC: arriba «volver»; abajo la barra de tiempo
@@ -184,7 +187,10 @@ local atEnd = false
 local pendingClick = nil
 local toast, toastUntil = nil, 0
 local lastData, lastW, lastH = nil, 0, 0
+local spinTimer = nil
+local loadingSince = nil
 local reqn = 0
+local infoUntil = 0
 
 local subMargin = 46
 local lastUi = 0
@@ -568,6 +574,54 @@ mp.observe_property("user-data/bambi/subs-state", "native", function(_, v)
   elseif v == "error" then say(tr("No se pudieron buscar subtítulos", "Could not search subtitles")) end
 end)
 
+-- Arriba a la izquierda, al empezar y con los controles a la vista: el título y las etiquetas de la fuente (4K,
+-- Dolby Vision, HDR10, Dolby Atmos, 5.1…), como en la tele. Si la fuente no dice nada, se sacan del propio vídeo.
+local function badgeList()
+  local list = {}
+  for b in string.gmatch(o.badges or "", "[^|]+") do list[#list + 1] = b end
+  if #list == 0 then
+    local h = mp.get_property_number("video-params/h") or 0
+    if h >= 2000 then list[#list + 1] = "4K" elseif h >= 1000 then list[#list + 1] = "1080p" elseif h >= 700 then list[#list + 1] = "720p" end
+    local g = mp.get_property("video-params/gamma") or ""
+    if g == "pq" then list[#list + 1] = "HDR" elseif g == "hlg" then list[#list + 1] = "HLG" end
+  end
+  return list
+end
+
+local function drawInfo(out, s)
+  local x = 130 * s
+  local title = mp.get_property("media-title") or ""
+  local room = math.max(10, math.floor((W * 0.62) / (15 * s)))
+  out[#out + 1] = text(x, 56 * s, 4, 30 * s, esc(cut(title, room)), WHITE, 0, true)
+  local bx = x
+  for _, b in ipairs(badgeList()) do
+    local w = (#b * 11 + 26) * s
+    out[#out + 1] = rrect(bx, 82 * s, w, 32 * s, 5 * s, BLACK, 0x70, 1.5 * s, WHITE)
+    out[#out + 1] = text(bx + w / 2, 98 * s, 5, 18 * s, esc(b), WHITE, 0, true)
+    bx = bx + w + 10 * s
+  end
+end
+
+-- Cargando, como Netflix: un aro del color del perfil que gira, con la cola que se desvanece.
+local function spinner(out, cx, cy, rad, th)
+  local n = 40
+  local sweep = math.pi * 1.6
+  local head = (now() * 2 * math.pi * 0.85) % (2 * math.pi)
+  local ro, ri = rad, rad - th
+  for i = 0, n - 1 do
+    local a1 = head - sweep * (n - i) / n
+    local a2 = head - sweep * (n - i - 1) / n + 0.015
+    local path = string.format("m %d %d l %d %d l %d %d l %d %d",
+      r(cx + ro * math.cos(a1)), r(cy + ro * math.sin(a1)),
+      r(cx + ro * math.cos(a2)), r(cy + ro * math.sin(a2)),
+      r(cx + ri * math.cos(a2)), r(cy + ri * math.sin(a2)),
+      r(cx + ri * math.cos(a1)), r(cy + ri * math.sin(a1)))
+    -- La cola (i pequeño) casi transparente; la cabeza, opaca.
+    local alpha = math.floor(255 * (1 - ((i + 1) / n) ^ 1.6))
+    out[#out + 1] = shape(path, ACCENT, alpha)
+  end
+end
+
 local function render()
   buttons = {}
   if W <= 0 or H <= 0 then return end
@@ -634,11 +688,6 @@ local function render()
       addButton(sx1 - 10 * s, rowY - 20 * s, sx2 + 10 * s, rowY + 20 * s, nil, "volume")
     end
 
-    -- Título en el centro.
-    local title = mp.get_property("media-title") or ""
-    local room = math.max(10, math.floor((W - 1100 * s) / (12 * s)))
-    out[#out + 1] = text(W / 2, rowY, 5, 24 * s, esc(cut(title, room)), WHITE, 0, true)
-
     -- Derecha: siguiente episodio, audio y subtítulos, pantalla completa.
     local rx = W - 72 * s
     if bambiListening() then
@@ -652,6 +701,12 @@ local function render()
     end
 
     if panel then drawPanel(out, s, barY - 40 * s) end
+  end
+
+  -- Título y etiquetas arriba a la izquierda (los primeros segundos, y siempre que se ven los controles).
+  if visible or now() < infoUntil then
+    if not visible then gradient(out, 0, 190 * s, 0x50, 0xFF) end
+    drawInfo(out, s)
   end
 
   -- Omitir intro / resumen (siempre, como en Netflix).
@@ -671,12 +726,22 @@ local function render()
 
   if editor then drawEditor(out, s) end
 
-  -- Cargando.
+  -- Cargando: el aro que gira (solo si tarda más de 0,3 s, para que no parpadee en cada salto corto).
   if mp.get_property_native("paused-for-cache") or (mp.get_property_native("seeking") and not paused) then
-    local pct = mp.get_property_number("cache-buffering-state")
-    local label = tr("Cargando", "Loading") .. ((pct and pct > 0 and pct < 100) and ("… " .. math.floor(pct) .. " %") or "…")
-    out[#out + 1] = rrect(W / 2 - 130 * s, H / 2 - 30 * s, 260 * s, 60 * s, 30 * s, BLACK, 0x50)
-    out[#out + 1] = text(W / 2, H / 2, 5, 24 * s, label, WHITE, 0, true)
+    loadingSince = loadingSince or now()
+    if now() - loadingSince > 0.3 then
+      out[#out + 1] = circle(W / 2, H / 2, 78 * s, BLACK, 0xA0)
+      spinner(out, W / 2, H / 2, 56 * s, 8 * s)
+      local pct = mp.get_property_number("cache-buffering-state")
+      if pct and pct > 0 and pct < 100 then
+        out[#out + 1] = text(W / 2, H / 2, 5, 20 * s, math.floor(pct) .. "%", WHITE, 0x30, true)
+      end
+    end
+    -- Mientras gira, se pinta a 30 por segundo (el resto del tiempo basta con 10).
+    if spinTimer and not spinTimer:is_enabled() then spinTimer:resume() end
+  else
+    loadingSince = nil
+    if spinTimer and spinTimer:is_enabled() then spinTimer:kill() end
   end
 
   if toast and now() < toastUntil then
@@ -692,6 +757,9 @@ local function render()
     lastData, lastW, lastH = data, W, H
   end
 end
+
+spinTimer = mp.add_periodic_timer(1 / 30, function() render() end)
+spinTimer:kill()
 
 -- Ratón --------------------------------------------------------------------------------------------------------------
 local function barFraction()
@@ -871,6 +939,7 @@ end
 
 mp.register_event("file-loaded", function()
   show(3)
+  infoUntil = now() + 8
   applyStyle()
   -- Audio que no es español y sin subtítulos en español: Bambi los busca solo (si está activado en Ajustes).
   if o.autosubs == "yes" then
@@ -886,6 +955,20 @@ mp.register_event("file-loaded", function()
     print("bambi-slate-now")
     mp.command("quit")
   end
+end)
+
+-- Primer fotograma: Bambi enseña la zona del vídeo (hasta ahora negra, para que no se vea la ventana en blanco).
+local readySent = false
+mp.register_event("playback-restart", function()
+  if readySent then return end
+  readySent = true
+  -- Bambi puede no estar escuchando aún (se conecta justo después de abrir mpv): se reintenta un rato.
+  local tries = 0
+  local function send()
+    if bambiListening() then request("ready")
+    elseif tries < 50 then tries = tries + 1; mp.add_timeout(0.2, send) end
+  end
+  send()
 end)
 
 mp.register_event("end-file", function()

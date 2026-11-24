@@ -40,6 +40,23 @@ class ConfigStoreTest {
     }
 
     @Test
+    fun `trakt writing its session does not wipe the settings keys`() {
+        // Lo que pasaba al crear un perfil: Trakt tenía abierto secrets.dat desde antes de poner las claves y, al
+        // guardar lo suyo, escribía su copia vieja y se perdían TMDB, el debrid y los addons.
+        val file = File(tmp.root, "config.json")
+        val trakt = SecretStore(File(tmp.root, "secrets.dat"))
+        trakt.get("trakt_p1")
+        ConfigStore(file).save(DesktopConfig(tmdbKey = "tmdb-secret", debridKey = "debrid-secret", addons = "https://a/manifest.json"))
+        trakt.set("trakt_p2", null)
+        trakt.set("trakt_p1", "{}")
+        val again = ConfigStore(file).current
+        assertEquals("tmdb-secret", again.tmdbKey)
+        assertEquals("debrid-secret", again.debridKey)
+        assertEquals("https://a/manifest.json", again.addons)
+        assertEquals("{}", SecretStore(File(tmp.root, "secrets.dat")).get("trakt_p1"))
+    }
+
+    @Test
     fun `clearing a key removes it`() {
         val file = File(tmp.root, "config.json")
         val store = ConfigStore(file)

@@ -31,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -314,6 +315,63 @@ internal class DesktopTraktPlatform(
  * Trakt en escritorio: la misma sincronización que la tele ([TraktSync]) sobre los perfiles y la biblioteca de
  * escritorio. Se crea cuando hay Client ID en Ajustes y se rehace si cambia.
  */
+/** Una lista pública de Trakt: dónde está ([path] en la API), cómo se llama, de quién es y cuántos títulos tiene. */
+data class TraktListInfo(
+    val path: String,
+    val name: String,
+    val user: String?,
+    val description: String,
+    val count: Int,
+    val likes: Int,
+)
+
+/** Lectura de las respuestas de listas de Trakt (separado para poder probarlo sin red). */
+object TraktLists {
+    private fun kotlinx.serialization.json.JsonObject.str(key: String) =
+        (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+    private fun kotlinx.serialization.json.JsonObject.num(key: String) =
+        (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull()
+    private fun kotlinx.serialization.json.JsonObject.obj(key: String) = this[key] as? kotlinx.serialization.json.JsonObject
+
+    fun info(list: kotlinx.serialization.json.JsonObject): TraktListInfo? {
+        val ids = list.obj("ids")
+        val traktId = ids?.num("trakt")
+        val user = list.obj("user")
+        val userSlug = user?.obj("ids")?.str("slug")
+        val slug = ids?.str("slug")
+        val path = when {
+            traktId != null -> "/lists/$traktId"
+            userSlug != null && slug != null -> "/users/$userSlug/lists/$slug"
+            else -> return null
+        }
+        return TraktListInfo(
+            path = path,
+            name = list.str("name")?.trim().orEmpty().ifBlank { "Lista de Trakt" },
+            user = user?.str("username") ?: userSlug,
+            description = list.str("description")?.trim().orEmpty(),
+            count = list.num("item_count")?.toInt() ?: 0,
+            likes = list.num("likes")?.toInt() ?: 0,
+        )
+    }
+
+    fun pathFromUrl(url: String): String? {
+        val text = url.trim()
+        Regex("trakt\\.tv/users/([^/?#\\s]+)/lists/([^/?#\\s]+)").find(text)?.let { return "/users/${it.groupValues[1]}/lists/${it.groupValues[2]}" }
+        Regex("trakt\\.tv/lists/([^/?#\\s]+)").find(text)?.let { return "/lists/${it.groupValues[1]}" }
+        return null
+    }
+
+    /** Elementos de una lista: (película o serie, id de TMDB), en su orden. */
+    fun items(body: kotlinx.serialization.json.JsonElement?): List<Pair<MediaType, String>> =
+        (body as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { element ->
+            val o = element as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+            val type = when (o.str("type")) { "movie" -> MediaType.MOVIE; "show" -> MediaType.TV; else -> return@mapNotNull null }
+            val media = o.obj(if (type == MediaType.MOVIE) "movie" else "show")
+            val tmdb = media?.obj("ids")?.num("tmdb") ?: return@mapNotNull null
+            type to tmdb.toString()
+        }.distinct()
+}
+
 class TraktManager(
     private val config: ConfigStore,
     private val profiles: ProfileStore,
@@ -430,6 +488,64 @@ class TraktManager(
     }
 
     fun canRate(): Boolean = session.profile?.let(::isConnected) == true
+
+    // --------------------------------------------------------------- listas públicas de Trakt
+
+    /** Cliente solo con el Client ID (las listas públicas no necesitan conectar la cuenta). */
+    private fun publicClient(): TraktClient {
+        val creds = credentials()
+        if (!creds.isConfigured) error("Para añadir listas de Trakt, pon el Client ID de Trakt en Ajustes → Trakt.")
+        return TraktClient(DesktopHttp.client, ApiFactory.json(), creds, userAgent = "Bambi/1.0 (Windows)")
+    }
+
+    /** Listas de Trakt que se llaman como [query] (o las más populares, si está vacío). */
+    suspend fun searchLists(query: String): List<TraktListInfo> {
+        val client = publicClient()
+        val q = query.trim()
+        val response = if (q.isEmpty()) client.get("/lists/popular?limit=30", null)
+        else client.get("/search/list?limit=30&query=" + java.net.URLEncoder.encode(q, "UTF-8"), null)
+        if (!response.ok) error("Trakt no responde (${response.code}).")
+        return (response.body as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { (it as? kotlinx.serialization.json.JsonObject)?.get("list") as? kotlinx.serialization.json.JsonObject }
+            .mapNotNull(TraktLists::info)
+    }
+
+    /** La lista de un enlace de Trakt (trakt.tv/users/…/lists/… o trakt.tv/lists/…). */
+    suspend fun listFromUrl(url: String): TraktListInfo {
+        val path = TraktLists.pathFromUrl(url) ?: error("Eso no parece un enlace de una lista de Trakt.")
+        val response = publicClient().get(path, null)
+        if (response.code == 404) error("Esa lista no existe o es privada.")
+        if (!response.ok) error("Trakt no responde (${response.code}).")
+        return (response.body as? kotlinx.serialization.json.JsonObject)?.let(TraktLists::info)?.copy(path = path)
+            ?: error("Trakt no ha devuelto la lista.")
+    }
+
+    /** Lo que tiene una lista de Trakt (hasta [limit]), ya como títulos de TMDB con su póster. */
+    suspend fun listItems(path: String, limit: Int = 100): List<CatalogItem> {
+        val response = publicClient().get("$path/items/movie,show?page=1&limit=$limit", null)
+        if (!response.ok) error("No se pudo leer la lista de Trakt (${response.code}).")
+        val refs = TraktLists.items(response.body)
+        val gate = kotlinx.coroutines.sync.Semaphore(8)
+        return coroutineScope {
+            refs.map { (type, id) ->
+                async { gate.withPermit { runCatching { repository.details(blank(type, id)).item }.getOrNull() } }
+            }.awaitAll().filterNotNull().filter { it.posterUrl != null }
+        }
+    }
+
+    /** Pone al día las listas de Trakt guardadas en el perfil (al entrar en él). */
+    fun refreshTraktLists(library: LibraryStore) {
+        if (!isConfigured) return
+        scope.launch {
+            for (list in library.lists.filter { it.isTrakt }) {
+                val path = list.traktPath ?: continue
+                if (System.currentTimeMillis() - list.updatedAt < 6 * 3600_000L) continue
+                runCatching { listItems(path) }.getOrNull()?.takeIf { it.isNotEmpty() }?.let {
+                    library.saveTraktList(path, list.name, list.traktUser, it)
+                }
+            }
+        }
+    }
 
     /** Busca en TMDB el título y el póster de lo que llegó de Trakt solo con su id. */
     private fun fillDetails(library: LibraryStore) {

@@ -6,7 +6,7 @@ import com.shieldstream.tv.model.Quality
 
 data class HomeRow(val title: String, val items: List<CatalogItem>)
 
-data class SeasonInfo(val number: Int, val name: String, val episodeCount: Int)
+data class SeasonInfo(val number: Int, val name: String, val episodeCount: Int, val airDate: String? = null)
 
 data class TitleDetails(
     val item: CatalogItem,
@@ -22,9 +22,25 @@ data class TitleDetails(
     val trailerKey: String? = null,
     /** La saga a la que pertenece (TMDB «colección»), en orden de estreno. */
     val saga: HomeRow? = null,
+    /** Fecha de estreno completa (película) o del primer episodio (serie), «2024-03-14». */
+    val releaseDate: String? = null,
+    /** Nota de IMDb («8.1»), de Cinemeta (sin clave). */
+    val imdbRating: String? = null,
 )
 
-data class CastMember(val name: String, val role: String?, val photoUrl: String?)
+data class CastMember(val name: String, val role: String?, val photoUrl: String?, val id: Int? = null)
+
+/** Ficha de una persona del reparto: sus datos y en qué ha salido (o qué ha dirigido), lo más conocido primero. */
+data class PersonDetails(
+    val id: Int,
+    val name: String,
+    val photoUrl: String?,
+    val biography: String,
+    val knownFor: String?,
+    val birthday: String?,
+    val placeOfBirth: String?,
+    val credits: List<CatalogItem>,
+)
 
 /** Una fuente lista para reproducir: [url] es el enlace que resuelve el servicio debrid. */
 data class DesktopSource(
@@ -84,6 +100,9 @@ interface DesktopRepository {
 
     /** Un título al azar entre los populares bien valorados («Sorpréndeme»). */
     suspend fun surprise(kids: Boolean = false): CatalogItem? = null
+
+    /** Una persona del reparto y su filmografía (películas y series). */
+    suspend fun person(id: Int): PersonDetails? = null
 
     suspend fun checkKeys(config: DesktopConfig): KeysCheck =
         KeysCheck(KeyStatus(true, "TMDB: clave correcta"), KeyStatus(true, "${config.debridService.title}: clave correcta"))

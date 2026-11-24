@@ -213,12 +213,22 @@ fun PlayerScreen(
             addMouseWheelListener(mouse)
         }
     }
+    val accent = BambiColors.Accent
+    val host = remember {
+        object : VideoHost() {}.apply {
+            background = java.awt.Color.BLACK
+            isOpaque = true
+            add(canvas, java.awt.BorderLayout.CENTER)
+        }
+    }
     // La zona del vídeo es una ventana de Windows: se coloca con la densidad real de la pantalla, no con la escalada
     // de la interfaz (si no, mpv se quedaba en una esquina).
     val density = LocalBaseDensity.current ?: androidx.compose.ui.platform.LocalDensity.current
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides density) {
-            SwingPanel(factory = { canvas }, modifier = Modifier.fillMaxSize(), background = Color.Black)
+            // El vídeo va dentro de un panel negro propio: mientras mpv arranca (con el vídeo escondido) se ve negro y no
+            // el gris claro de Swing, que era el «destello blanco» al dar a Reproducir.
+            SwingPanel(factory = { host }, modifier = Modifier.fillMaxSize(), background = Color.Black)
         }
     }
     val subs = androidx.compose.runtime.rememberCoroutineScope { Dispatchers.IO }
@@ -232,16 +242,33 @@ fun PlayerScreen(
         if (gone.get()) return@LaunchedEffect
         // Si queda un mpv de otro vídeo, fuera (nunca dos sonando a la vez).
         PlayerControl.session?.takeIf { it.alive }?.let { PlayerControl.quit(it) }
-        val wid = runCatching { com.sun.jna.Native.getComponentID(canvas) }.getOrNull()?.takeIf { it != 0L }
-        MpvPlayer.start(mpvPath, request, wid) { result ->
+        // Lo lento (la primera vez: cargar JNA y arrancar mpv) fuera del hilo que pinta la ventana: si se hacía en él,
+        // la ventana se quedaba sin pintar un cuarto de segundo y por el hueco del vídeo se veía blanco.
+        val wid = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            runCatching { com.sun.jna.Native.getComponentID(canvas) }.getOrNull()?.takeIf { it != 0L }
+        }
+        if (gone.get()) return@LaunchedEffect
+        // La ventana de mpv sale en blanco hasta el primer fotograma (el «destello blanco» al dar a Reproducir): la
+        // zona del vídeo se esconde (se ve negro) hasta que el script avisa de que ya hay imagen. Por si no avisa,
+        // se enseña igualmente a los 15 s.
+        canvas.isVisible = false
+        host.startLoading(java.awt.Color(accent.red, accent.green, accent.blue))
+        val started = System.currentTimeMillis()
+        val reveal = javax.swing.Timer(15_000) {
+            canvas.isVisible = true; host.stopLoading(); host.revalidate(); host.repaint()
+            System.err.println("vídeo visible (sin aviso, a los 15 s)")
+        }.apply { isRepeats = false; start() }
+        kotlinx.coroutines.withContext(Dispatchers.IO) { MpvPlayer.start(mpvPath, request, wid) { result ->
             javax.swing.SwingUtilities.invokeLater {
+                reveal.stop()
+                canvas.isVisible = true; host.stopLoading(); host.revalidate(); host.repaint()
                 val s = mine.get()
                 if (s != null && PlayerControl.session === s) PlayerControl.session = null
                 // Si ya se había salido de este vídeo, no se reintenta otra fuente ni se navega.
                 if (gone.get() && (result.failed || result.report.slate)) return@invokeLater
                 onExit(result)
             }
-        }.onSuccess { s ->
+        } }.onSuccess { s ->
             mine.set(s)
             if (gone.get()) {
                 PlayerControl.quit(s)
@@ -268,6 +295,11 @@ fun PlayerScreen(
                         // Solo si sigue siendo el vídeo que se está viendo.
                         if (PlayerControl.session === s) {
                             when (what) {
+                                "ready" -> {
+                                    reveal.stop()
+                                    canvas.isVisible = true; host.stopLoading(); host.revalidate(); host.repaint()
+                                    System.err.println("vídeo visible (primer fotograma, ${System.currentTimeMillis() - started} ms)")
+                                }
                                 "fs" -> PlayerControl.toggleFullscreen()
                                 "esc" -> PlayerControl.escape()
                             }
@@ -276,7 +308,12 @@ fun PlayerScreen(
                 },
             )
         }
-            .onFailure { System.err.println("mpv no se pudo abrir: ${it.message}"); onError(it.message ?: "No se pudo reproducir") }
+            .onFailure {
+                reveal.stop()
+                canvas.isVisible = true; host.stopLoading(); host.revalidate(); host.repaint()
+                System.err.println("mpv no se pudo abrir: ${it.message}")
+                onError(it.message ?: "No se pudo reproducir")
+            }
     }
     DisposableEffect(request) {
         onDispose {
@@ -339,5 +376,59 @@ private class OnlineSubtitles(private val session: MpvSession, private val targe
                 System.err.println("subtítulo: ${it.message}")
                 state("error")
             }
+    }
+}
+
+
+/**
+ * Lo que hay detrás del vídeo: negro y, mientras mpv prepara el primer fotograma (con el vídeo aún escondido), el aro
+ * de «cargando» que gira, como en Netflix (el mismo que dibuja el reproductor cuando se queda cargando). Sale a los
+ * 0,3 s, para que en las cargas rápidas no parpadee.
+ */
+internal open class VideoHost : javax.swing.JPanel(java.awt.BorderLayout()) {
+    private var since = 0L
+    private var color = java.awt.Color(0xE5, 0x09, 0x14)
+    private val tick = javax.swing.Timer(16) { repaint() }
+
+    fun startLoading(accent: java.awt.Color) {
+        color = accent
+        since = System.currentTimeMillis()
+        tick.start()
+    }
+
+    fun stopLoading() {
+        since = 0L
+        tick.stop()
+        repaint()
+    }
+
+    override fun paintComponent(g: java.awt.Graphics) {
+        g.color = java.awt.Color.BLACK
+        g.fillRect(0, 0, width, height)
+        val elapsed = System.currentTimeMillis() - since
+        if (since == 0L || elapsed < 300) return
+        val g2 = g.create() as java.awt.Graphics2D
+        try {
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_STROKE_CONTROL, java.awt.RenderingHints.VALUE_STROKE_PURE)
+            val scale = (height / 1080.0).coerceIn(0.55, 2.2)
+            val radius = 56 * scale
+            val thickness = (8 * scale).toFloat()
+            val r = radius - thickness / 2
+            g2.stroke = java.awt.BasicStroke(thickness, java.awt.BasicStroke.CAP_BUTT, java.awt.BasicStroke.JOIN_ROUND)
+            // Gira en el sentido de las agujas del reloj (en Java los ángulos van al revés): la cabeza opaca y la cola
+            // desvaneciéndose detrás.
+            val head = -((elapsed / 1000.0) * 360 * 0.85) % 360
+            val sweep = 288.0
+            val n = 40
+            for (i in 0 until n) {
+                val start = head + sweep * (n - 1 - i) / n
+                val alpha = (255 * Math.pow((i + 1.0) / n, 1.6)).toInt().coerceIn(0, 255)
+                g2.color = java.awt.Color(color.red, color.green, color.blue, alpha)
+                g2.draw(java.awt.geom.Arc2D.Double(width / 2.0 - r, height / 2.0 - r, r * 2, r * 2, start, sweep / n + 0.8, java.awt.geom.Arc2D.OPEN))
+            }
+        } finally {
+            g2.dispose()
+        }
     }
 }

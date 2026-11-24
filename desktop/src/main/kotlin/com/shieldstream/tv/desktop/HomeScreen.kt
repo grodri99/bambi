@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -76,6 +77,10 @@ fun HomeScreen(
     hiddenCategories: Set<String> = com.shieldstream.tv.model.Category.DEFAULT_HIDDEN,
     /** «Reproducir» de la portada y «Reproduce algo»: abre la ficha y empieza solo. */
     onPlay: (CatalogItem) -> Unit = onOpen,
+    /** «Seguir viendo»: abre la ficha en ese episodio y empieza solo donde lo dejaste. */
+    onResume: (SavedProgress) -> Unit = { onPlay(it.item.toItem()) },
+    /** Qué filas salen, en qué orden, y la portada (Ajustes → Inicio, por perfil). */
+    layout: HomeLayout = HomeLayout(),
     onSettings: () -> Unit,
 ) {
     // Lo ya cargado se enseña al momento (al volver de una ficha no se recarga ni se pierde la posición).
@@ -120,31 +125,58 @@ fun HomeScreen(
             }
         }
         is Load.Ok -> LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 56.dp)) {
-            val hero = s.value.flatMap { it.items }.firstOrNull { it.backdropUrl != null }
-            if (hero != null) item(key = "hero") { Billboard(hero, repository, library, onOpen, onPlay) }
-            else item(key = "space") { Spacer(Modifier.height(80.dp)) }
             val continuing = library.continueWatching().filter { wanted(it.item.type) }
-            if (continuing.isNotEmpty()) item(key = "continue") { ContinueRow(continuing, onOpen) { library.clear(it.key) } }
             val myList = library.myList.filter { wanted(it.type) }
-            if (myList.isNotEmpty() && catalog == Catalog.ALL) {
-                item(key = "mylist") { RowSection(HomeRow("Mi lista", myList.map { it.toItem() }), onOpen) }
+            // Portada: la que se haya elegido (si no hay de dónde sacarla, la de siempre).
+            val auto = s.value.flatMap { it.items }.firstOrNull { it.backdropUrl != null }
+            val hero = when (layout.billboard) {
+                HomeLayout.NONE -> null
+                HomeLayout.TOP10 -> top10.firstOrNull { it.backdropUrl != null } ?: auto
+                HomeLayout.MYLIST -> myList.map { it.toItem() }.firstOrNull { it.backdropUrl != null } ?: auto
+                else -> auto
             }
-            item(key = "play-something") {
-                PlaySomething(
-                    onPlaySomething = {
-                        // Como en la tele: lo que estabas viendo, luego Mi lista y, si no hay nada, una tendencia.
-                        val candidates = library.continueWatching().filter { wanted(it.item.type) }.map { it.item.toItem() }
-                            .ifEmpty { library.myList.filter { wanted(it.type) }.map { it.toItem() } }
-                            .ifEmpty { top10 }
-                        candidates.randomOrNull()?.let(onPlay)
-                    },
-                    onSurprise = { scope.launch { runCatching { repository.surprise(kids) }.getOrNull()?.let(onOpen) } },
-                )
+            if (hero != null) item(key = "hero") { Billboard(hero, repository, library, onOpen, onPlay) }
+            else item(key = "space") { Spacer(Modifier.height(if (layout.billboard == HomeLayout.NONE) 96.dp else 80.dp)) }
+            val lists = library.lists.associateBy { HomeLayout.listRow(it.id) }
+            val catalogRows = s.value.associateBy { HomeLayout.catalogRow(it.title) }
+            val available = HomeLayout.available(s.value.map { it.title }, library.lists)
+            for (id in layout.arrange(available)) {
+                when {
+                    id == HomeLayout.CONTINUE -> if (continuing.isNotEmpty()) item(key = "continue") {
+                        ContinueRow(
+                            continuing,
+                            onOpen = onOpen,
+                            onPlay = onResume,
+                            onWatched = { setWatched(library, trakt, it.item.toItem(), listOf(it.season to it.episode), true) },
+                            onRemove = { library.clear(it.key) },
+                        )
+                    }
+                    id == HomeLayout.MY_LIST_ROW -> if (myList.isNotEmpty() && catalog == Catalog.ALL) {
+                        item(key = "mylist") { RowSection(HomeRow("Mi lista", myList.map { it.toItem() }), onOpen) }
+                    }
+                    id == HomeLayout.PLAY_SOMETHING -> item(key = "play-something") {
+                        PlaySomething(
+                            onPlaySomething = {
+                                // Como en la tele: lo que estabas viendo, luego Mi lista y, si no hay nada, una tendencia.
+                                val candidates = library.continueWatching().filter { wanted(it.item.type) }.map { it.item.toItem() }
+                                    .ifEmpty { library.myList.filter { wanted(it.type) }.map { it.toItem() } }
+                                    .ifEmpty { top10 }
+                                candidates.randomOrNull()?.let(onPlay)
+                            },
+                            onSurprise = { scope.launch { runCatching { repository.surprise(kids) }.getOrNull()?.let(onOpen) } },
+                        )
+                    }
+                    id == HomeLayout.TOP10_ROW -> if (top10.isNotEmpty()) item(key = "top10") { Top10Row(top10, onOpen) }
+                    id == HomeLayout.TRAKT -> items(recommended, key = { "trakt-" + it.title }) { row -> RowSection(row, onOpen) }
+                    id == HomeLayout.CATEGORIES -> items(categoryRows, key = { "cat-" + it.title }) { row -> RowSection(row, onOpen) }
+                    id in lists -> {
+                        val l = lists.getValue(id)
+                        val shown = l.items.filter { wanted(it.type) }
+                        if (shown.isNotEmpty()) item(key = id) { RowSection(HomeRow(l.name, shown.map { it.toItem() }), onOpen) }
+                    }
+                    id in catalogRows -> item(key = id) { RowSection(catalogRows.getValue(id), onOpen) }
+                }
             }
-            if (top10.isNotEmpty()) item(key = "top10") { Top10Row(top10, onOpen) }
-            items(recommended, key = { "trakt-" + it.title }) { row -> RowSection(row, onOpen) }
-            items(s.value, key = { it.title }) { row -> RowSection(row, onOpen) }
-            items(categoryRows, key = { "cat-" + it.title }) { row -> RowSection(row, onOpen) }
         }
     }
 }
@@ -225,9 +257,19 @@ fun PillButton(
     }
 }
 
-/** «Seguir viendo»: fotos horizontales con la barra de lo que llevas visto. */
+/**
+ * «Seguir viendo»: fotos horizontales con la barra de lo que llevas visto. Cada una tiene su menú (botón ⋮, clic
+ * derecho o mantener pulsado, como mantener OK en la tele): seguir viendo, ver la ficha, marcar como visto o quitarla.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ContinueRow(entries: List<SavedProgress>, onOpen: (CatalogItem) -> Unit, onRemove: (SavedProgress) -> Unit) {
+private fun ContinueRow(
+    entries: List<SavedProgress>,
+    onOpen: (CatalogItem) -> Unit,
+    onPlay: (SavedProgress) -> Unit,
+    onWatched: (SavedProgress) -> Unit,
+    onRemove: (SavedProgress) -> Unit,
+) {
     Column(Modifier.padding(top = 8.dp)) {
         RowTitle("Seguir viendo")
         BambiLazyRow(contentPadding = PaddingValues(horizontal = 48.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -235,9 +277,15 @@ private fun ContinueRow(entries: List<SavedProgress>, onOpen: (CatalogItem) -> U
                 val interaction = remember { MutableInteractionSource() }
                 val hovered = interaction.collectIsHoveredAsState().value || interaction.collectIsFocusedAsState().value
                 val scale by animateFloatAsState(if (hovered) 1.05f else 1f)
-                // Como mantener OK en la tele: clic derecho o Supr lo quitan de «Seguir viendo» (y de Trakt).
+                var menu by remember { mutableStateOf(false) }
+                val what = if (entry.season != null) "el episodio" else "la película"
                 androidx.compose.foundation.ContextMenuArea(items = {
-                    listOf(androidx.compose.foundation.ContextMenuItem("Quitar de Seguir viendo") { onRemove(entry) })
+                    listOf(
+                        androidx.compose.foundation.ContextMenuItem("Seguir viendo") { onPlay(entry) },
+                        androidx.compose.foundation.ContextMenuItem("Ver ficha") { onOpen(entry.item.toItem()) },
+                        androidx.compose.foundation.ContextMenuItem("Marcar $what como visto") { onWatched(entry) },
+                        androidx.compose.foundation.ContextMenuItem("Quitar de Seguir viendo") { onRemove(entry) },
+                    )
                 }) {
                 Column(Modifier.width(300.dp)) {
                     Box(
@@ -250,17 +298,44 @@ private fun ContinueRow(entries: List<SavedProgress>, onOpen: (CatalogItem) -> U
                             .background(BambiColors.Placeholder)
                             .then(if (hovered) Modifier.border(3.dp, Color.White, BambiShapes.Poster) else Modifier)
                             .hoverable(interaction)
-                            .clickable(interactionSource = interaction, indication = null) { onOpen(entry.item.toItem()) },
+                            .combinedClickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onLongClick = { menu = true },
+                            ) { onOpen(entry.item.toItem()) },
                     ) {
                         RemoteImage(entry.item.backdropUrl ?: entry.item.posterUrl, Modifier.fillMaxSize(), placeholder = { TitlePlaceholder(entry.item.title) })
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
-                        // Botón de play en un círculo de cristal que crece al pasar por encima.
+                        // Botón de play en un círculo de cristal que crece al pasar por encima: sigue donde lo dejaste.
                         Box(
                             Modifier.align(Alignment.Center).size(if (hovered) 58.dp else 48.dp)
                                 .background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.CircleShape)
-                                .border(1.5.dp, Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.CircleShape),
+                                .border(1.5.dp, Color.White.copy(alpha = 0.8f), androidx.compose.foundation.shape.CircleShape)
+                                .clickable { onPlay(entry) },
                             contentAlignment = Alignment.Center,
-                        ) { Icon(AppIcons.Play, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp)) }
+                        ) { Icon(AppIcons.Play, contentDescription = "Seguir viendo", tint = Color.White, modifier = Modifier.size(26.dp)) }
+                        // Menú (⋮) arriba a la derecha, al pasar por encima.
+                        if (hovered || menu) {
+                            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                                Box(
+                                    Modifier.size(34.dp)
+                                        .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.CircleShape)
+                                        .border(1.dp, Color.White.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape)
+                                        .clickable { menu = true },
+                                    contentAlignment = Alignment.Center,
+                                ) { Icon(AppIcons.MoreVert, contentDescription = "Opciones", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                                androidx.compose.material3.DropdownMenu(
+                                    expanded = menu,
+                                    onDismissRequest = { menu = false },
+                                    modifier = Modifier.background(BambiColors.Surface).width(260.dp),
+                                ) {
+                                    MenuOption("Seguir viendo", AppIcons.Play) { menu = false; onPlay(entry) }
+                                    MenuOption("Ver ficha", AppIcons.Info) { menu = false; onOpen(entry.item.toItem()) }
+                                    MenuOption("Marcar $what como visto", AppIcons.Check) { menu = false; onWatched(entry) }
+                                    MenuOption("Quitar de Seguir viendo", AppIcons.Delete) { menu = false; onRemove(entry) }
+                                }
+                            }
+                        }
                         ProgressBar(entry.fraction, Modifier.align(Alignment.BottomCenter).padding(12.dp))
                     }
                     Text(
@@ -273,6 +348,16 @@ private fun ContinueRow(entries: List<SavedProgress>, onOpen: (CatalogItem) -> U
             }
         }
     }
+}
+
+/** Una opción de los menús desplegables (icono gris y texto blanco). */
+@Composable
+fun MenuOption(label: String, icon: ImageVector, onClick: () -> Unit) {
+    androidx.compose.material3.DropdownMenuItem(
+        text = { Text(label, color = Color.White) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = BambiColors.Muted) },
+        onClick = onClick,
+    )
 }
 
 @Composable
@@ -289,41 +374,6 @@ fun RowSection(row: HomeRow, onOpen: (CatalogItem) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(row.items, key = { it.key }) { PosterCard(it, onClick = { onOpen(it) }) }
-        }
-    }
-}
-
-@Composable
-fun MyListScreen(library: LibraryStore, onOpen: (CatalogItem) -> Unit, initialFilter: Catalog = Catalog.ALL) {
-    var filter by remember { mutableStateOf(initialFilter) }
-    Column(Modifier.fillMaxSize().padding(start = 48.dp, end = 48.dp, top = 88.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Mi lista", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(16.dp))
-            // Como en la tele: Todo · Series · Películas.
-            for ((value, label) in listOf(Catalog.ALL to "Todo", Catalog.SHOWS to "Series", Catalog.MOVIES to "Películas")) {
-                androidx.compose.material3.FilterChip(selected = filter == value, onClick = { filter = value }, label = { Text(label) })
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        val shown = library.myList.filter {
-            when (filter) {
-                Catalog.ALL -> true
-                Catalog.SHOWS -> it.type == MediaType.TV.name
-                Catalog.MOVIES -> it.type == MediaType.MOVIE.name
-            }
-        }
-        if (shown.isEmpty()) {
-            Text(if (library.myList.isEmpty()) "Aún no has añadido nada. En cualquier ficha, pulsa «Mi lista»." else "Nada en este filtro.", color = BambiColors.Muted)
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(158.dp),
-                contentPadding = PaddingValues(bottom = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
-                items(shown, key = { it.type + it.id }) { saved -> PosterCard(saved.toItem(), onClick = { onOpen(saved.toItem()) }) }
-            }
         }
     }
 }
@@ -413,7 +463,7 @@ object HomeCache {
 
 /** Línea de datos de la portada: edad en una etiqueta con filo, nota con estrella dorada y el resto separado por puntos. */
 @Composable
-fun MetaLine(age: String?, parts: List<String>, rating: Float?) {
+fun MetaLine(age: String?, parts: List<String>, rating: Float?, imdb: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         age?.let {
             Text(
@@ -424,11 +474,29 @@ fun MetaLine(age: String?, parts: List<String>, rating: Float?) {
                 modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.6f), BambiShapes.Badge).padding(horizontal = 7.dp, vertical = 2.dp),
             )
         }
+        // Notas: la de TMDB (estrella) y, si la hay, la de IMDb (con su amarillo), como piden en el foro.
         rating?.takeIf { it > 0 }?.let {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(AppIcons.Star, contentDescription = null, tint = BambiColors.Gold, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("%.1f".format(it), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                if (imdb != null) {
+                    Spacer(Modifier.width(5.dp))
+                    Text("TMDB", color = BambiColors.Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        imdb?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "IMDb",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.background(Color(0xFFF5C518), BambiShapes.Badge).padding(horizontal = 5.dp, vertical = 1.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(it.replace(',', '.'), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
         Text(parts.joinToString("  ·  "), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, fontWeight = FontWeight.Medium)

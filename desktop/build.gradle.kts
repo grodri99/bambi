@@ -44,7 +44,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Bambi"
-            packageVersion = "1.0.8"
+            packageVersion = "1.0.9"
             windows {
                 menuGroup = "Bambi"
                 shortcut = true
@@ -209,9 +209,39 @@ val windowsMpvDir by tasks.registering(Copy::class) {
     from({ zipTree(windowsMpv.get().outputs.files.singleFile) })
 }
 
+// yt-dlp: lo que usa mpv para los tráileres de YouTube. Va junto a mpv.exe. Se baja la última versión (YouTube
+// cambia a menudo) y Bambi la pone al día sola cada dos semanas.
+val windowsYtdlp by tasks.registering {
+    group = "distribution"
+    val exe = layout.buildDirectory.file("mpv/yt-dlp.exe")
+    outputs.file(exe)
+    doLast {
+        val file = exe.get().asFile
+        val week = 7L * 24 * 3600 * 1000
+        if (file.length() > 0 && System.currentTimeMillis() - file.lastModified() < week) return@doLast
+        file.parentFile.mkdirs()
+        val tmp = File(file.path + ".part")
+        uri("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe").toURL().openStream().use { input ->
+            tmp.outputStream().use { input.copyTo(it) }
+        }
+        if (tmp.length() < 1_000_000) error("yt-dlp.exe descargado incompleto (${tmp.length()} bytes)")
+        file.delete()
+        tmp.renameTo(file)
+    }
+}
+
+val windowsYtdlpDir by tasks.registering(Copy::class) {
+    group = "distribution"
+    dependsOn(windowsYtdlp)
+    val target = rootProject.layout.projectDirectory.dir("_windows/Bambi/mpv")
+    onlyIf { !target.file("yt-dlp.exe").asFile.exists() }
+    into(target)
+    from(layout.buildDirectory.file("mpv/yt-dlp.exe"))
+}
+
 val windowsDist by tasks.registering(Copy::class) {
     group = "distribution"
-    dependsOn(windowsExe, windowsMpvDir)
+    dependsOn(windowsExe, windowsMpvDir, windowsYtdlpDir)
     val target = rootProject.layout.projectDirectory.dir("_windows/Bambi").asFile
     into(target)
     // Si Bambi está abierto, Windows bloquea su Java y su .exe: Java solo se copia si falta (se mira una vez, antes).
@@ -316,7 +346,7 @@ val bambiUpgradeUuid = "62bfdda8-f99f-41bb-8a19-d7664aecfacd"
 
 val windowsInstaller by tasks.registering(Exec::class) {
     group = "distribution"
-    dependsOn(windowsExe, windowsMpv, windowsWixUnpacked, windowsJdkUnpacked)
+    dependsOn(windowsExe, windowsMpv, windowsYtdlp, windowsWixUnpacked, windowsJdkUnpacked)
     val image = layout.buildDirectory.dir("installer-image/Bambi")
     val out = layout.buildDirectory.dir("installer")
     val dest = rootProject.layout.projectDirectory.dir("_windows")
@@ -326,6 +356,7 @@ val windowsInstaller by tasks.registering(Exec::class) {
         delete(layout.buildDirectory.dir("installer-image"), out)
         copy { from(layout.buildDirectory.dir("jpackage/Bambi")); into(image) }
         copy { from(zipTree(windowsMpv.get().outputs.files.singleFile)); into(image.get().dir("mpv")) }
+        copy { from(layout.buildDirectory.file("mpv/yt-dlp.exe")); into(image.get().dir("mpv")) }
         out.get().asFile.mkdirs()
         // WiX tiene que estar en el PATH que ve jpackage (un programa de Windows lanzado desde WSL).
         val wixBin = layout.buildDirectory.dir("wix/bin").get().asFile.absolutePath

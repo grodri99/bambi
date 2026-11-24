@@ -134,6 +134,7 @@ data class TmdbSeasonSummaryDto(
     val season_number: Int = 0,
     val name: String = "",
     val episode_count: Int = 0,
+    val air_date: String? = null,
 )
 
 @Serializable

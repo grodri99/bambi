@@ -58,6 +58,23 @@ class ReleasesAndUpdatesTest {
         assertTrue(Updater.isNewer("1.1", "1.0.8"))
         assertFalse(Updater.isNewer("v1.0.8", "1.0.8"))
         assertFalse(Updater.isNewer("1.0.7", "1.0.8"))
+        assertTrue(Updater.isNewer("windows-1.0.9-beta", "1.0.8"))
+        assertFalse(Updater.isNewer("windows-1.0.8-beta", "1.0.8"))
+    }
+
+    @Test
+    fun `the newest windows release is found among tv releases and pre-releases`() {
+        val body = """
+            [
+              {"tag_name":"v1.1.0","draft":false,"prerelease":false,"assets":[{"name":"Bambi-1.1.0.apk","browser_download_url":"https://x/a.apk"}]},
+              {"tag_name":"windows-1.0.9-beta","draft":false,"prerelease":true,"assets":[{"name":"Bambi-Windows-Setup-1.0.9.exe","browser_download_url":"https://x/9.exe"}]},
+              {"tag_name":"windows-1.0.10-beta","draft":true,"prerelease":true,"assets":[{"name":"Bambi-Windows-Setup-1.0.10.exe","browser_download_url":"https://x/10.exe"}]},
+              {"tag_name":"windows-1.0.8-beta","draft":false,"prerelease":true,"assets":[{"name":"Bambi-Windows-Setup-1.0.8.exe","browser_download_url":"https://x/8.exe"}]}
+            ]
+        """.trimIndent()
+        val update = Updater.newestWindows(body)!!
+        assertEquals("1.0.9", update.version)
+        assertEquals("Bambi-Windows-Setup-1.0.9.exe", update.assetName)
     }
 
     @Test

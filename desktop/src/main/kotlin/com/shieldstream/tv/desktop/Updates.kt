@@ -30,15 +30,15 @@ import java.io.File
  * 6 horas; si hay una versión nueva para Windows (MSI o zip), se avisa, y solo al pulsar se descarga y se instala.
  */
 object Updater {
-    const val VERSION = "1.0.8"
+    const val VERSION = "1.0.9"
     const val REPO = "grodri99/bambi"
     const val CHECK_EVERY_MS = 6 * 3_600_000L
 
     data class Update(val version: String, val url: String, val assetName: String, val notes: String)
 
-    /** "v1.0.10" > "1.0.9"; lo que no sean números se ignora. */
+    /** "v1.0.10" > "1.0.9", "windows-1.0.9-beta" > "1.0.8": cuenta el primer número con puntos que aparezca. */
     fun isNewer(candidate: String, current: String = VERSION): Boolean {
-        fun parts(v: String) = v.trim().removePrefix("v").split('.', '-').map { it.toIntOrNull() ?: 0 }
+        fun parts(v: String) = (Regex("\\d+(\\.\\d+)*").find(v)?.value ?: "0").split('.').map { it.toIntOrNull() ?: 0 }
         val a = parts(candidate)
         val b = parts(current)
         for (i in 0 until maxOf(a.size, b.size)) {
@@ -63,14 +63,26 @@ object Updater {
             ?: assets.firstOrNull { it.first.endsWith(".msi", true) }
             ?: assets.firstOrNull { it.first.endsWith(".zip", true) && it.first.contains("windows", true) }
             ?: return null
-        return Update(tag.removePrefix("v"), asset.second, asset.first, (o["body"] as? JsonPrimitive)?.content.orEmpty())
+        val version = Regex("\\d+(\\.\\d+)*").find(tag)?.value ?: tag.removePrefix("v")
+        return Update(version, asset.second, asset.first, (o["body"] as? JsonPrimitive)?.content.orEmpty())
     }
+
+    /**
+     * De la lista de releases, la de Windows más nueva. No vale «la última» de GitHub: suele ser la de la tele y no
+     * cuenta las pre-releases (las de Windows son beta). Se saltan los borradores.
+     */
+    fun newestWindows(body: String): Update? =
+        (Json.parseToJsonElement(body) as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+            .filter { (it["draft"] as? JsonPrimitive)?.content != "true" }
+            .mapNotNull { parse(it.toString()) }
+            .filter { it.assetName.contains("windows", true) || it.assetName.endsWith(".msi", true) }
+            .maxWithOrNull { a, b -> if (isNewer(a.version, b.version)) 1 else if (isNewer(b.version, a.version)) -1 else 0 }
 
     suspend fun check(): Update? = withContext(Dispatchers.IO) {
         runCatching {
-            val request = Request.Builder().url("https://api.github.com/repos/$REPO/releases/latest")
+            val request = Request.Builder().url("https://api.github.com/repos/$REPO/releases?per_page=30")
                 .header("Accept", "application/vnd.github+json").header("User-Agent", "Bambi").build()
-            DesktopHttp.client.newCall(request).execute().use { r -> if (r.isSuccessful) parse(r.body?.string().orEmpty()) else null }
+            DesktopHttp.client.newCall(request).execute().use { r -> if (r.isSuccessful) newestWindows(r.body?.string().orEmpty()) else null }
         }.getOrNull()?.takeIf { isNewer(it.version) }
     }
 

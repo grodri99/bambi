@@ -4,6 +4,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,10 @@ fun main(args: Array<String>) {
         runCatching { File(System.getProperty("java.io.tmpdir"), "bambi-error.log").appendText(e.stackTraceToString() + "\n") }
     }
     val tour = System.getProperty("bambi.tour")?.let { Tour(File(it)) }
+    // En el recorrido de prueba, dibujo por software: las capturas de pantalla (Robot) a veces salen negras con DirectX.
+    // («…dx» en tour-solo.txt: con la tarjeta gráfica, como lo usa la gente, para medir destellos.)
+    val tourMode = System.getProperty("bambi.tour")?.let { runCatching { File(it, "tour-solo.txt").readText().trim() }.getOrNull() }.orEmpty()
+    if (tour != null && !tourMode.endsWith("dx") && System.getProperty("skiko.renderApi") == null) System.setProperty("skiko.renderApi", "SOFTWARE")
     application {
         val config = remember { ConfigStore() }
         Lang.current = AppLanguage.fromName(config.current.language) ?: AppLanguage.default()
@@ -62,32 +67,40 @@ fun main(args: Array<String>) {
         }
         val notice = remember { Notice() }
         val trakt = remember { TraktManager(config, profiles, session, repository) }
+        // yt-dlp (tráileres): se pone al día en segundo plano si tiene más de dos semanas. Y se deja cargado lo que usa
+        // el reproductor la primera vez (JNA, el script), para que dar a Reproducir no frene la ventana.
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    com.sun.jna.Native.POINTER_SIZE
+                    com.sun.jna.platform.win32.User32.INSTANCE
+                    BambiScript.options(null, false)
+                    BambiScript.parse("")
+                    MpvPlayer.find(config.current.mpvPath)
+                    // Guardar el progreso al salir del vídeo (la primera vez cargaba el serializador en el hilo de la
+                    // ventana y se veía un fotograma en blanco al volver a la ficha).
+                    kotlinx.serialization.json.Json.encodeToString(LibraryFile.serializer(), LibraryFile())
+                    kotlinx.serialization.json.Json.encodeToString(DesktopConfig.serializer(), DesktopConfig())
+                }
+                MpvPlayer.refreshYtDlp(config.current.mpvPath)
+            }
+        }
         // La ventana vuelve como la dejaste (tamaño, posición y monitor, maximizada o a pantalla completa).
         val saved = remember { WindowPrefs.load() }
         val windowState = rememberWindowState(
             width = saved?.width?.dp ?: 1440.dp,
             height = saved?.height?.dp ?: 880.dp,
             position = saved?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition(Alignment.Center),
-            placement = when {
-                saved?.fullscreen == true -> WindowPlacement.Fullscreen
-                saved?.maximized == true -> WindowPlacement.Maximized
-                else -> WindowPlacement.Floating
-            },
+            // Si se cerró a pantalla completa, se abre en ventana y se pone a pantalla completa ya abierta (abrir
+            // directamente así dejaba franjas blancas abajo y a la derecha con la pantalla escalada).
+            placement = if (saved?.maximized == true) WindowPlacement.Maximized else WindowPlacement.Floating,
         )
+        val fullscreen = remember { WindowFullscreen(windowState) }
         var userFullscreen by remember { mutableStateOf(saved?.fullscreen == true) }
         // El Escape que cerró el vídeo no debe, al soltarlo, cerrar también la ficha.
         var escapeForPlayer by remember { mutableStateOf(false) }
-        // A dónde volver al salir de pantalla completa (ventana normal o maximizada).
-        var restorePlacement by remember { mutableStateOf(if (saved?.maximized == true) WindowPlacement.Maximized else WindowPlacement.Floating) }
-        fun applyFullscreen(full: Boolean) {
-            if (full) {
-                if (windowState.placement != WindowPlacement.Fullscreen) restorePlacement = windowState.placement
-                windowState.placement = WindowPlacement.Fullscreen
-            } else if (windowState.placement == WindowPlacement.Fullscreen) {
-                windowState.placement = restorePlacement
-            }
-        }
-        PlayerControl.isFullscreen = { windowState.placement == WindowPlacement.Fullscreen }
+        fun applyFullscreen(full: Boolean) = fullscreen.set(full)
+        PlayerControl.isFullscreen = { fullscreen.active }
         PlayerControl.applyFullscreen = { full ->
             if (!full) userFullscreen = false
             applyFullscreen(full)
@@ -95,7 +108,7 @@ fun main(args: Array<String>) {
         Window(
             onCloseRequest = {
                 PlayerControl.session?.quit()
-                if (tour == null) WindowPrefs.save(windowState, userFullscreen)
+                if (tour == null) WindowPrefs.save(windowState, fullscreen.active, fullscreen.windowed)
                 exitApplication()
             },
             title = "Bambi",
@@ -128,8 +141,9 @@ fun main(args: Array<String>) {
                     if (event.type == KeyEventType.KeyUp) gate()
                     true
                 } else if (event.type == KeyEventType.KeyDown && event.key == Key.F11) {
-                    // Modo «10 pies»: pantalla completa con F11, como una tele.
-                    userFullscreen = !userFullscreen
+                    // Modo «10 pies»: pantalla completa con F11, como una tele. Siempre según cómo está de verdad (antes,
+                    // tras salir del vídeo a pantalla completa, había que pulsar F11 varias veces).
+                    userFullscreen = !fullscreen.active
                     applyFullscreen(userFullscreen)
                     true
                 } else if (event.type == KeyEventType.KeyUp && event.key == Key.Escape) {
@@ -217,10 +231,27 @@ fun main(args: Array<String>) {
                 )
             }
             }
+            androidx.compose.runtime.SideEffect {
+                fullscreen.window = window
+                // Debajo de la interfaz, negro: por el hueco que deja para el vídeo se veía el gris claro de Windows
+                // un instante al dar a Reproducir (el «destello blanco»).
+                val black = java.awt.Color.BLACK
+                if (window.background != black) {
+                    window.background = black
+                    window.contentPane.background = black
+                    window.rootPane.background = black
+                    window.layeredPane.background = black
+                }
+            }
+            // Se cerró a pantalla completa: se vuelve a poner, con la ventana ya abierta y colocada.
+            if (saved?.fullscreen == true && tour == null) LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(300)
+                fullscreen.set(true)
+            }
             if (tour == null) LaunchedEffect(Unit) { Gamepad.start(window) }
             if (tour != null) {
                 LaunchedEffect(Unit) {
-                    runCatching { tour.run(window, navigator, repository, session, profiles) }
+                    runCatching { tour.run(window, navigator, repository, session, profiles, trakt) }
                         .onFailure { tour.log("ERROR: ${it.stackTraceToString()}") }
                     exitApplication()
                 }
@@ -260,15 +291,22 @@ data class WindowPrefs(val x: Float, val y: Float, val width: Float, val height:
             kotlinx.serialization.json.Json.decodeFromString(serializer(), file.readText())
         }.getOrNull()?.takeIf { it.width >= 640 && it.height >= 400 }
 
-        fun save(state: androidx.compose.ui.window.WindowState, fullscreen: Boolean) {
+        /** [windowed]: cómo estaba la ventana antes de la pantalla completa (si lo está), que es lo que se guarda. */
+        fun save(
+            state: androidx.compose.ui.window.WindowState,
+            fullscreen: Boolean,
+            windowed: Triple<androidx.compose.ui.unit.DpSize, WindowPosition, WindowPlacement>? = null,
+        ) {
             runCatching {
-                val pos = state.position
+                val pos = windowed?.second ?: state.position
+                val size = windowed?.first ?: state.size
+                val placement = windowed?.third ?: state.placement
                 val prefs = WindowPrefs(
                     x = if (pos is WindowPosition.Absolute) pos.x.value else 0f,
                     y = if (pos is WindowPosition.Absolute) pos.y.value else 0f,
-                    width = state.size.width.value,
-                    height = state.size.height.value,
-                    maximized = state.placement == WindowPlacement.Maximized,
+                    width = size.width.value,
+                    height = size.height.value,
+                    maximized = placement == WindowPlacement.Maximized,
                     fullscreen = fullscreen,
                 )
                 file.parentFile?.mkdirs()

@@ -16,6 +16,11 @@ data class DesktopConfig(
     val debridKey: String = "",
     val mpvPath: String = "mpv",
     val spanishFirst: Boolean = true,
+    /**
+     * «Solo en español» del panel de fuentes. Se guarda (antes se quitaba al cambiar de episodio o de temporada) y
+     * también lo respetan «Reproducir», el siguiente episodio y las fuentes de reserva.
+     */
+    val spanishOnly: Boolean = false,
     /** Addons de Stremio (URL del manifest), como en Ajustes → Addons de la tele. */
     val addons: String = "",
     /** Aplicación de Trakt propia (trakt.tv/oauth/applications): Client ID y Client Secret. */

@@ -72,8 +72,15 @@ fun DetailsScreen(
     broken: BrokenSources = BrokenSources.default,
     /** Temporada con la que abrir (al pasar al siguiente episodio). */
     startSeason: Int? = null,
+    /** Episodio con el que empezar (desde «Seguir viendo»). */
+    startEpisode: Int? = null,
     autoNext: Boolean = true,
     matchRefresh: Boolean = false,
+    /** Clic en alguien del reparto: su ficha con todo lo que ha hecho. */
+    onPerson: (CastMember) -> Unit = {},
+    /** «Solo en español» (guardado en Ajustes): también para «Reproducir» y el siguiente episodio. */
+    spanishOnly: Boolean = false,
+    onSpanishOnly: (Boolean) -> Unit = {},
 ) {
     val details by produceState<Load<TitleDetails>>(Load.Loading, item) { value = load { repository.details(item) } }
     val info = (details as? Load.Ok)?.value
@@ -118,7 +125,15 @@ fun DetailsScreen(
     // Probar fuentes en orden hasta que una dé vídeo (o solo la elegida, si así está en Ajustes).
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var trying by remember(item) { mutableStateOf<String?>(null) }
-    fun play(candidates: List<DesktopSource>) {
+    // Panel de fuentes: se abre con el botón «Fuentes» (como en la tele), no siempre a la vista.
+    var showSources by remember(item) { mutableStateOf(DetailsTourHook.openSources) }
+    fun play(all: List<DesktopSource>) {
+        val candidates = if (spanishOnly) all.filter { it.spanish } else all
+        if (spanishOnly && candidates.isEmpty() && all.isNotEmpty()) {
+            onNotice("No hay fuentes en español para esto. Quita «Solo en español» en Fuentes para ver las demás.")
+            showSources = true
+            return
+        }
         if (trying != null || candidates.isEmpty()) return
         trying = "Preparando…"
         scope.launch {
@@ -142,6 +157,11 @@ fun DetailsScreen(
     LaunchedEffect(autoPlay, episodes) {
         if (!autoPlay || !isShow || episode != null) return@LaunchedEffect
         val list = (episodes as? Load.Ok)?.value ?: return@LaunchedEffect
+        // Desde «Seguir viendo»: justo ese episodio (aunque haya otros sin ver antes).
+        list.firstOrNull { startEpisode != null && it.season == startSeason && it.number == startEpisode }?.let {
+            episode = it
+            return@LaunchedEffect
+        }
         val pending = list.firstOrNull { library.progressFor(full, it.season, it.number)?.finished != true }
         // Temporada terminada: se sigue con la primera de la siguiente.
         val nextSeason = info?.seasons?.map { it.number }?.filter { it > (season ?: 0) }?.minOrNull()
@@ -150,7 +170,7 @@ fun DetailsScreen(
     LaunchedEffect(sources, autoPlay) {
         val state = (sources as? Load.Ok)?.value ?: return@LaunchedEffect
         // Se espera a que respondan todos los buscadores para elegir la mejor.
-        if (state.pending.isNotEmpty() && state.sources.none { it.cached }) return@LaunchedEffect
+        if (state.pending.isNotEmpty() && state.sources.none { it.cached && (!spanishOnly || it.spanish) }) return@LaunchedEffect
         val list = state.sources
         if (autoPlay) {
             autoPlay = false
@@ -158,7 +178,6 @@ fun DetailsScreen(
         }
     }
     // Panel de fuentes: se abre con el botón «Fuentes» (como en la tele), no siempre a la vista.
-    var showSources by remember(item) { mutableStateOf(DetailsTourHook.openSources) }
     androidx.compose.runtime.DisposableEffect(showSources) {
         if (!showSources) return@DisposableEffect onDispose {}
         // Mientras está abierto, Escape / «Atrás» lo cierran; al cerrarse, Atrás vuelve a cambiar de pantalla.
@@ -207,7 +226,23 @@ fun DetailsScreen(
                         }
                         val listed = library.inMyList(full)
                         PillButton(if (listed) "En Mi lista" else "Mi lista", if (listed) AppIcons.Check else AppIcons.Add) { library.toggleMyList(full) }
-                        info?.trailerKey?.let { key -> PillButton("Tráiler", null) { openInBrowser("https://www.youtube.com/watch?v=$key") } }
+                        // Más listas (propias): añadir o quitar, o crear una nueva con este título.
+                        ListsButton(library, full)
+                        // Tráiler dentro de Bambi, con el mismo reproductor (en la tele, igual); el navegador solo si falla.
+                        info?.trailerKey?.let { key ->
+                            PillButton("Tráiler", AppIcons.Play) {
+                                val url = "https://www.youtube.com/watch?v=$key"
+                                onPlay(
+                                    PlayRequest(
+                                        source = DesktopSource("Tráiler", "YouTube", com.shieldstream.tv.model.Quality.UNKNOWN, cached = true, url = url),
+                                        item = full,
+                                        episode = null,
+                                        title = "${full.title} · Tráiler",
+                                        trailer = true,
+                                    ),
+                                )
+                            }
+                        }
                         if (!isShow) {
                             val watched = library.progressFor(full)?.finished == true
                             PillButton(if (watched) "Vista" else "Marcar vista", if (watched) AppIcons.Check else null) {
@@ -230,9 +265,20 @@ fun DetailsScreen(
                                 FilterChip(
                                     selected = season == s.number,
                                     onClick = { season = s.number; episode = null },
-                                    label = { Text(s.name.ifBlank { "Temporada ${s.number}" }) },
+                                    label = {
+                                        // «Temporada 2 · 2024» en la pestaña; la fecha entera, debajo.
+                                        Text(listOfNotNull(s.name.ifBlank { "Temporada ${s.number}" }, s.airDate?.take(4)).joinToString(" · "))
+                                    },
                                 )
                             }
+                        }
+                        // De la temporada elegida: cuándo empezó (día, mes y año) y cuántos episodios tiene.
+                        info?.seasons?.firstOrNull { it.number == season }?.let { s ->
+                            val facts = listOfNotNull(
+                                s.airDate?.let { "Estreno: " + formatDate(it, long = true) },
+                                "${s.episodeCount} episodios".takeIf { s.episodeCount > 0 },
+                            )
+                            if (facts.isNotEmpty()) Text(facts.joinToString("  ·  "), color = BambiColors.Text, fontSize = 14.sp, modifier = Modifier.padding(bottom = 2.dp))
                         }
                         // Marcar la temporada entera, como en la tele.
                         val list = (episodes as? Load.Ok)?.value.orEmpty()
@@ -272,7 +318,7 @@ fun DetailsScreen(
                     }
                 }
                 if (showCast && info?.cast.orEmpty().isNotEmpty()) {
-                    item(key = "cast") { CastRow(info!!.cast) }
+                    item(key = "cast") { CastRow(info!!.cast, onPerson) }
                 }
                 info?.saga?.let { saga ->
                     item(key = "saga") {
@@ -307,16 +353,18 @@ fun DetailsScreen(
         ) {
             SourcesPanel(
                 sources = sources,
-                subtitle = episode?.let { "T${it.season} E${it.number} · ${it.title}" },
+                subtitle = episode?.let { "${full.title} · T${it.season} E${it.number} · ${it.title}" } ?: full.title.takeIf { !isShow },
                 hint = if (isShow) "Elige un episodio para ver sus fuentes." else "Buscando fuentes…",
                 trying = trying,
                 broken = broken,
+                spanishOnly = spanishOnly,
+                onSpanishOnly = onSpanishOnly,
                 onPlay = { chosen ->
                     val list = (sources as? Load.Ok)?.value?.sources.orEmpty().filterNot { broken.isBroken(it.title) }
                     play(if (keepChosenSource) listOf(chosen) else listOf(chosen) + list.filter { it != chosen })
                 },
                 onClose = { showSources = false },
-                modifier = Modifier.width(640.dp).fillMaxHeight().padding(top = 96.dp, bottom = 24.dp, end = 24.dp)
+                modifier = Modifier.width(700.dp).fillMaxHeight().padding(top = 96.dp, bottom = 24.dp, end = 24.dp)
                     // Que el clic dentro del panel no lo cierre.
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {},
             )
@@ -340,11 +388,13 @@ private fun Info(item: CatalogItem, info: TitleDetails?) {
         MetaLine(
             age = info?.ageRating,
             parts = listOfNotNull(
-                item.year?.toString(),
+                // La fecha entera (día, mes y año), no solo el año.
+                info?.releaseDate?.let { formatDate(it) } ?: item.year?.toString(),
                 info?.runtimeMinutes?.takeIf { it > 0 }?.let { if (it >= 60) "${it / 60} h ${it % 60} min" else "$it min" },
                 info?.genres?.take(3)?.joinToString(", ")?.takeIf { it.isNotBlank() },
             ),
             rating = item.rating,
+            imdb = info?.imdbRating,
         )
         info?.tagline?.let {
             Spacer(Modifier.height(10.dp))
@@ -383,139 +433,13 @@ private fun EpisodeRow(episode: Episode, selected: Boolean, progress: Float?, wa
                 if (watched) Icon(AppIcons.Check, contentDescription = "Visto", tint = BambiColors.Accent, modifier = Modifier.size(16.dp))
             }
             Text(
-                listOfNotNull(episode.airDate, episode.runtimeMinutes?.let { "$it min" }).joinToString("  ·  "),
+                listOfNotNull(episode.airDate?.let { formatDate(it) }, episode.runtimeMinutes?.let { "$it min" }).joinToString("  ·  "),
                 color = BambiColors.Muted,
                 fontSize = 12.sp,
             )
             Spacer(Modifier.height(4.dp))
             Text(episode.overview, color = BambiColors.Muted, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
-    }
-}
-
-@Composable
-private fun SourcesPanel(
-    sources: Load<SourcesState>?,
-    subtitle: String?,
-    hint: String,
-    trying: String?,
-    broken: BrokenSources,
-    onPlay: (DesktopSource) -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var spanishOnly by remember { mutableStateOf(false) }
-    // Cada buscador es un desplegable; de primeras, todos cerrados (como en la tele).
-    val open = remember(subtitle) { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
-    // Panel de cristal oscuro sobre el fondo de la ficha, con filo fino.
-    Column(
-        modifier.shadow(32.dp, BambiShapes.Panel).clip(BambiShapes.Panel).background(BambiColors.BackgroundRaised)
-            .border(1.dp, BambiColors.Stroke, BambiShapes.Panel).padding(24.dp),
-    ) {
-        val count = (sources as? Load.Ok)?.value?.sources?.size
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (count != null) "Fuentes · $count" else "Fuentes",
-                color = BambiColors.Text,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            // Como en la tele: «Solo en español».
-            FilterChip(selected = spanishOnly, onClick = { spanishOnly = !spanishOnly }, label = { Text("Solo en español") })
-            Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(BambiColors.Glass)
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.Close, contentDescription = "Cerrar", tint = Color.White, modifier = Modifier.size(20.dp)) }
-        }
-        subtitle?.let { Text(it, color = BambiColors.Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)) }
-        trying?.let {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 8.dp)) {
-                CircularProgressIndicator(color = BambiColors.Accent, strokeWidth = 2.dp, modifier = Modifier.width(18.dp).height(18.dp))
-                Text(it, color = BambiColors.Muted, fontSize = 13.sp)
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        when (sources) {
-            null -> Text(hint, color = BambiColors.Muted)
-            Load.Loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator(color = BambiColors.Accent, strokeWidth = 2.dp, modifier = Modifier.width(20.dp).height(20.dp))
-                Text("Buscando fuentes…", color = BambiColors.Muted)
-            }
-            is Load.Failed -> Text(sources.message, color = BambiColors.Text)
-            is Load.Ok -> {
-                val state = sources.value
-                // Como en la tele: una sección por buscador; las que aún buscan o no han dado nada, con su motivo.
-                val visible = state.sources.filter { !broken.isBroken(it.title) && (!spanishOnly || it.spanish) }
-                val sections = visible.groupBy { it.section }
-                    .toList()
-                    .sortedByDescending { (name, _) -> name == "En castellano" }
-                // Si solo hay un buscador, se abre solo.
-                val single = sections.size == 1
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    sections.forEach { (name, list) ->
-                        val expanded = open[name] ?: single
-                        item(key = "h-$name") {
-                            SourceGroupHeader(name.ifBlank { "Fuentes" }, list, expanded) { open[name] = !expanded }
-                        }
-                        if (expanded) items(list, key = { it.section + it.url }) { source ->
-                            // Clic derecho: descartar una fuente rota (se restaura en Ajustes).
-                            androidx.compose.foundation.ContextMenuArea(items = {
-                                listOf(androidx.compose.foundation.ContextMenuItem("Descartar fuente (no funciona)") { broken.discard(source.title) })
-                            }) { SourceRow(source, onClick = { onPlay(source) }) }
-                        }
-                    }
-                    state.pending.forEach { name -> item(key = "p-$name") { SectionHeader(name, "buscando…") } }
-                    state.unavailable.forEach { (name, why) -> item(key = "u-$name") { SectionHeader(name, why) } }
-                    if (visible.isEmpty() && state.pending.isEmpty() && state.unavailable.isEmpty()) {
-                        item(key = "empty") { Text(if (spanishOnly) "No hay fuentes en español." else "No hay fuentes para esto ahora mismo.", color = BambiColors.Muted) }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SourceRow(source: DesktopSource, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered = interaction.collectIsHoveredAsState().value || interaction.collectIsFocusedAsState().value
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        Modifier.fillMaxWidth().clip(shape)
-            .background(if (hovered) BambiColors.SurfaceHigh else Color.Transparent)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Calidad: 4K en dorado, como una etiqueta premium; lo desconocido, discreto.
-        val uhd = source.quality == com.shieldstream.tv.model.Quality.UHD_2160
-        Box(
-            Modifier.width(56.dp).clip(BambiShapes.Badge)
-                .background(if (uhd) BambiColors.Gold.copy(alpha = 0.12f) else BambiColors.SurfaceHigh)
-                .border(1.dp, if (uhd) BambiColors.Gold.copy(alpha = 0.6f) else Color.Transparent, BambiShapes.Badge)
-                .padding(vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                source.quality.label.takeIf { it != "?" } ?: "—",
-                color = if (uhd) BambiColors.Gold else BambiColors.Text,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            Text(source.title, color = BambiColors.Text, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (source.detail.isNotBlank()) {
-                Text(source.detail, color = BambiColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (source.cached) Text("⚡", color = BambiColors.Cached, fontSize = 16.sp)
     }
 }
 
@@ -526,50 +450,6 @@ fun formatClock(seconds: Double): String {
     val m = (total % 3600) / 60
     val sec = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
-}
-
-@Composable
-private fun SectionHeader(title: String, detail: String) {
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = BambiColors.Text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Spacer(Modifier.width(8.dp))
-        Text(detail, color = BambiColors.Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-
-/** Un buscador (Torrentio, Comet…) como desplegable: nombre, cuántas, cuántas en caché y la mejor calidad. */
-@Composable
-private fun SourceGroupHeader(title: String, list: List<DesktopSource>, expanded: Boolean, onToggle: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered = interaction.collectIsHoveredAsState().value || interaction.collectIsFocusedAsState().value
-    val rotation by androidx.compose.animation.core.animateFloatAsState(if (expanded) 180f else 0f)
-    val cached = list.count { it.cached }
-    val best = list.map { it.quality }.filter { it.rank > 0 }.maxByOrNull { it.rank }
-    Row(
-        Modifier.fillMaxWidth().padding(top = 6.dp).clip(BambiShapes.Control)
-            .background(if (hovered || expanded) BambiColors.SurfaceHigh else BambiColors.Surface)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(title, color = BambiColors.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text("${list.size}", color = BambiColors.Muted, fontSize = 14.sp)
-        Spacer(Modifier.weight(1f))
-        if (cached > 0) Text("⚡ $cached", color = BambiColors.Cached, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        best?.let {
-            val uhd = it == com.shieldstream.tv.model.Quality.UHD_2160
-            Text(
-                "hasta ${it.label}",
-                color = if (uhd) BambiColors.Gold else BambiColors.Muted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Icon(AppIcons.ExpandMore, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = rotation })
-    }
 }
 
 /** Tu nota en Trakt (1–10), como «Puntuar» en la tele. Pulsar la nota que ya tienes la quita. */
@@ -605,19 +485,36 @@ private fun TraktRating(trakt: TraktManager, item: CatalogItem) {
     }
 }
 
-/** Reparto: foto, nombre y personaje (se oculta en Ajustes → «Reparto en las fichas»). */
+/**
+ * Reparto: foto, nombre y personaje (se oculta en Ajustes → «Reparto en las fichas»). Clic en una persona: su ficha
+ * con todo lo que ha hecho, como en la tele.
+ */
 @Composable
-private fun CastRow(cast: List<CastMember>) {
+private fun CastRow(cast: List<CastMember>, onPerson: (CastMember) -> Unit) {
     Column(Modifier.padding(top = 24.dp)) {
         Text("Reparto", color = BambiColors.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         BambiLazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
             items(cast, key = { it.name + it.role }) { c ->
-                Column(Modifier.width(96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(84.dp).clip(androidx.compose.foundation.shape.CircleShape).background(BambiColors.SurfaceHigh), contentAlignment = Alignment.Center) {
+                val interaction = remember { MutableInteractionSource() }
+                val hovered = interaction.collectIsHoveredAsState().value || interaction.collectIsFocusedAsState().value
+                Column(
+                    Modifier.width(96.dp).clip(RoundedCornerShape(10.dp))
+                        .hoverable(interaction)
+                        .clickable(interactionSource = interaction, indication = null, enabled = c.id != null) { onPerson(c) }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(84.dp)
+                            .border(2.dp, if (hovered && c.id != null) Color.White else Color.Transparent, androidx.compose.foundation.shape.CircleShape)
+                            .padding(if (hovered && c.id != null) 3.dp else 0.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape).background(BambiColors.SurfaceHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Text(c.name.take(1), color = BambiColors.Muted, fontWeight = FontWeight.Bold)
                         RemoteImage(c.photoUrl, Modifier.fillMaxSize())
                     }
-                    Text(c.name, color = BambiColors.Text, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                    Text(c.name, color = if (hovered) Color.White else BambiColors.Text, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
                     c.role?.let { Text(it, color = BambiColors.Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
                 }
             }

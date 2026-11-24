@@ -181,12 +181,15 @@ fun LogoImage(
     alignment: Alignment = Alignment.BottomStart,
     placeholder: @Composable () -> Unit = {},
 ) {
-    val bitmap by produceState<ImageBitmap?>(null, url) { value = ImageCache.load(url) }
+    // El logo y si es oscuro se calculan fuera del hilo de la interfaz (leer sus píxeles en él frenaba la ficha).
+    val loaded by produceState<Pair<ImageBitmap, Boolean>?>(null, url) {
+        value = ImageCache.load(url)?.let { b -> b to kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { LogoTone.isDark(b) } }
+    }
     Box(modifier) {
-        val b = bitmap
+        val b = loaded?.first
         if (b == null) placeholder()
         else {
-            val dark = remember(b) { LogoTone.isDark(b) }
+            val dark = loaded?.second == true
             Image(
                 b,
                 contentDescription = null,
@@ -342,4 +345,21 @@ fun AdaptiveScale(content: @Composable () -> Unit) {
             LocalBaseDensity provides base,
         ) { content() }
     }
+}
+
+/**
+ * Fecha de TMDB («2024-03-14») como se lee: «14 mar 2024» (o «14 Mar 2024» en inglés). Si no es una fecha, tal cual.
+ * Con [long], el mes entero: «14 de marzo de 2024».
+ */
+fun formatDate(iso: String, long: Boolean = false): String {
+    val date = runCatching { java.time.LocalDate.parse(iso.take(10)) }.getOrNull() ?: return iso
+    val english = com.shieldstream.tv.model.Lang.isEnglish
+    val locale = java.util.Locale.forLanguageTag(if (english) "en" else "es")
+    val pattern = when {
+        long && english -> "MMMM d, yyyy"
+        long -> "d 'de' MMMM 'de' yyyy"
+        english -> "MMM d, yyyy"
+        else -> "d MMM yyyy"
+    }
+    return date.format(java.time.format.DateTimeFormatter.ofPattern(pattern, locale)).replace(".", "")
 }
