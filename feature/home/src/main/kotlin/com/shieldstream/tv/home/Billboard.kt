@@ -34,12 +34,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +65,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.currentStateAsState
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.shieldstream.tv.model.CatalogItem
 import com.shieldstream.tv.model.Category
@@ -85,27 +90,47 @@ private val CardShape = RoundedCornerShape(18.dp)
 
 /**
  * Portada grande del Inicio: los destacados de la semana. ◀ ▶ cambia de destacado (en bucle) y además
- * avanza solo cada 10 s. OK abre la ficha.
+ * avanza solo cada 10 s. OK abre la ficha. Con la portada enfocada se reproduce el tráiler mudo.
  */
 @Composable
 internal fun FeaturedCarousel(
     items: List<FeaturedItem>,
     onOpen: (CatalogItem) -> Unit,
+    trailersEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var index by rememberSaveable { mutableIntStateOf(0) }
     if (index >= items.size) index = 0
     var focused by remember { mutableStateOf(false) }
-    // Cambiar de destacado a mano reinicia la cuenta (el efecto depende de index).
-    // Interfaz ligera (Ajustes): sin avance automático para ahorrar trabajo en cajas lentas.
+    // Interfaz ligera (Ajustes): sin avance automático ni tráiler para ahorrar trabajo en cajas lentas.
     val lightweightUi = LocalLightweightUi.current
-    LaunchedEffect(index, items.size, lightweightUi) {
-        if (!lightweightUi && items.size > 1) {
-            delay(10_000)
+    val current = items[index]
+    // Con la app en segundo plano (botón Home) el WebView se para y se destruye.
+    val inForeground by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val resumed = inForeground.isAtLeast(Lifecycle.State.RESUMED)
+
+    // Clave del tráiler en curso. Se limpia al cambiar de destacado, al perder el foco o al salir de la app.
+    val trailerState = remember { mutableStateOf<String?>(null) }
+    val trailerKey = trailerState.value
+    val scope = rememberCoroutineScope()
+    val trailerSession = remember(scope) {
+        BillboardTrailerSession(scope) { trailerState.value = it }
+    }
+    LaunchedEffect(index, focused, trailersEnabled, lightweightUi, resumed, current.trailerKey) {
+        trailerSession.request(
+            trailerToPlay(current.trailerKey, trailersEnabled, lightweightUi, focused, resumed),
+        )
+    }
+    DisposableEffect(trailerSession) {
+        onDispose { trailerSession.dispose() }
+    }
+
+    LaunchedEffect(index, items.size, lightweightUi, trailerKey) {
+        if (shouldRotateCarousel(lightweightUi, items.size, trailerKey != null)) {
+            delay(BillboardTrailerTiming.ROTATION_MS)
             index = (index + 1) % items.size
         }
     }
-    val current = items[index]
     Box(
         modifier
             .fillMaxWidth()
@@ -130,7 +155,7 @@ internal fun FeaturedCarousel(
             .tvClickable { onOpen(current.item) },
     ) {
         Crossfade(targetState = current, animationSpec = tween(500), label = "featured") { featured ->
-            FeaturedSlide(featured)
+            FeaturedSlide(featured, trailerKey = trailerKey.takeIf { featured.item.key == current.item.key })
         }
         if (items.size > 1) {
             Row(
@@ -152,7 +177,7 @@ internal fun FeaturedCarousel(
 }
 
 @Composable
-private fun FeaturedSlide(featured: FeaturedItem) {
+private fun FeaturedSlide(featured: FeaturedItem, trailerKey: String?) {
     val item = featured.item
     Box(Modifier.fillMaxSize().background(Color(0xFF111114))) {
         AsyncImage(
@@ -165,6 +190,12 @@ private fun FeaturedSlide(featured: FeaturedItem) {
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        // Encima del arte y debajo del texto: el vídeo entra con fundido cuando el reproductor ya carga.
+        if (trailerKey != null) {
+            key(trailerKey) {
+                TrailerPreview(videoKey = trailerKey, modifier = Modifier.fillMaxSize())
+            }
+        }
         Box(
             Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(

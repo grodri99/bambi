@@ -133,6 +133,8 @@ aparece un código (y un QR), lo escribes en el móvil y listo.
 
 - **Portada** estilo Netflix con logos de los títulos, edad recomendada, nota y etiquetas ("Recién llegada",
   "La película del momento"…).
+- **Tráiler en la portada:** con el destacado enfocado, a los 2,5 s se reproduce el avance **sin sonido** y se
+  detiene al moverte, como en Netflix. Se puede desactivar en Ajustes y se ignora con la interfaz ligera.
 - Pestañas **Inicio · Series · Películas · Mi lista** y **categorías** (Dramas, Thrillers, Estados de ánimo,
   Policiacas…). En Ajustes eliges qué categorías se ven.
 - **Mi lista**: guarda películas y series desde su ficha; tiene su propia pestaña (con filtro Todo / Series /

@@ -207,6 +207,18 @@ internal fun HighResBackdropsCard(viewModel: SettingsViewModel = hiltViewModel()
     )
 }
 
+/** Tráiler mudo sobre el destacado, como en Netflix. */
+@Composable
+internal fun BillboardTrailersCard(viewModel: SettingsViewModel = hiltViewModel()) {
+    val enabled by viewModel.billboardTrailers.collectAsStateWithLifecycle()
+    OnOffCard(
+        title = localizedStringResource(StringsR.string.settings_billboard_trailers),
+        summary = localizedStringResource(StringsR.string.settings_billboard_trailers_summary),
+        enabled = enabled,
+        onChange = viewModel::setBillboardTrailers,
+    )
+}
+
 @Composable
 internal fun ShowCastCard(viewModel: SettingsViewModel = hiltViewModel()) {
     val enabled by viewModel.showCast.collectAsStateWithLifecycle()

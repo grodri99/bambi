@@ -143,6 +143,8 @@
     <string name="settings_soft_backdrops_summary">Blurs the artwork behind the Home rows so titles stand out.</string>
     <string name="settings_high_res_backdrops">High-resolution backgrounds</string>
     <string name="settings_high_res_backdrops_summary">Sharper full-screen artwork on Home. Uses more data and image memory; ignored with Lightweight UI.</string>
+    <string name="settings_billboard_trailers">Trailers on the billboard</string>
+    <string name="settings_billboard_trailers_summary">Plays the muted trailer after 2.5 s with the featured title in focus, and stops when you move away. Ignored with Lightweight UI.</string>
     <string name="settings_smaller_backdrops_no_automatic_rotation_or_focus">Smaller backdrops, no automatic rotation or focus animations. For low-power TV boxes.</string>
     <string name="settings_on">On</string>
     <string name="settings_off_9847b4">Off</string>

@@ -106,6 +106,10 @@ class HomeViewModel @Inject constructor(
     val hiddenCategories: StateFlow<Set<String>> = settings.hiddenCategories
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
+    /** Tráilers mudos en la portada (Ajustes). La interfaz ligera los desactiva siempre. */
+    val billboardTrailers: StateFlow<Boolean> = settings.billboardTrailers
+        .stateIn(viewModelScope, SharingStarted.Eagerly, settings.billboardTrailersEnabled)
+
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
 
     private val continueRows = MutableStateFlow<List<CatalogRow>?>(null)

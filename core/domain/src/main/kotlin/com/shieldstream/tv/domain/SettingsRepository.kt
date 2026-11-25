@@ -39,6 +39,11 @@ interface SettingsRepository {
     val highResBackdropsEnabled: Boolean
     suspend fun setHighResBackdrops(enabled: Boolean)
 
+    /** Muted trailer over the featured billboard, like Netflix. App-wide; on by default. */
+    val billboardTrailers: Flow<Boolean>
+    val billboardTrailersEnabled: Boolean
+    suspend fun setBillboardTrailers(enabled: Boolean)
+
     val seekThumbnails: Flow<Boolean>
     suspend fun setSeekThumbnails(enabled: Boolean)
 

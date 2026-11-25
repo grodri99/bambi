@@ -42,6 +42,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -631,6 +632,30 @@ class HomeViewModelsTest {
         coVerify(exactly = 0) { catalog.getHome(HomeFilter.MOVIES, any()) }
     }
 
+    @Test
+    fun `billboard trailers follow the settings flow`() = runTest {
+        val billboard = MutableStateFlow(true)
+        val settings = mockk<SettingsRepository> {
+            every { hiddenCategories } returns MutableStateFlow(emptySet())
+            every { homeRowItemLimit } returns MutableStateFlow(SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT)
+            every { billboardTrailers } returns billboard
+            every { billboardTrailersEnabled } returns true
+        }
+        val viewModel = homeViewModel(
+            catalog = mockk(relaxed = true),
+            trakt = mockk(relaxed = true),
+            active = profileFlow(),
+            settings = settings,
+        )
+
+        assertTrue(viewModel.billboardTrailers.value)
+
+        billboard.value = false
+        advanceUntilIdle()
+
+        assertFalse(viewModel.billboardTrailers.value)
+    }
+
     private fun MyListViewModel.content() = uiState.value as MyListUiState.Content
 
     private fun HomeViewModel.rowIds() = (uiState.value as HomeUiState.Content).rows.map { it.id }
@@ -661,12 +686,13 @@ class HomeViewModelsTest {
         episodeTracking: EpisodeTrackingRepository = tracking(),
         myList: MyListRepository? = null,
         rowItemLimit: MutableStateFlow<Int> = MutableStateFlow(SettingsRepository.DEFAULT_HOME_ROW_ITEM_LIMIT),
+        settings: SettingsRepository = homeSettings(rowItemLimit),
     ) = HomeViewModel(
         catalogRepository = catalog,
         watchProgress = watchProgress ?: mockk { every { this@mockk.progress } returns MutableStateFlow(progress) },
         episodeReleases = mockk(),
         tracking = episodeTracking,
-        settings = homeSettings(rowItemLimit),
+        settings = settings,
         myList = myList ?: mockk { every { entries } returns MutableStateFlow(emptyList()) },
         profiles = mockk { every { this@mockk.active } returns active },
         trakt = trakt,
@@ -679,6 +705,8 @@ class HomeViewModelsTest {
     ) = mockk<SettingsRepository> {
         every { hiddenCategories } returns MutableStateFlow(emptySet())
         every { homeRowItemLimit } returns rowItemLimit
+        every { billboardTrailers } returns MutableStateFlow(true)
+        every { billboardTrailersEnabled } returns true
     }
 
     private fun catalog(base: CatalogItem, vararg hydrated: CatalogItem): CatalogRepository {

@@ -323,6 +323,7 @@ private fun SettingsList(
             item { IntroAlwaysCard() }
             item { SoftBackdropsCard() }
             item { HighResBackdropsCard() }
+            item { BillboardTrailersCard() }
             item { SectionTitle("Idioma · Language") }
             item { LanguageCard(current = state.language, onApply = onLanguage) }
             item { SectionTitle(localizedStringResource(StringsR.string.settings_playback)) }
